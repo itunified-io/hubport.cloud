@@ -52,6 +52,8 @@ export function shell(title: string, body: string): string {
         <a href="/health" class="text-xs text-zinc-500 hover:text-zinc-300">API Health</a>
         <span class="text-xs text-zinc-600">|</span>
         <span class="text-xs text-zinc-500">Platform Administration</span>
+        <span class="text-xs text-zinc-600">|</span>
+        <a href="/cdn-cgi/access/logout" class="text-xs text-zinc-500 hover:text-[#ef4444] transition-colors">Logout</a>
       </div>
     </div>
   </nav>
@@ -59,7 +61,7 @@ export function shell(title: string, body: string): string {
   <footer class="max-w-6xl mx-auto px-6 py-6 border-t border-white/[.04] mt-12">
     <div class="flex items-center justify-between text-xs text-zinc-600">
       <span>hubport.cloud — ITUnified UG</span>
-      <span>Admin Portal v0.1.0</span>
+      <span>Admin Portal v2026.03.18</span>
     </div>
   </footer>
 </body>
