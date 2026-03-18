@@ -1,0 +1,120 @@
+# hubport.cloud — Self-Hosted Docker Stack
+# Documentation: https://hubport.cloud/docs
+# License: GPL-3.0-or-later
+
+services:
+  hubport:
+    image: ghcr.io/itunified-io/hubport.cloud:${HUBPORT_VERSION:-latest}
+    ports:
+      - "3000:3000"   # hub-app (React SPA)
+      - "3001:3001"   # hub-api (Fastify)
+      - "8080:8080"   # Setup wizard
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://hubport:${DB_PASSWORD}@postgres:5432/hubport
+      - VAULT_ADDR=http://vault:8200
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=hubport
+      - TENANT_ID=${TENANT_ID}
+      - CENTRAL_API_URL=https://api.hubport.cloud
+      - APP_PORT=3000
+      - API_PORT=3001
+      - WIZARD_PORT=8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=hubport
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=hubport
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hubport"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault-data:/vault/data
+      - ./config/vault:/vault/config
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -config=/vault/config/vault.hcl
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    ports:
+      - "8180:8080"
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
+      - KC_DB_SCHEMA=keycloak
+      - KC_DB_USERNAME=hubport
+      - KC_DB_PASSWORD=${DB_PASSWORD}
+      - KEYCLOAK_ADMIN=${KC_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KC_ADMIN_PASSWORD}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run --token ${CF_TUNNEL_TOKEN}
+    depends_on:
+      hubport:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: CF WARP for device posture checks
+  # Uncomment to enable (configured via setup wizard step 6)
+  # warp:
+  #   image: cloudflare/cloudflare-warp:latest
+  #   cap_add:
+  #     - NET_ADMIN
+  #   volumes:
+  #     - warp-data:/var/lib/cloudflare-warp
+  #   restart: unless-stopped
+
+volumes:
+  postgres-data:
+  vault-data:
+  # warp-data:
+
+networks:
+  default:
+    name: hubport
