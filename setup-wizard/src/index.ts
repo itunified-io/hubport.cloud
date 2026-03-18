@@ -3,12 +3,13 @@ import { renderWizard, renderStep } from './ui/wizard-page.js';
 import { tenantStep } from './steps/tenant-register.js';
 import { dbStep } from './steps/db-init.js';
 import { vaultStep } from './steps/vault-init.js';
+import { encryptionKeyStep } from './steps/encryption-key.js';
 import { keycloakStep } from './steps/keycloak-setup.js';
 import { tunnelStep } from './steps/cf-tunnel.js';
 import { warpStep } from './steps/warp-setup.js';
 import { adminStep } from './steps/admin-user.js';
 
-const STEPS = [tenantStep, dbStep, vaultStep, keycloakStep, tunnelStep, warpStep, adminStep];
+const STEPS = [tenantStep, dbStep, vaultStep, encryptionKeyStep, keycloakStep, tunnelStep, warpStep, adminStep];
 
 const app = Fastify({ logger: true });
 

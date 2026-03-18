@@ -6,7 +6,7 @@ const KC_ADMIN_PASSWORD = process.env.KC_ADMIN_PASSWORD || '';
 const REALM = 'hubport';
 
 export const adminStep: WizardStep = {
-  number: 7,
+  number: 8,
   id: 'admin-user',
   title: 'Admin User Creation',
   description: 'Create the first admin user in Keycloak for your congregation. This user will have full access to manage publishers, territories, and settings.',

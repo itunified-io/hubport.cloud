@@ -1,6 +1,6 @@
 /** Wizard step interface — each step is self-contained and idempotent. */
 export interface WizardStep {
-  /** Step number (1-7) */
+  /** Step number (1-8) */
   number: number;
   /** Machine name */
   id: string;

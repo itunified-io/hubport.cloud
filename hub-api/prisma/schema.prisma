@@ -9,10 +9,10 @@ datasource db {
 
 model Publisher {
   id        String   @id @default(uuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
+  firstName String   /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
+  lastName  String   /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
+  email     String?  /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
+  phone     String?  /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
   role      String   @default("publisher") // admin, elder, publisher, viewer
   status    String   @default("active") // active, inactive, away
   createdAt DateTime @default(now())

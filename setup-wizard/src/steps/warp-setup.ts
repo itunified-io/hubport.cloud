@@ -1,7 +1,7 @@
 import type { WizardStep, StepStatus, StepResult } from './types.js';
 
 export const warpStep: WizardStep = {
-  number: 6,
+  number: 7,
   id: 'warp-setup',
   title: 'CF WARP Client (Optional)',
   description: 'Enable Cloudflare WARP for device posture checks. This is optional — skip if you only need Keycloak for authentication.',

@@ -1,7 +1,7 @@
 import type { WizardStep, StepStatus, StepResult } from './types.js';
 
 export const tunnelStep: WizardStep = {
-  number: 5,
+  number: 6,
   id: 'cf-tunnel',
   title: 'Cloudflare Tunnel',
   description: 'Verify connectivity through your CF Tunnel. The tunnel token was provided in your signup email.',

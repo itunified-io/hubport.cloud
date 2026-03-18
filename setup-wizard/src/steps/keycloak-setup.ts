@@ -22,7 +22,7 @@ async function getAdminToken(): Promise<string | null> {
 }
 
 export const keycloakStep: WizardStep = {
-  number: 4,
+  number: 5,
   id: 'keycloak-setup',
   title: 'Keycloak Realm Setup',
   description: 'Create the hubport realm, configure OIDC client for the app, and set up RBAC roles (admin, elder, publisher, viewer).',
