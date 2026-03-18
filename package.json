@@ -1,0 +1,12 @@
+{
+  "name": "@itunified-io/hubport.cloud",
+  "private": true,
+  "version": "2026.03.18.1",
+  "license": "GPL-3.0-or-later",
+  "workspaces": ["central-api"],
+  "scripts": {
+    "build": "npm run build --workspace=central-api",
+    "test": "npm run test --workspace=central-api",
+    "dev": "npm run dev --workspace=central-api"
+  }
+}

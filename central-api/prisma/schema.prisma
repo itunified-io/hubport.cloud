@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+}
+
+model Tenant {
+  id           String       @id @default(uuid())
+  name         String
+  email        String
+  subdomain    String       @unique
+  status       TenantStatus @default(PENDING)
+  rejectReason String?
+  tunnelId     String?
+  tunnelToken  String?
+  ztAppId      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  activatedAt  DateTime?
+
+  sharingApprovals  SharingApproval[] @relation("requester")
+  sharingApprovedBy SharingApproval[] @relation("approver")
+  sharedTerritories SharedTerritory[]
+  sharedTalks       SharedTalk[]
+}
+
+model SharingApproval {
+  id          String   @id @default(uuid())
+  requesterId String
+  approverId  String
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  requester Tenant @relation("requester", fields: [requesterId], references: [id])
+  approver  Tenant @relation("approver", fields: [approverId], references: [id])
+
+  @@unique([requesterId, approverId])
+}
+
+model SharedTerritory {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model SharedTalk {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@itunified-io/hubport-central-api",
+  "version": "2026.03.18.1",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "@fastify/cors": "^10.0.0",
+    "@sinclair/typebox": "^0.34.0",
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "vitest": "^2.0.0",
+    "prisma": "^6.0.0",
+    "tsx": "^4.0.0"
+  }
+}
