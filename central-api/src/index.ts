@@ -1,13 +1,17 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import formbody from '@fastify/formbody';
 import { tenantRoutes } from './routes/tenants.js';
 import { sharingRoutes } from './routes/sharing.js';
+import { adminRoutes } from './admin/index.js';
 
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
+await app.register(formbody);
 await app.register(tenantRoutes, { prefix: '/tenants' });
 await app.register(sharingRoutes, { prefix: '/sharing' });
+await app.register(adminRoutes, { prefix: '/admin' });
 
 app.get('/health', async () => ({ status: 'ok' }));
 
