@@ -13,6 +13,9 @@ await app.register(tenantRoutes, { prefix: '/tenants' });
 await app.register(sharingRoutes, { prefix: '/sharing' });
 await app.register(adminRoutes, { prefix: '/admin' });
 
+// Root redirect to admin portal
+app.get('/', async (_req, reply) => reply.redirect('/admin'));
+
 app.get('/health', async () => ({ status: 'ok' }));
 
 app.get('/releases/latest', async () => ({
