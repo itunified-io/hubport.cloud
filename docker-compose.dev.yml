@@ -1,0 +1,23 @@
+# hubport.cloud — Local Development Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  hubport:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    volumes:
+      - ./hub-app/src:/app/hub-app/src
+      - ./hub-api/src:/app/hub-api/src
+      - ./setup-wizard/src:/app/setup-wizard/src
+
+  # No cloudflared in dev — access via localhost
+  cloudflared:
+    profiles: ["tunnel"]
