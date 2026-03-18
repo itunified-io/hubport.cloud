@@ -1,6 +1,27 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.18.3
+
+### Full App Implementation (#6)
+- **hub-app**: React 19 + Vite + Tailwind v4 PWA
+  - OIDC auth (react-oidc-context, Keycloak), RBAC role guards (admin/elder/publisher/viewer)
+  - i18n (react-intl, en-US + de-DE), locale detection + switcher
+  - Design system: dark theme (#050507), amber brand (#d97706), Inter font, Lucide icons
+  - PWA: vite-plugin-pwa, service worker, installable manifest, offline-first
+  - Pages: Dashboard, Publishers (list/form), Territories (list/map), Meetings (list/form), Settings, Sharing
+  - Role-filtered navigation sidebar
+  - Build: 398KB JS (117KB gzip), 13KB CSS, service worker generated
+- **hub-api**: Fastify v5 + Prisma v6
+  - RBAC middleware: requireRole/requireAnyRole preHandler guards
+  - JWT auth: dev mode (no token needed), TST (JWT_SECRET), UAT/PRD (Keycloak JWKS)
+  - Routes: publishers CRUD (elder+), territories CRUD + assign/return (elder+), meetings CRUD (elder+ write, all read)
+  - Prisma schema: Publisher, Territory, TerritoryAssignment, Meeting
+  - Health endpoints: /health, /health/db
+- Updated Dockerfile (proper multi-stage build)
+- Updated root package.json workspaces (hub-app, hub-api, setup-wizard, central-api)
+- Fixed setup-wizard keycloak-setup duplicate key bug
+
 ## v2026.03.18.2
 
 ### Docker Stack + Setup Wizard (#4)

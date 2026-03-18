@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Publisher {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  role      String   @default("publisher") // admin, elder, publisher, viewer
+  status    String   @default("active") // active, inactive, away
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments TerritoryAssignment[]
+}
+
+model Territory {
+  id          String   @id @default(uuid())
+  number      String   @unique
+  name        String
+  description String?
+  boundaries  Json? // GeoJSON for map display
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments TerritoryAssignment[]
+}
+
+model TerritoryAssignment {
+  id          String    @id @default(uuid())
+  territoryId String
+  publisherId String
+  assignedAt  DateTime  @default(now())
+  returnedAt  DateTime?
+
+  territory Territory @relation(fields: [territoryId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+
+  @@index([territoryId])
+  @@index([publisherId])
+}
+
+model Meeting {
+  id        String   @id @default(uuid())
+  title     String
+  type      String // midweek, weekend, special
+  date      DateTime
+  startTime String // "19:00"
+  endTime   String? // "21:00"
+  location  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
