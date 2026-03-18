@@ -1,12 +1,15 @@
 {
   "name": "@itunified-io/hubport.cloud",
   "private": true,
-  "version": "2026.03.18.1",
+  "version": "2026.03.18.2",
   "license": "GPL-3.0-or-later",
-  "workspaces": ["central-api"],
+  "workspaces": ["central-api", "hub-app", "hub-api", "setup-wizard"],
   "scripts": {
-    "build": "npm run build --workspace=central-api",
-    "test": "npm run test --workspace=central-api",
-    "dev": "npm run dev --workspace=central-api"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:api": "npm run dev --workspace=hub-api",
+    "dev:app": "npm run dev --workspace=hub-app",
+    "dev:wizard": "npm run dev --workspace=setup-wizard",
+    "dev:central": "npm run dev --workspace=central-api"
   }
 }
