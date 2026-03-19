@@ -113,21 +113,26 @@ export function onboardingEmailHtml(tenant: {
 
   <div style="padding: 30px 0;">
     <h2 style="color: #e4e4e7;">Welcome, ${tenant.name}!</h2>
-    <p>Your congregation has been approved on hubport.cloud. Here are your setup credentials:</p>
+    <p>Your congregation has been approved on hubport.cloud. You can now set up your self-hosted instance.</p>
 
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
-      <h3 style="color: #d97706; margin-top: 0;">Your Credentials</h3>
+      <h3 style="color: #d97706; margin-top: 0;">Your Registration</h3>
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 8px 0; color: #a1a1aa;">Tenant ID</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;">${tenant.id}</td></tr>
         <tr><td style="padding: 8px 0; color: #a1a1aa;">Subdomain</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;"> ${tenant.subdomain}.hubport.cloud</td></tr>
-        ${tenant.tunnelToken ? `<tr><td style="padding: 8px 0; color: #a1a1aa;">Tunnel Token</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b; word-break: break-all; font-size: 11px;">${tenant.tunnelToken}</td></tr>` : ''}
+        <tr><td style="padding: 8px 0; color: #a1a1aa;">Status</td><td style="padding: 8px 0; color: #22c55e; font-weight: 600;">Approved</td></tr>
       </table>
+    </div>
+
+    <div style="background: rgba(217,119,6,0.1); border: 1px solid rgba(217,119,6,0.3); border-radius: 10px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> (Tenant ID and Tunnel Token) are available in your <a href="https://${tenant.subdomain}.hubport.cloud/setup" style="color: #d97706; font-weight: 600;">Tenant Portal</a>. For security, credentials are not sent via email.</p>
     </div>
 
     <h3 style="color: #e4e4e7;">Quick Start</h3>
     <ol style="line-height: 1.8;">
       <li>Install <a href="https://docs.docker.com/get-docker/" style="color: #d97706;">Docker</a> on your server</li>
-      <li>Save the <code>docker-compose.yml</code> below to a folder on your server</li>
+      <li>Create a <code>docker-compose.yml</code> file (see below)</li>
+      <li>Look up your credentials in the <a href="https://${tenant.subdomain}.hubport.cloud/setup" style="color: #d97706;">Tenant Portal</a></li>
+      <li>Fill in <code>HUBPORT_TENANT_ID</code> and <code>CF_TUNNEL_TOKEN</code> in the compose file</li>
       <li>Run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">docker compose up -d</code></li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
@@ -141,8 +146,8 @@ export function onboardingEmailHtml(tenant: {
       - "3000:3000"
       - "8080:8080"
     environment:
-      - HUBPORT_TENANT_ID=${tenant.id}
-      - CF_TUNNEL_TOKEN=${tenant.tunnelToken || 'YOUR_TUNNEL_TOKEN'}
+      - HUBPORT_TENANT_ID=your-tenant-id    # from Tenant Portal
+      - CF_TUNNEL_TOKEN=your-tunnel-token    # from Tenant Portal
     volumes:
       - hubport-data:/data
     restart: unless-stopped
@@ -161,8 +166,6 @@ volumes:
   hubport-data:
   pg-data:</pre>
     </div>
-
-    <p style="font-size: 13px; color: #a1a1aa;">Copy the docker-compose.yml above, then run <code>docker compose up -d</code>. The setup wizard at <code>:8080</code> will guide you through the remaining configuration.</p>
 
     <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">
       <h3 style="color: #d97706; margin-top: 0;">Need a Server?</h3>
@@ -191,7 +194,7 @@ volumes:
   </div>
 
   <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; text-align: center; color: #71717a; font-size: 12px;">
-    <p>hubport.cloud - Self-hosted congregation management</p>
+    <p>hubport.cloud - Self-hosted congregation management (MIT + Commons Clause)</p>
   </div>
 </body>
 </html>`;
