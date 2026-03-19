@@ -6,6 +6,7 @@ import { publisherRoutes } from "./routes/publishers.js";
 import { territoryRoutes } from "./routes/territories.js";
 import { meetingRoutes } from "./routes/meetings.js";
 import prisma from "./lib/prisma.js";
+import { startTokenRotationJob } from './jobs/token-rotation.js';
 
 const app = Fastify({
   logger: {
@@ -68,6 +69,8 @@ async function start(): Promise<void> {
   const host = process.env.API_HOST ?? "0.0.0.0";
 
   await app.listen({ port, host });
+  // Start API token auto-rotation
+  startTokenRotationJob(app.log);
   app.log.info(`hub-api listening on ${host}:${port}`);
 }
 
