@@ -128,7 +128,30 @@ export function onboardingEmailHtml(tenant: {
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
 
-    <p style="margin-top: 30px;">Need help? Visit <a href="https://hubport.cloud/docs" style="color: #d97706;">hubport.cloud/docs</a> or <a href="https://hubport.cloud/contact" style="color: #d97706;">contact us</a>.</p>
+    <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">
+      <h3 style="color: #d97706; margin-top: 0;">Need a Server?</h3>
+      <p style="font-size: 14px; margin: 8px 0;">hubport.cloud runs on any server with Docker. If your congregation doesn't have one yet, we recommend Hostinger VPS:</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
+        <tr>
+          <td style="padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+            <strong style="color: #f59e0b;">KVM1</strong> <span style="color: #a1a1aa; font-size: 12px;">— small congregations (up to 50 publishers)</span><br>
+            <span style="font-size: 12px; color: #71717a;">1 vCPU, 4 GB RAM, 50 GB SSD · from ~$5/month</span><br>
+            <a href="https://www.hostinger.com/cart?product=vps%3Avps_kvm_1&period=24&referral_type=cart_link&REFERRALCODE=NSGBUECHEBQR&referral_id=019d04a9-d6f7-725d-a226-c08ca5d70b0b" style="color: #d97706; font-size: 13px; font-weight: 600;">Get KVM1 VPS &rarr;</a>
+          </td>
+        </tr>
+        <tr><td style="height: 8px;"></td></tr>
+        <tr>
+          <td style="padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+            <strong style="color: #f59e0b;">KVM2</strong> <span style="color: #a1a1aa; font-size: 12px;">— medium congregations (50–150 publishers)</span><br>
+            <span style="font-size: 12px; color: #71717a;">2 vCPU, 8 GB RAM, 100 GB SSD · from ~$10/month</span><br>
+            <a href="https://www.hostinger.com/cart?product=vps%3Avps_kvm_2&period=24&referral_type=cart_link&REFERRALCODE=NSGBUECHEBQR&referral_id=019d04a9-baed-70fa-b7da-b1d81e15c69a" style="color: #d97706; font-size: 13px; font-weight: 600;">Get KVM2 VPS &rarr;</a>
+          </td>
+        </tr>
+      </table>
+      <p style="font-size: 12px; color: #71717a; margin: 8px 0 0;">You can also run hubport.cloud on a Synology NAS, Raspberry Pi, or any computer with Docker.</p>
+    </div>
+
+    <p style="margin-top: 20px;">Need help? Visit <a href="https://hubport.cloud/docs" style="color: #d97706;">hubport.cloud/docs</a> or <a href="https://hubport.cloud/contact" style="color: #d97706;">contact us</a>.</p>
   </div>
 
   <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; text-align: center; color: #71717a; font-size: 12px;">
