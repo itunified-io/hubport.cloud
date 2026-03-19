@@ -55,6 +55,8 @@ export async function tenantRoutes(app: FastifyInstance) {
   // One-time call-home from setup wizard
   app.post('/:id/activate', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const authedTenantId = (request as unknown as Record<string, unknown>).tenantId as string;
+    if (id !== authedTenantId) return reply.status(403).send({ error: 'Forbidden' });
 
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
@@ -83,6 +85,8 @@ export async function tenantRoutes(app: FastifyInstance) {
   // Get tenant info (tenant-authenticated)
   app.get('/:id', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const authedTenantId = (request as unknown as Record<string, unknown>).tenantId as string;
+    if (id !== authedTenantId) return reply.status(403).send({ error: 'Forbidden' });
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
     return reply.send(tenant);

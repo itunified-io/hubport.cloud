@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { apiTokenAuth } from '../middleware/api-token-auth.js';
+import { portalAuth } from '../portal/auth.js';
 import { generateApiToken, hashToken, TOKEN_EXPIRY_MS } from '../lib/tokens.js';
 
 const rotationRateLimit = new Map<string, number>();
@@ -50,16 +51,14 @@ export async function tokenRoutes(app: FastifyInstance): Promise<void> {
       }),
     ]);
     rotationRateLimit.set(tenantId, Date.now());
+    setTimeout(() => rotationRateLimit.delete(tenantId), ROTATION_COOLDOWN_MS + 1000);
     await prisma.tenantAuditLog.create({
       data: { tenantId, action: 'token_rotated', ip: req.ip, userAgent: req.headers['user-agent'] ?? null },
     }).catch(() => {});
     return reply.send({ token: plaintext, expiresAt: expiresAt.toISOString() });
   });
 
-  app.post('/revoke', async (req, reply) => {
-    const { portalAuth } = await import('../portal/auth.js');
-    await portalAuth(req, reply);
-    if (reply.sent) return;
+  app.post('/revoke', { preHandler: portalAuth }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const result = await prisma.tenantApiToken.updateMany({
       where: { tenantId, revokedAt: null },

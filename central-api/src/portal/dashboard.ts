@@ -18,6 +18,11 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).type('text/html').send(portalShell('Not Found', '<p>Tenant not found.</p>'));
     }
 
+    // Enforce MFA gate — redirect if setup not completed
+    if (tenant.auth && !tenant.auth.mfaCompleted) {
+      return reply.redirect('/portal/mfa-setup');
+    }
+
     const apiToken = readApiTokenCookie(req.headers.cookie);
     reply.type('text/html').send(portalShell(`Dashboard - ${tenant.name}`, dashboardPage(tenant, apiToken)));
   });

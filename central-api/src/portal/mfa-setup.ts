@@ -4,9 +4,7 @@ import { portalAuth } from './auth.js';
 import { portalShell } from './ui.js';
 
 export async function mfaSetupRoutes(app: FastifyInstance): Promise<void> {
-  app.addHook('preHandler', portalAuth);
-
-  app.get('/mfa-setup', async (req, reply) => {
+  app.get('/mfa-setup', { preHandler: portalAuth }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const auth = await prisma.tenantAuth.findUnique({ where: { tenantId } });
     if (auth?.mfaCompleted) return reply.redirect('/portal/dashboard');
@@ -18,7 +16,7 @@ export async function mfaSetupRoutes(app: FastifyInstance): Promise<void> {
     reply.type('text/html').send(portalShell('Set Up Two-Factor Authentication', mfaSetupPage(hasPasskey, hasTOTP)));
   });
 
-  app.post('/mfa-setup/complete', async (req, reply) => {
+  app.post('/mfa-setup/complete', { preHandler: portalAuth }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const auth = await prisma.tenantAuth.findUnique({ where: { tenantId } });
     if (!auth) return reply.status(404).send({ error: 'Account not found' });
