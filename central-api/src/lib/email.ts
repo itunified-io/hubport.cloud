@@ -44,12 +44,18 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+function encodeSubject(subject: string): string {
+  // RFC 2047 encoded-word for UTF-8 subjects (handles em-dash, umlauts, etc.)
+  const encoded = Buffer.from(subject, 'utf-8').toString('base64');
+  return `=?UTF-8?B?${encoded}?=`;
+}
+
 function buildMimeMessage(to: string, subject: string, htmlBody: string): string {
   const boundary = `boundary_${Date.now()}`;
   const raw = [
     `From: hubport.cloud <${senderEmail()}>`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeSubject(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ``,
@@ -113,7 +119,7 @@ export function onboardingEmailHtml(tenant: {
       <h3 style="color: #d97706; margin-top: 0;">Your Credentials</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr><td style="padding: 8px 0; color: #a1a1aa;">Tenant ID</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;">${tenant.id}</td></tr>
-        <tr><td style="padding: 8px 0; color: #a1a1aa;">Subdomain</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;">${tenant.subdomain}.hubport.cloud</td></tr>
+        <tr><td style="padding: 8px 0; color: #a1a1aa;">Subdomain</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;"> ${tenant.subdomain}.hubport.cloud</td></tr>
         ${tenant.tunnelToken ? `<tr><td style="padding: 8px 0; color: #a1a1aa;">Tunnel Token</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b; word-break: break-all; font-size: 11px;">${tenant.tunnelToken}</td></tr>` : ''}
       </table>
     </div>
@@ -121,11 +127,42 @@ export function onboardingEmailHtml(tenant: {
     <h3 style="color: #e4e4e7;">Quick Start</h3>
     <ol style="line-height: 1.8;">
       <li>Install <a href="https://docs.docker.com/get-docker/" style="color: #d97706;">Docker</a> on your server</li>
-      <li>Clone the repository:<br><code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">git clone https://github.com/itunified-io/hubport.cloud.git</code></li>
-      <li>Copy <code>.env.example</code> to <code>.env</code> and fill in your credentials above</li>
+      <li>Save the <code>docker-compose.yml</code> below to a folder on your server</li>
       <li>Run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">docker compose up -d</code></li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
+
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; margin: 20px 0;">
+      <h4 style="color: #d97706; margin-top: 0; font-size: 14px;">docker-compose.yml</h4>
+      <pre style="background: #0a0a0c; padding: 12px; border-radius: 6px; font-size: 12px; color: #e4e4e7; overflow-x: auto; white-space: pre; line-height: 1.5;">services:
+  hubport:
+    image: ghcr.io/itunified-io/hubport.cloud:latest
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    environment:
+      - HUBPORT_TENANT_ID=${tenant.id}
+      - CF_TUNNEL_TOKEN=${tenant.tunnelToken || 'YOUR_TUNNEL_TOKEN'}
+    volumes:
+      - hubport-data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=hubport
+      - POSTGRES_USER=hubport
+      - POSTGRES_PASSWORD=changeme
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  hubport-data:
+  pg-data:</pre>
+    </div>
+
+    <p style="font-size: 13px; color: #a1a1aa;">Copy the docker-compose.yml above, then run <code>docker compose up -d</code>. The setup wizard at <code>:8080</code> will guide you through the remaining configuration.</p>
 
     <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">
       <h3 style="color: #d97706; margin-top: 0;">Need a Server?</h3>
@@ -154,7 +191,7 @@ export function onboardingEmailHtml(tenant: {
   </div>
 
   <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; text-align: center; color: #71717a; font-size: 12px;">
-    <p>hubport.cloud — Free, open-source congregation management (GPL-3.0)</p>
+    <p>hubport.cloud - Self-hosted congregation management</p>
   </div>
 </body>
 </html>`;
