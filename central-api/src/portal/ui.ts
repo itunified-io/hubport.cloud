@@ -118,7 +118,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm text-zinc-500 uppercase tracking-wider">docker-compose.yml</h3>
         <div class="flex gap-2">
-          <button onclick="generatePgPassword()" class="text-xs bg-zinc-700/50 border border-zinc-600 text-zinc-300 px-3 py-1 rounded hover:bg-zinc-600/50 transition">Generate PG Password</button>
+          <!-- PG password managed by setup wizard via Vault -->
           <button onclick="copyYaml()" id="copy-btn" class="text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
         </div>
       </div>
@@ -143,7 +143,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     environment:
       - POSTGRES_DB=hubport
       - POSTGRES_USER=hubport
-      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-amber-400">changeme</span>
+      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-zinc-500">managed-by-setup-wizard</span>
     volumes:
       - pg-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -276,15 +276,7 @@ volumes:
         document.getElementById('reveal-error').classList.remove('hidden');
       }
     }
-    function generatePgPassword() {
-      const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*';
-      const arr = new Uint8Array(24);
-      crypto.getRandomValues(arr);
-      const pass = Array.from(arr, b => chars[b % chars.length]).join('');
-      document.getElementById('yaml-pgpass').textContent = pass;
-      document.getElementById('yaml-pgpass').classList.add('text-green-400');
-      document.getElementById('pg-password-warning').classList.remove('hidden');
-    }
+    // PG password managed by setup wizard via Vault — no manual generation needed
     function copyYaml() {
       const yaml = document.getElementById('compose-yaml').textContent;
       navigator.clipboard.writeText(yaml).then(() => {
