@@ -1,6 +1,6 @@
 # hubport.cloud
 
-Self-hosted congregation management platform — always free, GPL licensed.
+Self-hosted congregation management platform — always free, source-available under MIT + Commons Clause.
 
 ## Architecture
 - **Central API** (`central-api/`) — tenant registry, sharing, provisioning
@@ -17,7 +17,7 @@ npm run build     # build for production
 ```
 
 ## License
-GPL-3.0-or-later — see [LICENSE](LICENSE)
+MIT + Commons Clause — free for non-commercial use. See [LICENSE](LICENSE) for details.
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md)

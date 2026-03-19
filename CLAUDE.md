@@ -15,6 +15,6 @@ Self-hosted congregation management platform. This repo contains:
 
 ## Conventions
 - Language: English (code, docs, commits)
-- License: GPL-3.0-or-later
+- License: MIT + Commons Clause (ADR-0060)
 - Contributions welcome — see CONTRIBUTING.md
 - Deploy central-api to K8s via `kubectl apply` (manifests in infrastructure repo)

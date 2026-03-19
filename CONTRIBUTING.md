@@ -30,4 +30,4 @@ Open a GitHub issue with steps to reproduce.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under GPL-3.0-or-later.
+By contributing, you agree that your contributions will be licensed under MIT + Commons Clause.
