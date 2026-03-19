@@ -85,7 +85,6 @@ export async function adminRoutes(app: FastifyInstance) {
           name: string;
           subdomain: string;
           id: string;
-          tunnelToken?: string;
         });
       } else if (body.templateName === 'rejection') {
         html = rejectionEmailHtml(
