@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { setupRoutes } from './setup.js';
 import { loginRoutes } from './login.js';
 import { dashboardRoutes } from './dashboard.js';
+import { totpRoutes } from './totp.js';
 
 export async function portalRoutes(app: FastifyInstance): Promise<void> {
   // Public routes (no auth needed)
@@ -10,4 +11,5 @@ export async function portalRoutes(app: FastifyInstance): Promise<void> {
 
   // Authenticated routes
   await app.register(dashboardRoutes);
+  await app.register(totpRoutes);
 }
