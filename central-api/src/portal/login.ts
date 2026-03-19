@@ -1,0 +1,98 @@
+import type { FastifyInstance } from 'fastify';
+import { prisma } from '../lib/prisma.js';
+import { verifyPassword, createAccessToken, createRefreshToken } from '../lib/crypto.js';
+import { portalShell, loginPage } from './ui.js';
+
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+export async function loginRoutes(app: FastifyInstance): Promise<void> {
+  // GET /portal/login — show login form
+  app.get('/login', async (_req, reply) => {
+    reply.type('text/html').send(portalShell('Log In', loginPage()));
+  });
+
+  // POST /portal/login — authenticate
+  app.post('/login', async (req, reply) => {
+    const body = req.body as { email?: string; password?: string } | null;
+
+    if (!body?.email || !body?.password) {
+      return reply.type('text/html').send(portalShell('Log In', loginPage('Email and password are required.')));
+    }
+
+    const tenant = await prisma.tenant.findFirst({
+      where: { email: body.email.toLowerCase().trim(), status: { in: ['APPROVED', 'ACTIVE'] } },
+      include: { auth: true },
+    });
+
+    if (!tenant?.auth?.passwordHash) {
+      return reply.type('text/html').send(portalShell('Log In', loginPage('Invalid email or password.')));
+    }
+
+    const auth = tenant.auth;
+
+    // Check lockout
+    if (auth.lockedUntil && auth.lockedUntil > new Date()) {
+      const remainingMin = Math.ceil((auth.lockedUntil.getTime() - Date.now()) / 60000);
+      return reply.type('text/html').send(portalShell('Log In', loginPage(`Account locked. Try again in ${remainingMin} minutes.`)));
+    }
+
+    const valid = await verifyPassword(auth.passwordHash, body.password);
+
+    if (!valid) {
+      const attempts = auth.failedAttempts + 1;
+      const update: Record<string, unknown> = { failedAttempts: attempts };
+      if (attempts >= LOCKOUT_THRESHOLD) {
+        update.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+      }
+      await prisma.tenantAuth.update({ where: { id: auth.id }, data: update });
+      return reply.type('text/html').send(portalShell('Log In', loginPage('Invalid email or password.')));
+    }
+
+    // Check TOTP if enabled
+    if (auth.totpEnabled) {
+      const tempToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
+      return reply.type('text/html').send(portalShell('Two-Factor Authentication', totpPage(tempToken)));
+    }
+
+    // Success — clear failed attempts, issue tokens
+    await prisma.tenantAuth.update({
+      where: { id: auth.id },
+      data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+    });
+
+    const accessToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
+    const refreshToken = await createRefreshToken({ tenantId: tenant.id });
+
+    reply
+      .header('Set-Cookie', `hubport_refresh=${refreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${7 * 24 * 60 * 60}`)
+      .header('Set-Cookie', `hubport_access=${accessToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${15 * 60}`)
+      .redirect('/portal/dashboard');
+  });
+
+  // POST /portal/logout
+  app.post('/logout', async (_req, reply) => {
+    reply
+      .header('Set-Cookie', 'hubport_refresh=; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=0')
+      .header('Set-Cookie', 'hubport_access=; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=0')
+      .redirect('/portal/login');
+  });
+}
+
+function totpPage(tempToken: string): string {
+  return `
+    <div class="max-w-md mx-auto">
+      <h2 class="text-2xl text-amber-500 mb-6 text-center">Two-Factor Authentication</h2>
+      <form method="POST" action="/portal/login/2fa" class="space-y-4">
+        <input type="hidden" name="tempToken" value="${tempToken}">
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Authentication Code</label>
+          <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 text-center text-2xl tracking-widest focus:border-amber-500 focus:outline-none"
+            placeholder="000000" required autofocus>
+        </div>
+        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-lg transition">Verify</button>
+      </form>
+    </div>
+  `;
+}
