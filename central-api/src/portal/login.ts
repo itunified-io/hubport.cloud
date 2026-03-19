@@ -58,10 +58,11 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
         .redirect('/portal/mfa-setup');
     }
 
-    // Check TOTP if enabled
+    // Check 2FA — show passkey + TOTP options
     if (auth.totpEnabled) {
       const tempToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
-      return reply.type('text/html').send(portalShell('Two-Factor Authentication', totpPage(tempToken)));
+      const passkeyCount = await prisma.tenantPasskey.count({ where: { tenantId: tenant.id } });
+      return reply.type('text/html').send(portalShell('Two-Factor Authentication', twoFactorPage(tempToken, tenant.email, passkeyCount > 0)));
     }
 
     // Success — clear failed attempts, issue tokens
@@ -136,21 +137,79 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
   });
 }
 
-function totpPage(tempToken: string, error?: string): string {
+function twoFactorPage(tempToken: string, email: string, hasPasskey: boolean, error?: string): string {
   return `
     <div class="max-w-md mx-auto">
       <h2 class="text-2xl text-amber-500 mb-6 text-center">Two-Factor Authentication</h2>
       ${error ? `<div class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-4 text-sm text-red-400">${error}</div>` : ''}
+      <div id="2fa-error" class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-4 text-sm text-red-400 hidden"></div>
+      ${hasPasskey ? `
+      <div class="mb-6">
+        <button id="passkey-btn" onclick="loginWithPasskey()" class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2">
+          <span class="text-xl">&#128274;</span> Sign in with Passkey
+        </button>
+      </div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex-1 h-px bg-zinc-700"></div>
+        <span class="text-xs text-zinc-500 uppercase tracking-wider">or use authenticator app</span>
+        <div class="flex-1 h-px bg-zinc-700"></div>
+      </div>
+      ` : ''}
       <form method="POST" action="/portal/login/2fa" class="space-y-4">
         <input type="hidden" name="tempToken" value="${tempToken}">
         <div>
           <label class="block text-sm text-zinc-400 mb-1">Authentication Code</label>
           <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
             class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 text-center text-2xl tracking-widest focus:border-amber-500 focus:outline-none"
-            placeholder="000000" required autofocus>
+            placeholder="000000" required ${hasPasskey ? '' : 'autofocus'}>
         </div>
         <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-lg transition">Verify</button>
       </form>
     </div>
+    ${hasPasskey ? `
+    <script>
+    async function loginWithPasskey() {
+      var btn = document.getElementById('passkey-btn');
+      var errEl = document.getElementById('2fa-error');
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Waiting for passkey...';
+      try {
+        var optRes = await fetch('/portal/passkey/auth-options?email=${encodeURIComponent(email)}');
+        if (!optRes.ok) throw new Error('Failed to get options');
+        var options = await optRes.json();
+        var tenantId = options.tenantId;
+        options.challenge = base64URLToBuffer(options.challenge);
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(function(c) { return Object.assign({}, c, {id: base64URLToBuffer(c.id)}); });
+        }
+        var assertion = await navigator.credentials.get({ publicKey: options });
+        if (!assertion) throw new Error('No credential returned');
+        var verifyRes = await fetch('/portal/passkey/auth-verify', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'same-origin',
+          body: JSON.stringify({
+            id: assertion.id, rawId: bufferToBase64URL(assertion.rawId), tenantId: tenantId,
+            response: { clientDataJSON: bufferToBase64URL(assertion.response.clientDataJSON), authenticatorData: bufferToBase64URL(assertion.response.authenticatorData), signature: bufferToBase64URL(assertion.response.signature), userHandle: assertion.response.userHandle ? bufferToBase64URL(assertion.response.userHandle) : null },
+            type: assertion.type, clientExtensionResults: assertion.getClientExtensionResults(),
+          }),
+        });
+        if (verifyRes.ok) { var data = await verifyRes.json(); window.location.href = data.redirect || '/portal/dashboard'; }
+        else { var err = await verifyRes.json(); throw new Error(err.error || 'Verification failed'); }
+      } catch (e) {
+        errEl.textContent = 'Passkey failed: ' + e.message;
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Sign in with Passkey';
+      }
+    }
+    function base64URLToBuffer(b) { var s = b.replace(/-/g,'+').replace(/_/g,'/'); var p = s.length % 4 === 0 ? '' : '='.repeat(4 - s.length % 4); return Uint8Array.from(atob(s+p), function(c){return c.charCodeAt(0)}).buffer; }
+    function bufferToBase64URL(buf) { var bytes = new Uint8Array(buf); var s = ''; for (var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,''); }
+    </script>
+    ` : ''}
   `;
+}
+
+/** Legacy wrapper for TOTP-only error re-display */
+function totpPage(tempToken: string, error?: string): string {
+  return twoFactorPage(tempToken, '', false, error);
 }

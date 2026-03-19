@@ -16,7 +16,7 @@ services:
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=hubport
       - TENANT_ID=${TENANT_ID}
-      - CENTRAL_API_URL=https://api.hubport.cloud
+      - CENTRAL_API_URL=${CENTRAL_API_URL:-https://api.hubport.cloud}
       - APP_PORT=3000
       - API_PORT=3001
       - WIZARD_PORT=8080
