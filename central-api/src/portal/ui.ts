@@ -3,6 +3,15 @@ export function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/** Derive CENTRAL_API_URL from PORTAL_BASE_URL so docker-compose snippet is env-aware. */
+function centralApiUrl(): string {
+  const portalBase = process.env.PORTAL_BASE_URL || '';
+  // portal-uat.hubport.cloud → api-uat.hubport.cloud
+  const m = portalBase.match(/^https:\/\/portal(-\w+)?\.hubport\.cloud$/);
+  if (m) return `https://api${m[1] || ''}.hubport.cloud`;
+  return 'https://api.hubport.cloud';
+}
+
 export function portalShell(title: string, content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -113,7 +122,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
               ? `<code id="api-token-value" data-token="${escapeHtml(apiToken)}" class="font-mono text-amber-400 text-xs break-all select-all">${escapeHtml(apiToken)}</code>
                  <button onclick="copyApiToken()" class="ml-2 text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
                  <p class="text-xs text-zinc-500 mt-1">This token is shown once. Save it now — it will not appear again.</p>`
-              : '<span class="text-zinc-600">Token has been displayed. Rotate from the portal if needed.</span>'
+              : '<span class="text-zinc-600">Token was already displayed. <a href="/portal/dashboard" class="text-amber-500 underline">Reload</a> or use <code class="bg-zinc-800 px-1 rounded">POST /api/v1/tokens/rotate</code> to generate a new one.</span>'
             }
           </td>
         </tr>
@@ -149,6 +158,8 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       - "8080:8080"
     environment:
       - HUBPORT_TENANT_ID=${tenant.id}
+      - HUBPORT_API_TOKEN=<span id="yaml-api-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
+      - CENTRAL_API_URL=${escapeHtml(centralApiUrl())}
       - CF_TUNNEL_TOKEN=<span id="yaml-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
     volumes:
       - hubport-data:/data
@@ -305,6 +316,16 @@ volumes:
         setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
       });
     }
+    // Auto-populate YAML API token from displayed value
+    (function() {
+      var el = document.getElementById('api-token-value');
+      var yamlEl = document.getElementById('yaml-api-token');
+      if (el && yamlEl && el.dataset.token) {
+        yamlEl.textContent = el.dataset.token;
+        yamlEl.classList.remove('text-zinc-600');
+        yamlEl.classList.add('text-amber-400');
+      }
+    })();
     </script>
   `;
 }
