@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { encryptionMiddleware } from "./prisma-encryption.js";
+import { encryptionExtension } from "./prisma-encryption.js";
 
-const prisma = new PrismaClient({
+const basePrisma = new PrismaClient({
   log:
     process.env.NODE_ENV === "development"
       ? ["query", "info", "warn", "error"]
@@ -9,6 +9,6 @@ const prisma = new PrismaClient({
 });
 
 // Transparent field-level encryption for personal data (Publisher model)
-prisma.$use(encryptionMiddleware());
+const prisma = basePrisma.$extends(encryptionExtension);
 
 export default prisma;

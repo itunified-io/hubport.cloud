@@ -72,7 +72,6 @@ services:
     environment:
       - KC_DB=postgres
       - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
-      - KC_DB_SCHEMA=keycloak
       - KC_DB_USERNAME=hubport
       - KC_DB_PASSWORD=${DB_PASSWORD}
       - KEYCLOAK_ADMIN=${KC_ADMIN:-admin}

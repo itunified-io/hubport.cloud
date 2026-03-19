@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import formbody from '@fastify/formbody';
 import { renderWizard, renderStep } from './ui/wizard-page.js';
 import { tenantStep } from './steps/tenant-register.js';
 import { dbStep } from './steps/db-init.js';
@@ -13,6 +14,7 @@ import { apiTokenStep } from './steps/api-token.js';
 const STEPS = [apiTokenStep, tenantStep, dbStep, vaultStep, encryptionKeyStep, keycloakStep, tunnelStep, warpStep, adminStep];
 
 const app = Fastify({ logger: true });
+await app.register(formbody);
 
 // Wizard landing — shows progress overview
 app.get('/', async (_req, reply) => {

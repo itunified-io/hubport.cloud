@@ -82,6 +82,14 @@ export async function tenantRoutes(app: FastifyInstance) {
     return reply.send({ id: updated.id, status: updated.status });
   });
 
+  // Public status check — setup wizard step 1 (no auth, minimal data)
+  app.get('/:id/status', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const tenant = await prisma.tenant.findUnique({ where: { id }, select: { status: true, subdomain: true } });
+    if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
+    return reply.send(tenant);
+  });
+
   // Get tenant info (tenant-authenticated)
   app.get('/:id', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };

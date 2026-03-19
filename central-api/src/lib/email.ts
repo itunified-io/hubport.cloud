@@ -147,10 +147,19 @@ export function onboardingEmailHtml(tenant: {
       - "8080:8080"
     environment:
       - HUBPORT_TENANT_ID=your-tenant-id       # from Tenant Portal
+      - HUBPORT_API_TOKEN=your-api-token        # from Tenant Portal
       - CF_TUNNEL_TOKEN=your-tunnel-token       # from Tenant Portal
-      - HUBPORT_API_TOKEN=your-api-token        # from Tenant Portal (after MFA setup)
-    volumes:
-      - hubport-data:/data
+      - DATABASE_URL=postgresql://hubport:changeme@postgres:5432/hubport
+      - VAULT_ADDR=http://vault:8200
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=hubport
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -161,11 +170,63 @@ export function onboardingEmailHtml(tenant: {
       - POSTGRES_PASSWORD=changeme
     volumes:
       - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hubport"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault-data:/vault/data
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    ports:
+      - "8180:8080"
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
+      - KC_DB_USERNAME=hubport
+      - KC_DB_PASSWORD=changeme
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=changeme
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3&lt;&gt;/dev/tcp/localhost/8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run --token your-tunnel-token
+    depends_on:
+      - hubport
     restart: unless-stopped
 
 volumes:
-  hubport-data:
-  pg-data:</pre>
+  pg-data:
+  vault-data:</pre>
     </div>
 
     <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">
