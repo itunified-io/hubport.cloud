@@ -4,6 +4,35 @@
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/** Custom modal JS + CSS injected into the shell */
+function modalSystem(): string {
+  return `
+  <style>
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: #0c0c12; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; max-width: 480px; width: 90%; padding: 0; box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: modalIn 0.15s ease-out; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal-header { padding: 20px 24px 0; display: flex; align-items: center; gap: 12px; }
+    .modal-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .modal-icon.danger { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .modal-icon.approve { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .modal-icon.reject { background: rgba(217,119,6,0.15); color: #d97706; }
+    .modal-body { padding: 16px 24px; }
+    .modal-body p { color: #a1a1aa; font-size: 14px; line-height: 1.6; margin: 0 0 8px; }
+    .modal-body ul { color: #a1a1aa; font-size: 13px; line-height: 1.6; padding-left: 0; list-style: none; margin: 12px 0; }
+    .modal-body ul li { padding: 4px 0; display: flex; align-items: start; gap: 8px; }
+    .modal-body ul li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .modal-body ul.danger li::before { background: #ef4444; }
+    .modal-body ul.approve li::before { background: #22c55e; }
+    .modal-footer { padding: 16px 24px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 8px; }
+  </style>
+  <script>
+    function showModal(id) { document.getElementById(id).classList.add('active'); }
+    function hideModal(id) { document.getElementById(id).classList.remove('active'); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active')); });
+  </script>`;
+}
+
 export function shell(title: string, body: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -36,11 +65,13 @@ export function shell(title: string, body: string): string {
     .badge-approved { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
     .badge-active { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
     .badge-rejected { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+    .badge-decommissioned { background: rgba(113,113,122,0.12); color: #a1a1aa; border: 1px solid rgba(113,113,122,0.25); }
     .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #18181b; border-radius: 2px; }
   </style>
 </head>
 <body class="min-h-screen">
+  ${modalSystem()}
   <nav class="bg-[var(--bg-1)]/80 backdrop-blur-lg border-b border-white/[.04] sticky top-0 z-50">
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -61,7 +92,7 @@ export function shell(title: string, body: string): string {
   <footer class="max-w-6xl mx-auto px-6 py-6 border-t border-white/[.04] mt-12">
     <div class="flex items-center justify-between text-xs text-zinc-600">
       <span>hubport.cloud — ITUnified UG</span>
-      <span>Admin Portal v2026.03.18</span>
+      <span>Admin Portal v2026.03.19</span>
     </div>
   </footer>
 </body>
@@ -95,11 +126,22 @@ interface TenantLike {
   rejectReason?: string | null;
 }
 
-function statusBadge(status: string): string {
+function isDecommissioned(tenant: TenantLike): boolean {
+  return tenant.status === 'REJECTED' && tenant.rejectReason === 'Decommissioned';
+}
+
+function displayStatus(tenant: TenantLike): string {
+  if (isDecommissioned(tenant)) return 'DECOMMISSIONED';
+  return tenant.status;
+}
+
+function statusBadge(tenant: TenantLike): string {
+  const status = displayStatus(tenant);
   const dot = status === 'ACTIVE' ? '\u25CF ' : '';
   const cls = status === 'PENDING' ? 'badge-pending'
     : status === 'APPROVED' ? 'badge-approved'
     : status === 'ACTIVE' ? 'badge-active'
+    : status === 'DECOMMISSIONED' ? 'badge-decommissioned'
     : 'badge-rejected';
   return `<span class="badge ${cls}">${dot}${esc(status)}</span>`;
 }
@@ -119,12 +161,15 @@ function timeAgo(date: Date): string {
 }
 
 export function tenantRow(tenant: TenantLike, showActions: boolean): string {
+  const modalId = `approve-${tenant.id.slice(0, 8)}`;
+  const rejectId = `reject-${tenant.id.slice(0, 8)}`;
+
   return `
     <div class="card p-4 flex items-center justify-between gap-4">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2.5 mb-1.5">
           <a href="/admin/tenant/${esc(tenant.id)}" class="font-semibold text-white hover:text-[#f59e0b] transition-colors truncate">${esc(tenant.name)}</a>
-          ${statusBadge(tenant.status)}
+          ${statusBadge(tenant)}
         </div>
         <div class="text-sm text-zinc-500 truncate flex items-center gap-1.5">
           <span class="text-[#f59e0b]/60 font-mono text-xs">${esc(tenant.subdomain)}.hubport.cloud</span>
@@ -136,18 +181,69 @@ export function tenantRow(tenant: TenantLike, showActions: boolean): string {
       </div>
       ${showActions ? `
         <div class="flex gap-2 shrink-0">
-          <form method="POST" action="/admin/tenant/${esc(tenant.id)}/approve" style="display:inline">
-            <button type="submit" class="btn text-sm" onclick="return confirm('Approve and provision ${esc(tenant.name)}?\\n\\nThis will create a CF Tunnel, DNS record, and send onboarding email.')">Approve</button>
-          </form>
-          <form method="POST" action="/admin/tenant/${esc(tenant.id)}/reject" style="display:inline">
-            <button type="submit" class="btn btn-danger text-sm" onclick="return confirm('Reject ${esc(tenant.name)}?')">Reject</button>
-          </form>
+          <button type="button" class="btn text-sm" onclick="showModal('${modalId}')">Approve</button>
+          <button type="button" class="btn btn-danger text-sm" onclick="showModal('${rejectId}')">Reject</button>
+        </div>
+
+        <!-- Approve Modal -->
+        <div id="${modalId}" class="modal-overlay" onclick="if(event.target===this)hideModal('${modalId}')">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-icon approve">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <h3 class="text-lg font-semibold text-white">Approve ${esc(tenant.name)}</h3>
+            </div>
+            <div class="modal-body">
+              <p>This will provision infrastructure for <strong class="text-white">${esc(tenant.subdomain)}.hubport.cloud</strong>:</p>
+              <ul class="approve">
+                <li>Create CF Tunnel <span class="font-mono text-xs text-zinc-500">(hubport-tenant-${esc(tenant.subdomain)})</span></li>
+                <li>Create DNS CNAME record (proxied)</li>
+                <li>Send onboarding email with credentials</li>
+                <li>Notify #hubport-cloud on Slack</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" onclick="hideModal('${modalId}')">Cancel</button>
+              <form method="POST" action="/admin/tenant/${esc(tenant.id)}/approve" style="display:inline">
+                <button type="submit" class="btn">Approve &amp; Provision</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reject Modal -->
+        <div id="${rejectId}" class="modal-overlay" onclick="if(event.target===this)hideModal('${rejectId}')">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-icon reject">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </div>
+              <h3 class="text-lg font-semibold text-white">Reject ${esc(tenant.name)}</h3>
+            </div>
+            <form method="POST" action="/admin/tenant/${esc(tenant.id)}/reject">
+              <div class="modal-body">
+                <p>The tenant will be notified via email.</p>
+                <label class="block text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2 mt-4">Reason (optional)</label>
+                <input name="reason" class="input" placeholder="e.g., Duplicate request, invalid congregation name">
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="hideModal('${rejectId}')">Cancel</button>
+                <button type="submit" class="btn btn-danger">Reject</button>
+              </div>
+            </form>
+          </div>
         </div>
       ` : ''}
     </div>`;
 }
 
 export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tunnelToken?: string | null; activatedAt?: Date | null }): string {
+  const decommissionId = `decommission-${tenant.id.slice(0, 8)}`;
+  const approveId = `approve-detail-${tenant.id.slice(0, 8)}`;
+  const rejectId = `reject-detail-${tenant.id.slice(0, 8)}`;
+  const decomm = isDecommissioned(tenant);
+
   return `
     <a href="/admin" class="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors mb-6">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -155,18 +251,18 @@ export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tu
     </a>
 
     <div class="flex items-center gap-4 mb-8">
-      <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#d97706] to-[#b45309] flex items-center justify-center text-white text-xl font-bold">${esc(tenant.name.charAt(0).toUpperCase())}</div>
+      <div class="w-12 h-12 rounded-xl ${decomm ? 'bg-zinc-800' : 'bg-gradient-to-br from-[#d97706] to-[#b45309]'} flex items-center justify-center text-white text-xl font-bold ${decomm ? 'opacity-50' : ''}">${esc(tenant.name.charAt(0).toUpperCase())}</div>
       <div>
-        <h1 class="text-2xl font-bold text-white">${esc(tenant.name)}</h1>
+        <h1 class="text-2xl font-bold text-white ${decomm ? 'line-through opacity-60' : ''}">${esc(tenant.name)}</h1>
         <span class="text-sm text-zinc-500 font-mono">${esc(tenant.subdomain)}.hubport.cloud</span>
       </div>
-      <div class="ml-auto">${statusBadge(tenant.status)}</div>
+      <div class="ml-auto">${statusBadge(tenant)}</div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
       <div class="card p-5">
         <div class="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2">Subdomain</div>
-        <div class="font-mono text-[#f59e0b] text-lg">${esc(tenant.subdomain)}.hubport.cloud</div>
+        <div class="font-mono text-[#f59e0b] text-lg ${decomm ? 'line-through opacity-40' : ''}">${esc(tenant.subdomain)}.hubport.cloud</div>
       </div>
       <div class="card p-5">
         <div class="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2">Contact Email</div>
@@ -192,7 +288,15 @@ export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tu
           <div class="text-[#4ade80]">${new Date(tenant.activatedAt).toISOString().slice(0, 16).replace('T', ' ')}</div>
         </div>
       ` : ''}
-      ${tenant.rejectReason ? `
+      ${decomm ? `
+        <div class="card p-5 md:col-span-2 border-zinc-700/30">
+          <div class="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2">Status</div>
+          <div class="flex items-center gap-2 text-zinc-400">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6"/></svg>
+            Decommissioned — CF Tunnel and DNS record have been permanently deleted.
+          </div>
+        </div>
+      ` : tenant.rejectReason ? `
         <div class="card p-5 md:col-span-2 border-[#ef4444]/20">
           <div class="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2">Rejection Reason</div>
           <div class="text-[#f87171]">${esc(tenant.rejectReason)}</div>
@@ -204,33 +308,104 @@ export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tu
       <div class="card p-6 border-[#d97706]/20">
         <h3 class="text-sm font-semibold text-white mb-4">Actions</h3>
         <div class="flex flex-wrap gap-3">
-          <form method="POST" action="/admin/tenant/${esc(tenant.id)}/approve">
-            <button type="submit" class="btn" onclick="return confirm('Approve and provision ${esc(tenant.name)}?\\n\\nThis will:\\n1. Create CF Tunnel\\n2. Create DNS CNAME record\\n3. Send onboarding email with credentials')">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-              Approve &amp; Provision
-            </button>
-          </form>
-          <form method="POST" action="/admin/tenant/${esc(tenant.id)}/reject" class="flex items-center gap-2">
-            <input name="reason" class="input" placeholder="Rejection reason (optional)" style="max-width: 280px">
-            <button type="submit" class="btn btn-danger" onclick="return confirm('Reject ${esc(tenant.name)}?')">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              Reject
-            </button>
+          <button type="button" class="btn" onclick="showModal('${approveId}')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            Approve &amp; Provision
+          </button>
+          <button type="button" class="btn btn-danger" onclick="showModal('${rejectId}')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Reject
+          </button>
+        </div>
+      </div>
+
+      <!-- Approve Modal -->
+      <div id="${approveId}" class="modal-overlay" onclick="if(event.target===this)hideModal('${approveId}')">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-icon approve">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white">Approve &amp; Provision</h3>
+          </div>
+          <div class="modal-body">
+            <p>Approve <strong class="text-white">${esc(tenant.name)}</strong> and provision infrastructure for <strong class="text-[#f59e0b]">${esc(tenant.subdomain)}.hubport.cloud</strong>:</p>
+            <ul class="approve">
+              <li>Create CF Tunnel <span class="font-mono text-xs text-zinc-500">(hubport-tenant-${esc(tenant.subdomain)})</span></li>
+              <li>Create DNS CNAME record (proxied via Cloudflare)</li>
+              <li>Send onboarding email with tunnel token + Docker setup instructions</li>
+              <li>Notify #hubport-cloud on Slack</li>
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="hideModal('${approveId}')">Cancel</button>
+            <form method="POST" action="/admin/tenant/${esc(tenant.id)}/approve" style="display:inline">
+              <button type="submit" class="btn">Approve &amp; Provision</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reject Modal -->
+      <div id="${rejectId}" class="modal-overlay" onclick="if(event.target===this)hideModal('${rejectId}')">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-icon reject">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white">Reject Registration</h3>
+          </div>
+          <form method="POST" action="/admin/tenant/${esc(tenant.id)}/reject">
+            <div class="modal-body">
+              <p>Reject <strong class="text-white">${esc(tenant.name)}</strong>. A rejection email will be sent to <strong class="text-zinc-300">${esc(tenant.email)}</strong>.</p>
+              <label class="block text-xs text-zinc-500 font-medium uppercase tracking-wider mb-2 mt-4">Reason (optional)</label>
+              <input name="reason" class="input" placeholder="e.g., Duplicate request, invalid congregation name">
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" onclick="hideModal('${rejectId}')">Cancel</button>
+              <button type="submit" class="btn btn-danger">Reject &amp; Notify</button>
+            </div>
           </form>
         </div>
       </div>
     ` : ''}
 
-    ${tenant.status === 'APPROVED' || tenant.status === 'ACTIVE' ? `
+    ${(tenant.status === 'APPROVED' || tenant.status === 'ACTIVE') ? `
       <div class="card p-6 border-[#ef4444]/10 mt-4">
         <h3 class="text-sm font-semibold text-white mb-2">Danger Zone</h3>
-        <p class="text-xs text-zinc-500 mb-4">Decommissioning will delete the CF Tunnel, DNS record, and revoke all access. This cannot be undone.</p>
-        <form method="POST" action="/admin/tenant/${esc(tenant.id)}/decommission">
-          <button type="submit" class="btn btn-danger" onclick="return confirm('⚠️ DECOMMISSION ${esc(tenant.name)}?\\n\\nThis will PERMANENTLY:\\n• Delete CF Tunnel (hubport-${esc(tenant.subdomain)})\\n• Delete DNS record (${esc(tenant.subdomain)}.hubport.cloud)\\n• Revoke all access\\n\\nThe tenant will no longer be reachable.\\n\\nAre you sure?')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6"/></svg>
-            Decommission Tenant
-          </button>
-        </form>
+        <p class="text-xs text-zinc-500 mb-4">Decommissioning will permanently delete the CF Tunnel, DNS record, and revoke all access.</p>
+        <button type="button" class="btn btn-danger" onclick="showModal('${decommissionId}')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6"/></svg>
+          Decommission Tenant
+        </button>
+      </div>
+
+      <!-- Decommission Modal -->
+      <div id="${decommissionId}" class="modal-overlay" onclick="if(event.target===this)hideModal('${decommissionId}')">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-icon danger">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white">Decommission Tenant</h3>
+          </div>
+          <div class="modal-body">
+            <p class="text-[#f87171] font-medium">This action is permanent and cannot be undone.</p>
+            <p class="mt-3">Decommissioning <strong class="text-white">${esc(tenant.name)}</strong> will:</p>
+            <ul class="danger">
+              <li>Delete CF Tunnel <span class="font-mono text-xs text-zinc-500">(hubport-tenant-${esc(tenant.subdomain)})</span></li>
+              <li>Delete DNS record <span class="font-mono text-xs text-zinc-500">(${esc(tenant.subdomain)}.hubport.cloud)</span></li>
+              <li>Revoke all network access — the tenant will be unreachable</li>
+            </ul>
+            <p class="text-zinc-500 text-xs mt-3">The tenant's local Docker stack will continue to run but will no longer be connected to hubport.cloud.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="hideModal('${decommissionId}')">Cancel</button>
+            <form method="POST" action="/admin/tenant/${esc(tenant.id)}/decommission" style="display:inline">
+              <button type="submit" class="btn btn-danger">Decommission Permanently</button>
+            </form>
+          </div>
+        </div>
       </div>
     ` : ''}
   `;
