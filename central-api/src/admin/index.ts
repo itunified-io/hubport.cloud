@@ -1,13 +1,14 @@
 /**
  * Admin portal — server-rendered HTML dashboard for platform administration.
  * Served at admin-uat.hubport.cloud (CF Zero Trust protected).
+ *
+ * Read-only: provisioning is managed via the hubport-admin MCP skill.
  */
 
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
-import { provisionTenant, deprovisionTenant } from '../lib/provision.js';
-import { sendEmail, onboardingEmailHtml, rejectionEmailHtml } from '../lib/email.js';
-import { shell, tenantRow, tenantDetail, statsCard } from './ui.js';
+import { sendEmail } from '../lib/email.js';
+import { shell, tenantRow, tenantDetail, statsCard, readOnlyBanner } from './ui.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   // Dashboard — overview with stats + pending requests
@@ -42,15 +43,15 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const pendingHtml = pendingTenants.length > 0
       ? `<h2 class="text-xl font-bold mb-4 text-[#d97706]">Pending Approval (${pendingTenants.length})</h2>
-         <div class="space-y-3 mb-8">${pendingTenants.map(t => tenantRow(t, true)).join('')}</div>`
+         <div class="space-y-3 mb-8">${pendingTenants.map(t => tenantRow(t)).join('')}</div>`
       : '<p class="text-zinc-400 mb-8">No pending requests.</p>';
 
     const allHtml = `
       <h2 class="text-xl font-bold mb-4">All Tenants</h2>
-      <div class="space-y-3">${recentTenants.map(t => tenantRow(t, false)).join('')}</div>
+      <div class="space-y-3">${recentTenants.map(t => tenantRow(t)).join('')}</div>
     `;
 
-    reply.type('text/html').send(shell('Dashboard', stats + pendingHtml + allHtml));
+    reply.type('text/html').send(shell('Dashboard', readOnlyBanner() + stats + pendingHtml + allHtml));
   });
 
   // Tenant detail page
@@ -61,134 +62,45 @@ export async function adminRoutes(app: FastifyInstance) {
     reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant)));
   });
 
-  // Approve tenant — provisions CF resources + sends onboarding email
-  app.post('/tenant/:id/approve', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const tenant = await prisma.tenant.findUnique({ where: { id } });
-    if (!tenant) return reply.redirect('/admin');
-    if (tenant.status !== 'PENDING') return reply.redirect(`/admin/tenant/${id}`);
+  // Internal-only endpoint for MCP skill to send emails
+  app.post('/internal/send-email', async (req, reply) => {
+    const body = req.body as {
+      to: string;
+      subject: string;
+      templateName: string;
+      templateData: Record<string, unknown>;
+    } | null;
 
-    let tunnelId = '';
-    let tunnelToken = '';
-    let provisionError = '';
-
-    try {
-      const result = await provisionTenant(tenant.subdomain, tenant.email);
-      tunnelId = result.tunnelId;
-      tunnelToken = result.tunnelToken;
-    } catch (err) {
-      provisionError = (err as Error).message;
-      app.log.error({ err, tenantId: id }, 'CF provisioning failed');
+    if (!body?.to || !body?.subject || !body?.templateName) {
+      return reply.status(400).send({ error: 'Missing required fields: to, subject, templateName' });
     }
 
-    const updated = await prisma.tenant.update({
-      where: { id },
-      data: {
-        status: 'APPROVED',
-        tunnelId: tunnelId || null,
-        tunnelToken: tunnelToken || null,
-      },
-    });
-
-    // Send onboarding email via Gmail API
     try {
-      await sendEmail(
-        tenant.email,
-        `Welcome to hubport.cloud — ${tenant.name}`,
-        onboardingEmailHtml({
-          name: tenant.name,
-          subdomain: tenant.subdomain,
-          id: tenant.id,
-          tunnelToken: tunnelToken || undefined,
-        }),
-      );
-      app.log.info({ tenantId: id, email: tenant.email }, 'Onboarding email sent');
-    } catch (err) {
-      app.log.error({ err, tenantId: id }, 'Onboarding email failed');
-    }
+      // Import email templates dynamically based on templateName
+      const { onboardingEmailHtml, rejectionEmailHtml } = await import('../lib/email.js');
 
-    // Slack notification
-    const slackWh = process.env.SLACK_WEBHOOK_URL;
-    if (slackWh) {
-      fetch(slackWh, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: `✅ Tenant approved: *${tenant.name}* (${tenant.subdomain}.hubport.cloud)${provisionError ? `\n⚠️ Provisioning error: ${provisionError}` : ''}`,
-        }),
-      }).catch(() => {});
-    }
-
-    reply.redirect(`/admin/tenant/${id}`);
-  });
-
-  // Reject tenant — sends rejection email
-  app.post('/tenant/:id/reject', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const body = req.body as { reason?: string } | null;
-    const reason = body?.reason || '';
-
-    const tenant = await prisma.tenant.findUnique({ where: { id } });
-    if (!tenant) return reply.redirect('/admin');
-
-    await prisma.tenant.update({
-      where: { id },
-      data: { status: 'REJECTED', rejectReason: reason || null },
-    });
-
-    // Send rejection email
-    try {
-      await sendEmail(
-        tenant.email,
-        `hubport.cloud — Registration Update`,
-        rejectionEmailHtml({ name: tenant.name }, reason || undefined),
-      );
-    } catch (err) {
-      app.log.error({ err, tenantId: id }, 'Rejection email failed');
-    }
-
-    reply.redirect('/admin');
-  });
-
-  // Decommission tenant — removes CF resources
-  app.post('/tenant/:id/decommission', async (req, reply) => {
-    const { id } = req.params as { id: string };
-
-    const tenant = await prisma.tenant.findUnique({ where: { id } });
-    if (!tenant) return reply.redirect('/admin');
-
-    // Delete CF resources
-    try {
-      if (tenant.tunnelId) {
-        await deprovisionTenant(tenant.tunnelId);
+      let html: string;
+      if (body.templateName === 'onboarding') {
+        html = onboardingEmailHtml(body.templateData as {
+          name: string;
+          subdomain: string;
+          id: string;
+          tunnelToken?: string;
+        });
+      } else if (body.templateName === 'rejection') {
+        html = rejectionEmailHtml(
+          body.templateData as { name: string },
+          (body.templateData as { reason?: string }).reason,
+        );
+      } else {
+        return reply.status(400).send({ error: `Unknown template: ${body.templateName}` });
       }
+
+      await sendEmail(body.to, body.subject, html);
+      return reply.send({ ok: true });
     } catch (err) {
-      app.log.error({ err, tenantId: id }, 'Deprovision failed');
+      app.log.error({ err }, 'Internal send-email failed');
+      return reply.status(500).send({ error: (err as Error).message });
     }
-
-    await prisma.tenant.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        rejectReason: 'Decommissioned',
-        tunnelId: null,
-        tunnelToken: null,
-        ztAppId: null,
-      },
-    });
-
-    // Slack notification
-    const slackWh = process.env.SLACK_WEBHOOK_URL;
-    if (slackWh) {
-      fetch(slackWh, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: `🗑️ Tenant decommissioned: *${tenant.name}* (${tenant.subdomain}.hubport.cloud)`,
-        }),
-      }).catch(() => {});
-    }
-
-    reply.redirect('/admin');
   });
 }
