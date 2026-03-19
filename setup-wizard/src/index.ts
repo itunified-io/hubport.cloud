@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { renderWizard, renderStep } from './ui/wizard-page.js';
 import { tenantStep } from './steps/tenant-register.js';
 import { dbStep } from './steps/db-init.js';
-import { vaultStep } from './steps/vault-init.js';
+import { vaultStep, vaultConfirmHandler } from './steps/vault-init.js';
 import { encryptionKeyStep } from './steps/encryption-key.js';
 import { keycloakStep } from './steps/keycloak-setup.js';
 import { tunnelStep } from './steps/cf-tunnel.js';
@@ -38,6 +38,13 @@ app.post<{ Params: { step: string } }>('/step/:step', async (req, reply) => {
   const result = await step.execute(req.body as Record<string, string>);
   const status = await step.check();
   reply.type('text/html').send(renderStep(step, idx + 1, status, result));
+});
+
+// Vault credential confirmation — second phase after user downloads & confirms credentials
+app.post('/step/3/confirm', async (req, reply) => {
+  const result = await vaultConfirmHandler(req.body as Record<string, string>);
+  const status = await vaultStep.check();
+  reply.type('text/html').send(renderStep(vaultStep, 3, status, result));
 });
 
 app.get('/health', async () => ({ status: 'ok', wizard: true }));

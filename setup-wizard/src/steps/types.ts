@@ -28,4 +28,15 @@ export interface StepResult {
   credentials?: Record<string, string>;
   /** Warnings that need attention */
   warnings?: string[];
+  /** If set, triggers a hard-stop credential confirmation page instead of normal rendering */
+  hardStop?: VaultCredentialStop;
+  /** If set, triggers a second download prompt for the encryption key after Vault confirm */
+  encryptionKeyDownload?: { key: string; generatedAt: string };
+}
+
+/** Data for the Vault credential hard-stop page — user must download & confirm before continuing */
+export interface VaultCredentialStop {
+  unsealKey: string;
+  rootToken: string;
+  generatedAt: string;
 }

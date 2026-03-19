@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import type { WizardStep, StepStatus, StepResult } from './types.js';
 
 const VAULT_ADDR = process.env.VAULT_ADDR || 'http://vault:8200';
@@ -8,9 +7,9 @@ const SECRET_PATH = 'secret/data/hubport/encryption-key';
 export const encryptionKeyStep: WizardStep = {
   number: 4,
   id: 'encryption-key',
-  title: 'Encryption Key Generation',
+  title: 'Encryption Key Verification',
   description:
-    'Generate a 32-byte random encryption key and store it securely in Vault. The key is used to encrypt sensitive tenant data at rest and is never exposed outside Vault.',
+    'Verifies the encryption key was generated during Vault initialization (Step 3). The key encrypts personal data (names, emails, phone numbers) at rest.',
   optional: false,
 
   async check(): Promise<StepStatus> {
@@ -29,7 +28,9 @@ export const encryptionKeyStep: WizardStep = {
 
       return {
         completed: exists,
-        details: exists ? { status: 'Key present in Vault' } : { status: 'Key not found' },
+        details: exists
+          ? { status: 'Encryption key present in Vault (generated during Step 3)' }
+          : { status: 'Key not found — re-run Step 3 (Vault Initialization)' },
       };
     } catch {
       return { completed: false, details: { status: 'Vault unreachable' } };
@@ -37,60 +38,20 @@ export const encryptionKeyStep: WizardStep = {
   },
 
   async execute(): Promise<StepResult> {
-    if (!VAULT_TOKEN) {
-      return {
-        success: false,
-        message: 'VAULT_TOKEN is not set. Complete the Vault Initialization step first.',
-      };
-    }
+    // Encryption key is now generated during Vault init (Step 3)
+    // This step only verifies it exists
+    const status = await this.check();
 
-    try {
-      // Check if a key already exists (idempotent)
-      const existingRes = await fetch(`${VAULT_ADDR}/v1/${SECRET_PATH}`, {
-        headers: { 'X-Vault-Token': VAULT_TOKEN },
-        signal: AbortSignal.timeout(3000),
-      });
-
-      if (existingRes.ok) {
-        const body = (await existingRes.json()) as {
-          data?: { data?: { key?: string } };
-        };
-        if (typeof body.data?.data?.key === 'string' && body.data.data.key.length > 0) {
-          return {
-            success: true,
-            message: 'Encryption key already exists in Vault. Skipping generation.',
-          };
-        }
-      }
-
-      // Generate a 32-byte random key
-      const key = randomBytes(32).toString('base64');
-
-      // Store in Vault KV v2
-      const writeRes = await fetch(`${VAULT_ADDR}/v1/${SECRET_PATH}`, {
-        method: 'POST',
-        headers: {
-          'X-Vault-Token': VAULT_TOKEN,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: { key } }),
-      });
-
-      if (!writeRes.ok) {
-        const errBody = (await writeRes.text()) || writeRes.statusText;
-        return { success: false, message: `Failed to store key in Vault: ${errBody}` };
-      }
-
+    if (status.completed) {
       return {
         success: true,
-        message:
-          'Encryption key generated and stored in Vault at hubport/encryption-key. The key is not displayed for security — it will be read from Vault by the application at runtime.',
-      };
-    } catch (err) {
-      return {
-        success: false,
-        message: `Encryption key generation failed: ${(err as Error).message}`,
+        message: 'Encryption key verified in Vault. Generated during Step 3 (Vault Initialization).',
       };
     }
+
+    return {
+      success: false,
+      message: 'Encryption key not found in Vault. Please re-run Step 3 (Vault Initialization) first.',
+    };
   },
 };
