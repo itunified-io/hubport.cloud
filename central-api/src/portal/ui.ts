@@ -68,7 +68,7 @@ export function setupPage(tenantName: string, token: string): string {
   `;
 }
 
-export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }): string {
+export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }, _apiToken?: string | null): string {
   const statusColor = tenant.status === 'ACTIVE' ? 'text-green-400' : tenant.status === 'APPROVED' ? 'text-amber-400' : 'text-zinc-400';
   return `
     <h2 class="text-2xl text-amber-500 mb-6">Dashboard</h2>

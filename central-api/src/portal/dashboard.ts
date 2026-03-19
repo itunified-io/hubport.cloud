@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { verifyPassword } from '../lib/crypto.js';
 import { portalAuth } from './auth.js';
 import { portalShell, dashboardPage } from './ui.js';
+import { readApiTokenCookie } from '../lib/encrypted-cookie.js';
 
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   // All dashboard routes require auth
@@ -17,7 +18,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).type('text/html').send(portalShell('Not Found', '<p>Tenant not found.</p>'));
     }
 
-    reply.type('text/html').send(portalShell(`Dashboard - ${tenant.name}`, dashboardPage(tenant)));
+    const apiToken = readApiTokenCookie(req.headers.cookie);
+    reply.type('text/html').send(portalShell(`Dashboard - ${tenant.name}`, dashboardPage(tenant, apiToken)));
   });
 
   // POST /portal/reveal-token — requires password re-entry
