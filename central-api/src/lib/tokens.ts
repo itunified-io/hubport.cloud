@@ -6,7 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
  */
 export function generateApiToken(tenantId: string): { plaintext: string; hash: string } {
   const tenantIdHash = createHash('sha256').update(tenantId).digest('hex').slice(0, 8);
-  const random = randomBytes(32).toString('base64url');
+  const random = randomBytes(32).toString('base64url'); // 32 bytes → 43 chars base64url (no padding)
   const plaintext = `hpt_${tenantIdHash}_${random}`;
   const hash = hashToken(plaintext);
   return { plaintext, hash };
@@ -22,7 +22,7 @@ export function validateTokenFormat(token: string): boolean {
   return /^hpt_[a-f0-9]{8}_[A-Za-z0-9_-]{43}$/.test(token);
 }
 
-/** Extract the 8-char tenant ID hash from a token. */
+/** Extract the 8-char tenant ID hash from a token. Used by token routes (Phase 2). */
 export function extractTenantIdHash(token: string): string {
   return token.split('_')[1] ?? '';
 }

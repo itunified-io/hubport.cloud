@@ -57,6 +57,10 @@ export async function apiTokenAuth(request: FastifyRequest, reply: FastifyReply)
   }
 
   if (!tokenRecord) {
+    // Deliberate UX trade-off: distinguish expired from invalid tokens.
+    // An attacker would need the plaintext token to compute the hash,
+    // so the information leak is low-severity. The portal_url helps
+    // legitimate M2M clients discover where to get a new token.
     // Check if it was an expired token
     const expired = await prisma.tenantApiToken.findFirst({
       where: { tokenHash },
