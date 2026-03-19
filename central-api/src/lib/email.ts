@@ -124,7 +124,7 @@ export function onboardingEmailHtml(tenant: {
 
     <div style="background: rgba(217,119,6,0.1); border: 1px solid rgba(217,119,6,0.3); border-radius: 10px; padding: 16px; margin: 20px 0;">
       <p style="margin: 0 0 8px; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> (Tenant ID, Tunnel Token, and API Token) are available in your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706; font-weight: 600;">Tenant Portal</a>. For security, credentials are not sent via email.</p>
-      <p style="margin: 0; font-size: 13px; color: #a1a1aa;">Log in to your Tenant Portal at <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">portal.hubport.cloud</a> to complete MFA setup and get your API token.</p>
+      <p style="margin: 0; font-size: 13px; color: #a1a1aa;">Log in to your Tenant Portal at <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">${(process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud').replace('https://', '')}</a> to complete MFA setup and get your API token.</p>
     </div>
 
     <h3 style="color: #e4e4e7;">Quick Start</h3>
