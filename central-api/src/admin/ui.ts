@@ -220,5 +220,18 @@ export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tu
         </div>
       </div>
     ` : ''}
+
+    ${tenant.status === 'APPROVED' || tenant.status === 'ACTIVE' ? `
+      <div class="card p-6 border-[#ef4444]/10 mt-4">
+        <h3 class="text-sm font-semibold text-white mb-2">Danger Zone</h3>
+        <p class="text-xs text-zinc-500 mb-4">Decommissioning will delete the CF Tunnel, DNS record, and revoke all access. This cannot be undone.</p>
+        <form method="POST" action="/admin/tenant/${esc(tenant.id)}/decommission">
+          <button type="submit" class="btn btn-danger" onclick="return confirm('⚠️ DECOMMISSION ${esc(tenant.name)}?\\n\\nThis will PERMANENTLY:\\n• Delete CF Tunnel (hubport-${esc(tenant.subdomain)})\\n• Delete DNS record (${esc(tenant.subdomain)}.hubport.cloud)\\n• Revoke all access\\n\\nThe tenant will no longer be reachable.\\n\\nAre you sure?')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6"/></svg>
+            Decommission Tenant
+          </button>
+        </form>
+      </div>
+    ` : ''}
   `;
 }

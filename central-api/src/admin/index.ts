@@ -5,7 +5,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
-import { provisionTenant } from '../lib/provision.js';
+import { provisionTenant, deprovisionTenant } from '../lib/provision.js';
 import { sendEmail, onboardingEmailHtml, rejectionEmailHtml } from '../lib/email.js';
 import { shell, tenantRow, tenantDetail, statsCard } from './ui.js';
 
@@ -145,6 +145,48 @@ export async function adminRoutes(app: FastifyInstance) {
       );
     } catch (err) {
       app.log.error({ err, tenantId: id }, 'Rejection email failed');
+    }
+
+    reply.redirect('/admin');
+  });
+
+  // Decommission tenant — removes CF resources
+  app.post('/tenant/:id/decommission', async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) return reply.redirect('/admin');
+
+    // Delete CF resources
+    try {
+      if (tenant.tunnelId) {
+        await deprovisionTenant(tenant.tunnelId);
+      }
+    } catch (err) {
+      app.log.error({ err, tenantId: id }, 'Deprovision failed');
+    }
+
+    await prisma.tenant.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectReason: 'Decommissioned',
+        tunnelId: null,
+        tunnelToken: null,
+        ztAppId: null,
+      },
+    });
+
+    // Slack notification
+    const slackWh = process.env.SLACK_WEBHOOK_URL;
+    if (slackWh) {
+      fetch(slackWh, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `🗑️ Tenant decommissioned: *${tenant.name}* (${tenant.subdomain}.hubport.cloud)`,
+        }),
+      }).catch(() => {});
     }
 
     reply.redirect('/admin');
