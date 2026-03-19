@@ -11,7 +11,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   // GET /portal/dashboard
   app.get('/dashboard', async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, include: { auth: true } });
 
     if (!tenant) {
       return reply.status(404).type('text/html').send(portalShell('Not Found', '<p>Tenant not found.</p>'));

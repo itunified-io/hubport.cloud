@@ -82,3 +82,15 @@ model SharedTalk {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
+
+model TenantAuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  action    String   // e.g., "token_revealed", "login", "login_failed", "2fa_enabled", "2fa_disabled", "account_setup"
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}

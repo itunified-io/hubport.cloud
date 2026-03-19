@@ -68,7 +68,7 @@ export function setupPage(tenantName: string, token: string): string {
   `;
 }
 
-export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date }): string {
+export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }): string {
   const statusColor = tenant.status === 'ACTIVE' ? 'text-green-400' : tenant.status === 'APPROVED' ? 'text-amber-400' : 'text-zinc-400';
   return `
     <h2 class="text-2xl text-amber-500 mb-6">Dashboard</h2>
@@ -143,6 +143,68 @@ volumes:
   hubport-data:
   pg-data:</pre>
     </div>
+
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
+      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Security</h3>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-zinc-200 font-semibold">Two-Factor Authentication</p>
+          <p class="text-sm text-zinc-400">${tenant.auth?.totpEnabled ? 'Enabled — your account is protected' : 'Not enabled — add an extra layer of security'}</p>
+        </div>
+        ${tenant.auth?.totpEnabled
+          ? '<button type="button" onclick="disable2fa()" class="text-sm bg-red-600/20 border border-red-600/40 text-red-400 px-4 py-2 rounded-lg hover:bg-red-600/30 transition">Disable</button>'
+          : '<a href="/portal/totp/enroll" class="text-sm bg-amber-600/20 border border-amber-600/40 text-amber-400 px-4 py-2 rounded-lg hover:bg-amber-600/30 transition">Enable 2FA</a>'
+        }
+      </div>
+    </div>
+
+    <!-- Disable 2FA modal -->
+    <div id="disable-2fa-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+      <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4">
+        <h3 class="text-lg text-amber-500 mb-4">Disable Two-Factor Authentication</h3>
+        <p class="text-sm text-zinc-400 mb-4">Enter your password to confirm disabling 2FA.</p>
+        <input type="password" id="disable-2fa-password" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none mb-4" placeholder="Password">
+        <div id="disable-2fa-error" class="text-sm text-red-400 mb-3 hidden"></div>
+        <div class="flex gap-3">
+          <button onclick="closeDisable2faModal()" class="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 py-2 rounded-lg transition">Cancel</button>
+          <button onclick="submitDisable2fa()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition">Disable 2FA</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function disable2fa() {
+      document.getElementById('disable-2fa-modal').classList.remove('hidden');
+      document.getElementById('disable-2fa-modal').classList.add('flex');
+      document.getElementById('disable-2fa-password').focus();
+    }
+    function closeDisable2faModal() {
+      document.getElementById('disable-2fa-modal').classList.add('hidden');
+      document.getElementById('disable-2fa-modal').classList.remove('flex');
+      document.getElementById('disable-2fa-password').value = '';
+      document.getElementById('disable-2fa-error').classList.add('hidden');
+    }
+    async function submitDisable2fa() {
+      const password = document.getElementById('disable-2fa-password').value;
+      if (!password) return;
+      try {
+        const res = await fetch('/portal/totp/disable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        if (!res.ok) {
+          document.getElementById('disable-2fa-error').textContent = 'Invalid password';
+          document.getElementById('disable-2fa-error').classList.remove('hidden');
+          return;
+        }
+        window.location.href = '/portal/dashboard';
+      } catch {
+        document.getElementById('disable-2fa-error').textContent = 'Request failed';
+        document.getElementById('disable-2fa-error').classList.remove('hidden');
+      }
+    }
+    </script>
 
     <div class="mt-8 text-center">
       <form method="POST" action="/portal/logout">

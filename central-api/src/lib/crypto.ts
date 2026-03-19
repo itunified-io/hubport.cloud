@@ -53,3 +53,43 @@ export async function verifyToken(token: string): Promise<{ tenantId: string; em
 export function generateSetupToken(): string {
   return randomUUID();
 }
+
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+
+const ENCRYPTION_KEY = () => {
+  const key = process.env.ENCRYPTION_KEY;
+  if (!key) return null;
+  return Buffer.from(key, 'base64');
+};
+
+export function encryptToken(plaintext: string): string {
+  const key = ENCRYPTION_KEY();
+  if (!key) return plaintext; // fallback: no encryption in dev
+
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  // Format: base64(iv + authTag + encrypted)
+  return Buffer.concat([iv, authTag, encrypted]).toString('base64');
+}
+
+export function decryptToken(ciphertext: string): string {
+  const key = ENCRYPTION_KEY();
+  if (!key) return ciphertext; // fallback: no encryption in dev
+
+  try {
+    const data = Buffer.from(ciphertext, 'base64');
+    const iv = data.subarray(0, 12);
+    const authTag = data.subarray(12, 28);
+    const encrypted = data.subarray(28);
+
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  } catch {
+    // If decryption fails, assume plaintext (migration period)
+    return ciphertext;
+  }
+}
