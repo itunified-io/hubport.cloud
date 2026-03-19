@@ -6,6 +6,7 @@
 import { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma.js';
+import { apiTokenAuth } from '../middleware/api-token-auth.js';
 
 const TenantRequestBody = Type.Object({
   name: Type.String({ minLength: 2 }),
@@ -52,7 +53,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   });
 
   // One-time call-home from setup wizard
-  app.post('/:id/activate', async (request, reply) => {
+  app.post('/:id/activate', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
 
     const tenant = await prisma.tenant.findUnique({ where: { id } });
@@ -80,7 +81,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   });
 
   // Get tenant info (tenant-authenticated)
-  app.get('/:id', async (request, reply) => {
+  app.get('/:id', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
