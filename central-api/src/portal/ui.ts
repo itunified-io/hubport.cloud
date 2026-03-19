@@ -114,9 +114,18 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       </ol>
     </div>
 
-    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">docker-compose.yml</h3>
-      <pre class="bg-[#0a0a0c] p-4 rounded-lg text-xs text-zinc-300 overflow-x-auto">services:
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm text-zinc-500 uppercase tracking-wider">docker-compose.yml</h3>
+        <div class="flex gap-2">
+          <button onclick="generatePgPassword()" class="text-xs bg-zinc-700/50 border border-zinc-600 text-zinc-300 px-3 py-1 rounded hover:bg-zinc-600/50 transition">Generate PG Password</button>
+          <button onclick="copyYaml()" id="copy-btn" class="text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
+        </div>
+      </div>
+      <div id="pg-password-warning" class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-3 hidden">
+        <p class="text-xs text-red-400"><strong>Important:</strong> Save this password in a secure place now. It will not be stored or shown again. If you lose it, you will need to reset your database.</p>
+      </div>
+      <pre id="compose-yaml" class="bg-[#0a0a0c] p-4 rounded-lg text-xs text-zinc-300 overflow-x-auto select-all">services:
   hubport:
     image: ghcr.io/itunified-io/hubport.cloud:latest
     ports:
@@ -124,7 +133,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       - "8080:8080"
     environment:
       - HUBPORT_TENANT_ID=${tenant.id}
-      - CF_TUNNEL_TOKEN=&lt;reveal above&gt;
+      - CF_TUNNEL_TOKEN=<span id="yaml-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
     volumes:
       - hubport-data:/data
     restart: unless-stopped
@@ -134,7 +143,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     environment:
       - POSTGRES_DB=hubport
       - POSTGRES_USER=hubport
-      - POSTGRES_PASSWORD=changeme
+      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-amber-400">changeme</span>
     volumes:
       - pg-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -257,11 +266,32 @@ volumes:
         document.getElementById('token-value').textContent = data.tunnelToken;
         document.getElementById('token-value').classList.remove('hidden');
         document.getElementById('reveal-btn').classList.add('hidden');
+        // Update docker-compose YAML with revealed token
+        document.getElementById('yaml-token').textContent = data.tunnelToken;
+        document.getElementById('yaml-token').classList.remove('text-zinc-600');
+        document.getElementById('yaml-token').classList.add('text-amber-400');
         closeRevealModal();
       } catch {
         document.getElementById('reveal-error').textContent = 'Request failed';
         document.getElementById('reveal-error').classList.remove('hidden');
       }
+    }
+    function generatePgPassword() {
+      const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*';
+      const arr = new Uint8Array(24);
+      crypto.getRandomValues(arr);
+      const pass = Array.from(arr, b => chars[b % chars.length]).join('');
+      document.getElementById('yaml-pgpass').textContent = pass;
+      document.getElementById('yaml-pgpass').classList.add('text-green-400');
+      document.getElementById('pg-password-warning').classList.remove('hidden');
+    }
+    function copyYaml() {
+      const yaml = document.getElementById('compose-yaml').textContent;
+      navigator.clipboard.writeText(yaml).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
     }
     </script>
   `;
