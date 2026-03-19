@@ -161,8 +161,17 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       - HUBPORT_API_TOKEN=<span id="yaml-api-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
       - CENTRAL_API_URL=${escapeHtml(centralApiUrl())}
       - CF_TUNNEL_TOKEN=<span id="yaml-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
-    volumes:
-      - hubport-data:/data
+      - DATABASE_URL=postgresql://hubport:<span id="yaml-dbpass" class="text-zinc-500">changeme</span>@postgres:5432/hubport
+      - VAULT_ADDR=http://vault:8200
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=hubport
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
@@ -170,14 +179,68 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     environment:
       - POSTGRES_DB=hubport
       - POSTGRES_USER=hubport
-      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-zinc-500">managed-by-setup-wizard</span>
+      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-zinc-500">changeme</span>
     volumes:
       - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hubport"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault-data:/vault/data
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    ports:
+      - "8180:8080"
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
+      - KC_DB_USERNAME=hubport
+      - KC_DB_PASSWORD=<span id="yaml-kcpass" class="text-zinc-500">changeme</span>
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=<span id="yaml-kcadminpass" class="text-zinc-500">changeme</span>
+      - KC_HOSTNAME_STRICT=false
+      - KC_HTTP_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3&lt;&gt;/dev/tcp/localhost/8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=<span id="yaml-cfd-token" class="text-zinc-600">&lt;same as CF_TUNNEL_TOKEN above&gt;</span>
+    depends_on:
+      - hubport
     restart: unless-stopped
 
 volumes:
-  hubport-data:
-  pg-data:</pre>
+  pg-data:
+  vault-data:</pre>
     </div>
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
@@ -301,6 +364,9 @@ volumes:
         document.getElementById('yaml-token').textContent = data.tunnelToken;
         document.getElementById('yaml-token').classList.remove('text-zinc-600');
         document.getElementById('yaml-token').classList.add('text-amber-400');
+        // Also set cloudflared TUNNEL_TOKEN
+        var cfdEl = document.getElementById('yaml-cfd-token');
+        if (cfdEl) { cfdEl.textContent = data.tunnelToken; cfdEl.classList.remove('text-zinc-600'); cfdEl.classList.add('text-amber-400'); }
         closeRevealModal();
       } catch {
         document.getElementById('reveal-error').textContent = 'Request failed';

@@ -1,6 +1,8 @@
 /**
- * Prisma middleware that transparently encrypts/decrypts
+ * Prisma client extension that transparently encrypts/decrypts
  * personal data fields on the Publisher model using AES-256-GCM.
+ *
+ * Replaces deprecated $use middleware (removed in Prisma v6).
  */
 
 import { Prisma } from "@prisma/client";
@@ -14,8 +16,6 @@ const ENCRYPTED_FIELDS = [
   "email",
   "phone",
 ] as const;
-
-type EncryptedField = (typeof ENCRYPTED_FIELDS)[number];
 
 /** Models whose data is subject to field-level encryption. */
 const ENCRYPTED_MODELS = ["Publisher"] as const;
@@ -85,43 +85,39 @@ const WRITE_ACTIONS = ["create", "update", "upsert", "createMany", "updateMany"]
 const READ_ACTIONS = ["findUnique", "findFirst", "findMany"];
 
 /**
- * Returns a Prisma middleware function that handles transparent
+ * Returns a Prisma client extension that handles transparent
  * field-level encryption for personal data.
  */
-export function encryptionMiddleware(): Prisma.Middleware {
-  return async (
-    params: Prisma.MiddlewareParams,
-    next: (params: Prisma.MiddlewareParams) => Promise<unknown>,
-  ): Promise<unknown> => {
-    if (!isEncryptedModel(params.model)) {
-      return next(params);
-    }
-
-    // --- Encrypt before write ---
-    if (WRITE_ACTIONS.includes(params.action)) {
-      if (params.args.data) {
-        await encryptFields(params.args.data as Record<string, unknown>);
+export const encryptionExtension = Prisma.defineExtension({
+  name: "field-encryption",
+  query: {
+    $allOperations: async ({ model, operation, args, query }) => {
+      if (!isEncryptedModel(model)) {
+        return query(args);
       }
-      // createMany uses an array
-      if (Array.isArray(params.args.data)) {
-        for (const item of params.args.data) {
-          await encryptFields(item as Record<string, unknown>);
+
+      // --- Encrypt before write ---
+      if (WRITE_ACTIONS.includes(operation)) {
+        const data = (args as Record<string, unknown>).data;
+        if (data && typeof data === "object") {
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              await encryptFields(item as Record<string, unknown>);
+            }
+          } else {
+            await encryptFields(data as Record<string, unknown>);
+          }
         }
       }
-    }
 
-    const result = await next(params);
+      const result = await query(args);
 
-    // --- Decrypt after read ---
-    if (READ_ACTIONS.includes(params.action)) {
-      await decryptResult(result);
-    }
+      // --- Decrypt after read or write (so returned object is plaintext) ---
+      if (READ_ACTIONS.includes(operation) || WRITE_ACTIONS.includes(operation)) {
+        await decryptResult(result);
+      }
 
-    // Also decrypt after write so the returned object is plaintext
-    if (WRITE_ACTIONS.includes(params.action)) {
-      await decryptResult(result);
-    }
-
-    return result;
-  };
-}
+      return result;
+    },
+  },
+});

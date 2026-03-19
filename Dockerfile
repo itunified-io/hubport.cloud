@@ -34,8 +34,6 @@ RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
 COPY --from=builder /app/hub-app/dist ./hub-app/dist/
 COPY --from=builder /app/hub-api/dist ./hub-api/dist/
 COPY --from=builder /app/hub-api/prisma ./hub-api/prisma/
-COPY --from=builder /app/hub-api/node_modules/.prisma ./node_modules/.prisma/
-COPY --from=builder /app/hub-api/node_modules/@prisma ./node_modules/@prisma/
 COPY --from=builder /app/setup-wizard/dist ./setup-wizard/dist/
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/package.json ./
