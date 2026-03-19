@@ -29,10 +29,27 @@ model Tenant {
   updatedAt    DateTime     @updatedAt
   activatedAt  DateTime?
 
+  auth              TenantAuth?
   sharingApprovals  SharingApproval[] @relation("requester")
   sharingApprovedBy SharingApproval[] @relation("approver")
   sharedTerritories SharedTerritory[]
   sharedTalks       SharedTalk[]
+}
+
+model TenantAuth {
+  id                  String    @id @default(uuid())
+  tenantId            String    @unique
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  passwordHash        String
+  totpSecret          String?
+  totpEnabled         Boolean   @default(false)
+  setupToken          String?   @unique
+  setupTokenExpiresAt DateTime?
+  failedAttempts      Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }
 
 model SharingApproval {
