@@ -70,7 +70,7 @@ export async function apiTokenAuth(request: FastifyRequest, reply: FastifyReply)
       reply.status(401).send({
         error: 'token_expired',
         message: 'API token has expired',
-        portal_url: process.env.PORTAL_URL || 'https://portal.hubport.cloud',
+        portal_url: process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud',
       });
       return;
     }
