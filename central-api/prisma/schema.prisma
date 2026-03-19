@@ -34,6 +34,8 @@ model Tenant {
   sharingApprovedBy SharingApproval[] @relation("approver")
   sharedTerritories SharedTerritory[]
   sharedTalks       SharedTalk[]
+  apiTokens         TenantApiToken[]
+  passkeys          TenantPasskey[]
 }
 
 model TenantAuth {
@@ -47,9 +49,41 @@ model TenantAuth {
   setupTokenExpiresAt DateTime?
   failedAttempts      Int       @default(0)
   lockedUntil         DateTime?
+  mfaCompleted        Boolean   @default(false) // Set true after passkey or TOTP setup (Phase 3)
   lastLoginAt         DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+model TenantApiToken {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  tokenHash String    // SHA-256 hash of plaintext token
+  expiresAt DateTime  // 14 days from issuance
+  rotatedAt DateTime? // last rotation timestamp
+  revokedAt DateTime? // null = active
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([tenantId])
+}
+
+model TenantPasskey {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  credentialId Bytes    // WebAuthn credential ID
+  publicKey    Bytes    // COSE public key
+  counter      BigInt   @default(0)
+  deviceType   String   // "singleDevice" | "multiDevice"
+  backedUp     Boolean  @default(false)
+  transports   String[] // ["usb", "ble", "nfc", "internal"]
+  friendlyName String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([credentialId])
 }
 
 model SharingApproval {

@@ -1,3 +1,8 @@
+/** Escape HTML special characters to prevent XSS in server-rendered templates. */
+export function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 export function portalShell(title: string, content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -68,7 +73,7 @@ export function setupPage(tenantName: string, token: string): string {
   `;
 }
 
-export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }): string {
+export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }, apiToken?: string | null): string {
   const statusColor = tenant.status === 'ACTIVE' ? 'text-green-400' : tenant.status === 'APPROVED' ? 'text-amber-400' : 'text-zinc-400';
   return `
     <h2 class="text-2xl text-amber-500 mb-6">Dashboard</h2>
@@ -76,8 +81,8 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
       <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
         <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Congregation</h3>
-        <p class="text-xl text-zinc-200 font-semibold">${tenant.name}</p>
-        <p class="text-sm text-zinc-400 mt-1">${tenant.subdomain}.hubport.cloud</p>
+        <p class="text-xl text-zinc-200 font-semibold">${escapeHtml(tenant.name)}</p>
+        <p class="text-sm text-zinc-400 mt-1">${escapeHtml(tenant.subdomain)}.hubport.cloud</p>
       </div>
       <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
         <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Status</h3>
@@ -99,6 +104,17 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
             <span id="token-hidden" class="text-zinc-600">Hidden for security</span>
             <span id="token-value" class="font-mono text-amber-400 text-xs break-all hidden"></span>
             <button id="reveal-btn" onclick="revealToken()" class="ml-2 text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Reveal</button>
+          </td>
+        </tr>
+        <tr class="border-b border-zinc-800">
+          <td class="py-3 text-zinc-400">API Token</td>
+          <td class="py-3">
+            ${apiToken
+              ? `<code id="api-token-value" data-token="${escapeHtml(apiToken)}" class="font-mono text-amber-400 text-xs break-all select-all">${escapeHtml(apiToken)}</code>
+                 <button onclick="copyApiToken()" class="ml-2 text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
+                 <p class="text-xs text-zinc-500 mt-1">This token is shown once. Save it now — it will not appear again.</p>`
+              : '<span class="text-zinc-600">Token has been displayed. Rotate from the portal if needed.</span>'
+            }
           </td>
         </tr>
       </table>
@@ -182,6 +198,10 @@ volumes:
     </div>
 
     <script>
+    function copyApiToken() {
+      const el = document.getElementById('api-token-value');
+      if (el) navigator.clipboard.writeText(el.dataset.token || '');
+    }
     function disable2fa() {
       document.getElementById('disable-2fa-modal').classList.remove('hidden');
       document.getElementById('disable-2fa-modal').classList.add('flex');

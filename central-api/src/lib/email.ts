@@ -100,7 +100,6 @@ export function onboardingEmailHtml(tenant: {
   name: string;
   subdomain: string;
   id: string;
-  tunnelToken?: string;
 }): string {
   return `
 <!DOCTYPE html>
@@ -124,15 +123,16 @@ export function onboardingEmailHtml(tenant: {
     </div>
 
     <div style="background: rgba(217,119,6,0.1); border: 1px solid rgba(217,119,6,0.3); border-radius: 10px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> (Tenant ID and Tunnel Token) are available in your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706; font-weight: 600;">Tenant Portal</a>. For security, credentials are not sent via email.</p>
+      <p style="margin: 0 0 8px; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> (Tenant ID, Tunnel Token, and API Token) are available in your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706; font-weight: 600;">Tenant Portal</a>. For security, credentials are not sent via email.</p>
+      <p style="margin: 0; font-size: 13px; color: #a1a1aa;">Log in to your Tenant Portal at <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">portal.hubport.cloud</a> to complete MFA setup and get your API token.</p>
     </div>
 
     <h3 style="color: #e4e4e7;">Quick Start</h3>
     <ol style="line-height: 1.8;">
       <li>Install <a href="https://docs.docker.com/get-docker/" style="color: #d97706;">Docker</a> on your server</li>
       <li>Create a <code>docker-compose.yml</code> file (see below)</li>
-      <li>Look up your credentials in the <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">Tenant Portal</a></li>
-      <li>Fill in <code>HUBPORT_TENANT_ID</code> and <code>CF_TUNNEL_TOKEN</code> in the compose file</li>
+      <li>Log in to your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">Tenant Portal</a> and complete MFA setup to retrieve your credentials</li>
+      <li>Fill in <code>HUBPORT_TENANT_ID</code>, <code>CF_TUNNEL_TOKEN</code>, and <code>HUBPORT_API_TOKEN</code> in the compose file</li>
       <li>Run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">docker compose up -d</code></li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
@@ -146,8 +146,9 @@ export function onboardingEmailHtml(tenant: {
       - "3000:3000"
       - "8080:8080"
     environment:
-      - HUBPORT_TENANT_ID=your-tenant-id    # from Tenant Portal
-      - CF_TUNNEL_TOKEN=your-tunnel-token    # from Tenant Portal
+      - HUBPORT_TENANT_ID=your-tenant-id       # from Tenant Portal
+      - CF_TUNNEL_TOKEN=your-tunnel-token       # from Tenant Portal
+      - HUBPORT_API_TOKEN=your-api-token        # from Tenant Portal (after MFA setup)
     volumes:
       - hubport-data:/data
     restart: unless-stopped

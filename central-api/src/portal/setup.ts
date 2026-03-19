@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword } from '../lib/crypto.js';
+import { hashPassword, createAccessToken } from '../lib/crypto.js';
 import { portalShell, setupPage } from './ui.js';
 
 export async function setupRoutes(app: FastifyInstance): Promise<void> {
@@ -67,13 +67,11 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
-    reply.type('text/html').send(portalShell('Account Created', `
-      <div class="text-center py-8">
-        <div class="text-4xl mb-4">&#10003;</div>
-        <h2 class="text-2xl text-amber-500 mb-4">Account Created Successfully</h2>
-        <p class="text-zinc-400 mb-6">Your password has been set for <strong class="text-zinc-200">${auth.tenant.name}</strong>.</p>
-        <a href="/portal/login" class="inline-block bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-8 rounded-lg transition">Log In Now</a>
-      </div>
-    `));
+    // After password set, redirect to mandatory MFA enrollment
+    const accessToken = await createAccessToken({ tenantId: auth.tenantId, email: auth.tenant.email });
+
+    reply
+      .header('Set-Cookie', `hubport_access=${accessToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${15 * 60}`)
+      .redirect('/portal/mfa-setup');
   });
 }

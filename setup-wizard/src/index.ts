@@ -8,8 +8,9 @@ import { keycloakStep } from './steps/keycloak-setup.js';
 import { tunnelStep } from './steps/cf-tunnel.js';
 import { warpStep } from './steps/warp-setup.js';
 import { adminStep } from './steps/admin-user.js';
+import { apiTokenStep } from './steps/api-token.js';
 
-const STEPS = [tenantStep, dbStep, vaultStep, encryptionKeyStep, keycloakStep, tunnelStep, warpStep, adminStep];
+const STEPS = [apiTokenStep, tenantStep, dbStep, vaultStep, encryptionKeyStep, keycloakStep, tunnelStep, warpStep, adminStep];
 
 const app = Fastify({ logger: true });
 
@@ -41,10 +42,10 @@ app.post<{ Params: { step: string } }>('/step/:step', async (req, reply) => {
 });
 
 // Vault credential confirmation — second phase after user downloads & confirms credentials
-app.post('/step/3/confirm', async (req, reply) => {
+app.post('/step/4/confirm', async (req, reply) => {
   const result = await vaultConfirmHandler(req.body as Record<string, string>);
   const status = await vaultStep.check();
-  reply.type('text/html').send(renderStep(vaultStep, 3, status, result));
+  reply.type('text/html').send(renderStep(vaultStep, 4, status, result));
 });
 
 app.get('/health', async () => ({ status: 'ok', wizard: true }));
