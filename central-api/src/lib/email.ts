@@ -5,24 +5,23 @@
  * Env vars:
  *   GMAIL_SERVICE_ACCOUNT_EMAIL — service account email
  *   GMAIL_PRIVATE_KEY — PEM private key (base64-encoded)
- *   GMAIL_SENDER_EMAIL — sender "from" address
+ *   GMAIL_senderEmail() — sender "from" address
  */
 
 import { SignJWT, importPKCS8 } from 'jose';
 
-const SA_EMAIL = process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || '';
-const PRIVATE_KEY_B64 = process.env.GMAIL_PRIVATE_KEY || '';
-const SENDER_EMAIL = process.env.GMAIL_SENDER_EMAIL || '';
-const GMAIL_USER = SENDER_EMAIL;
+function saEmail(): string { return process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || ''; }
+function privateKeyB64(): string { return process.env.GMAIL_PRIVATE_KEY || ''; }
+function senderEmail(): string { return process.env.GMAIL_SENDER_EMAIL || ''; }
 
 async function getAccessToken(): Promise<string> {
-  const privateKeyPem = Buffer.from(PRIVATE_KEY_B64, 'base64').toString('utf-8');
+  const privateKeyPem = Buffer.from(privateKeyB64(), 'base64').toString('utf-8');
   const privateKey = await importPKCS8(privateKeyPem, 'RS256');
 
   const now = Math.floor(Date.now() / 1000);
   const jwt = await new SignJWT({
-    iss: SA_EMAIL,
-    sub: GMAIL_USER,
+    iss: saEmail(),
+    sub: senderEmail(),
     scope: 'https://www.googleapis.com/auth/gmail.send',
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
@@ -48,7 +47,7 @@ async function getAccessToken(): Promise<string> {
 function buildMimeMessage(to: string, subject: string, htmlBody: string): string {
   const boundary = `boundary_${Date.now()}`;
   const raw = [
-    `From: hubport.cloud <${SENDER_EMAIL}>`,
+    `From: hubport.cloud <${senderEmail()}>`,
     `To: ${to}`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
@@ -65,7 +64,7 @@ function buildMimeMessage(to: string, subject: string, htmlBody: string): string
 }
 
 export async function sendEmail(to: string, subject: string, htmlBody: string): Promise<void> {
-  if (!SA_EMAIL || !PRIVATE_KEY_B64 || !SENDER_EMAIL) {
+  if (!saEmail() || !privateKeyB64() || !senderEmail()) {
     console.warn('[email] Gmail API not configured — skipping email send');
     return;
   }
@@ -74,7 +73,7 @@ export async function sendEmail(to: string, subject: string, htmlBody: string): 
   const raw = buildMimeMessage(to, subject, htmlBody);
 
   const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(GMAIL_USER)}/messages/send`,
+    `https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(senderEmail())}/messages/send`,
     {
       method: 'POST',
       headers: {

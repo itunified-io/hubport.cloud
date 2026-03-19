@@ -8,13 +8,14 @@
  */
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
-const CF_TOKEN = process.env.CF_API_TOKEN || '';
-const CF_ACCOUNT = process.env.CF_ACCOUNT_ID || '';
-const CF_ZONE = process.env.CF_ZONE_ID || '';
+
+function cfToken(): string { return process.env.CF_API_TOKEN || ''; }
+function cfAccount(): string { return process.env.CF_ACCOUNT_ID || ''; }
+function cfZone(): string { return process.env.CF_ZONE_ID || ''; }
 
 function headers(): Record<string, string> {
   return {
-    Authorization: `Bearer ${CF_TOKEN}`,
+    Authorization: `Bearer ${cfToken()}`,
     'Content-Type': 'application/json',
   };
 }
@@ -27,7 +28,7 @@ export interface ProvisionResult {
 }
 
 export async function provisionTenant(subdomain: string, email: string): Promise<ProvisionResult> {
-  if (!CF_TOKEN || !CF_ACCOUNT || !CF_ZONE) {
+  if (!cfToken() || !cfAccount() || !cfZone()) {
     throw new Error('CF_API_TOKEN, CF_ACCOUNT_ID, CF_ZONE_ID required for provisioning');
   }
 
@@ -35,7 +36,7 @@ export async function provisionTenant(subdomain: string, email: string): Promise
   const tunnelName = `hubport-tenant-${subdomain}`;
   const tunnelSecret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64');
 
-  const tunnelRes = await fetch(`${CF_API}/accounts/${CF_ACCOUNT}/cfd_tunnel`, {
+  const tunnelRes = await fetch(`${CF_API}/accounts/${cfAccount()}/cfd_tunnel`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ name: tunnelName, tunnel_secret: tunnelSecret }),
@@ -45,7 +46,7 @@ export async function provisionTenant(subdomain: string, email: string): Promise
   const tunnelId = tunnelData.result.id;
 
   // 2. Get tunnel token
-  const tokenRes = await fetch(`${CF_API}/accounts/${CF_ACCOUNT}/cfd_tunnel/${tunnelId}/token`, {
+  const tokenRes = await fetch(`${CF_API}/accounts/${cfAccount()}/cfd_tunnel/${tunnelId}/token`, {
     method: 'GET',
     headers: headers(),
   });
@@ -54,7 +55,7 @@ export async function provisionTenant(subdomain: string, email: string): Promise
   const tunnelToken = tokenData.result;
 
   // 3. Create DNS CNAME (explicit, no wildcard)
-  const dnsRes = await fetch(`${CF_API}/zones/${CF_ZONE}/dns_records`, {
+  const dnsRes = await fetch(`${CF_API}/zones/${cfZone()}/dns_records`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
@@ -82,11 +83,11 @@ export async function provisionTenant(subdomain: string, email: string): Promise
 }
 
 export async function deprovisionTenant(tunnelId: string, dnsRecordId?: string): Promise<void> {
-  if (!CF_TOKEN || !CF_ACCOUNT || !CF_ZONE) return;
+  if (!cfToken() || !cfAccount() || !cfZone()) return;
 
   // Delete tunnel
   if (tunnelId) {
-    await fetch(`${CF_API}/accounts/${CF_ACCOUNT}/cfd_tunnel/${tunnelId}`, {
+    await fetch(`${CF_API}/accounts/${cfAccount()}/cfd_tunnel/${tunnelId}`, {
       method: 'DELETE',
       headers: headers(),
       body: JSON.stringify({ cascade: true }),
@@ -95,7 +96,7 @@ export async function deprovisionTenant(tunnelId: string, dnsRecordId?: string):
 
   // Delete DNS record
   if (dnsRecordId) {
-    await fetch(`${CF_API}/zones/${CF_ZONE}/dns_records/${dnsRecordId}`, {
+    await fetch(`${CF_API}/zones/${cfZone()}/dns_records/${dnsRecordId}`, {
       method: 'DELETE',
       headers: headers(),
     });
