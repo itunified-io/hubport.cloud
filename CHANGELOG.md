@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.19.1
+
+### Admin Portal Read-Only + License Change (#10)
+- **Admin portal**: Removed approve/reject/decommission buttons and POST handlers
+- **Admin portal**: Added read-only status indicators (tunnel ID, DNS badge, provisioned/activation dates)
+- **Admin portal**: Added info banner — provisioning managed via `hubport-admin` MCP skill (ADR-0065)
+- **Internal endpoint**: Added `POST /internal/send-email` for MCP skill email sending
+- **Removed**: `central-api/src/lib/provision.ts` — direct Cloudflare API calls removed
+- **License**: Changed from GPL-3.0 to MIT + Commons Clause (ADR-0060)
+
 ## v2026.03.18.3
 
 ### Full App Implementation (#6)
