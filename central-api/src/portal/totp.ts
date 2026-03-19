@@ -118,11 +118,17 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
       data: { totpEnabled: true },
     });
 
+    // Check if MFA setup is still in progress
+    if (!auth.mfaCompleted) {
+      return reply.redirect('/portal/mfa-setup');
+    }
+
+    // Already completed MFA — show normal success page
     reply.type('text/html').send(portalShell('2FA Enabled', `
       <div class="text-center py-8">
         <div class="text-4xl mb-4 text-green-400">&#10003;</div>
         <h2 class="text-2xl text-amber-500 mb-4">Two-Factor Authentication Enabled</h2>
-        <p class="text-zinc-400 mb-6">Your account is now protected with 2FA. You will need your authenticator app code every time you log in.</p>
+        <p class="text-zinc-400 mb-6">Your account is now protected with 2FA.</p>
         <a href="/portal/dashboard" class="inline-block bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-8 rounded-lg transition">Back to Dashboard</a>
       </div>
     `));

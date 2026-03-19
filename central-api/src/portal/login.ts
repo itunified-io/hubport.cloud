@@ -50,6 +50,14 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
       return reply.type('text/html').send(portalShell('Log In', loginPage('Invalid email or password.')));
     }
 
+    // Check mfaCompleted gate — authoritative, checked before method-specific 2FA
+    if (!auth.mfaCompleted) {
+      const tempAccessToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
+      return reply
+        .header('Set-Cookie', `hubport_access=${tempAccessToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${15 * 60}`)
+        .redirect('/portal/mfa-setup');
+    }
+
     // Check TOTP if enabled
     if (auth.totpEnabled) {
       const tempToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
