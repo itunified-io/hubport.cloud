@@ -6,8 +6,21 @@ interface LayoutProps {
   children: ReactNode;
 }
 
+function getTenantName(): string {
+  const subdomain =
+    (window as unknown as Record<string, unknown>).__HUBPORT_SUBDOMAIN__ as string | undefined;
+  if (subdomain) return subdomain;
+  // Fallback: try to read from hostname (e.g., penzberg-north-uat.hubport.cloud)
+  const host = window.location.hostname;
+  if (host.endsWith(".hubport.cloud")) {
+    return host.replace(".hubport.cloud", "");
+  }
+  return "Hubport";
+}
+
 export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const tenantName = getTenantName();
 
   return (
     <div className="min-h-dvh flex bg-[var(--bg)]">
@@ -26,7 +39,9 @@ export function Layout({ children }: LayoutProps) {
         }`}
       >
         <div className="h-14 flex items-center px-4 border-b border-[var(--border)]">
-          <span className="text-[var(--amber)] font-bold text-lg">Hubport</span>
+          <span className="text-[var(--amber)] font-bold text-lg tracking-wide">
+            {tenantName}
+          </span>
         </div>
         <div className="flex-1 overflow-y-auto pt-2">
           <Sidebar onNavigate={() => setSidebarOpen(false)} />

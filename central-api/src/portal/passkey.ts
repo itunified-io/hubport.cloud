@@ -281,14 +281,14 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
       where: { tenantId },
       select: { id: true, deviceType: true, backedUp: true, friendlyName: true, createdAt: true },
     });
-    return reply.send(passkeys);
+    return reply.send({ passkeys: passkeys.map((pk) => ({ ...pk, name: pk.friendlyName })) });
   });
 
   app.post('/passkey/delete', { preHandler: portalAuth }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
-    const body = req.body as { passkeyId?: string; password?: string } | null;
-    if (!body?.passkeyId || !body?.password) {
-      return reply.status(400).send({ error: 'Passkey ID and password required' });
+    const body = req.body as { credentialId?: string; password?: string } | null;
+    if (!body?.credentialId || !body?.password) {
+      return reply.status(400).send({ error: 'Credential ID and password required' });
     }
     const auth = await prisma.tenantAuth.findUnique({ where: { tenantId } });
     if (!auth) return reply.status(404).send({ error: 'Account not found' });
@@ -298,12 +298,12 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     if (!valid) return reply.status(401).send({ error: 'Invalid password' });
 
     const remainingPasskeys = await prisma.tenantPasskey.count({
-      where: { tenantId, id: { not: body.passkeyId } },
+      where: { tenantId, id: { not: body.credentialId } },
     });
     if (remainingPasskeys === 0 && !auth.totpEnabled) {
       return reply.status(400).send({ error: 'Cannot remove last MFA method. Enable TOTP first.' });
     }
-    await prisma.tenantPasskey.delete({ where: { id: body.passkeyId } });
+    await prisma.tenantPasskey.delete({ where: { id: body.credentialId } });
     return reply.send({ deleted: true });
   });
 }

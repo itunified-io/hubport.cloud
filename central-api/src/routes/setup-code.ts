@@ -3,12 +3,16 @@ import { prisma } from '../lib/prisma.js';
 import { portalAuth } from '../portal/auth.js';
 import {
   generateSetupCode,
+  generateDeviceCode,
   validateCodeFormat,
   getCodeExpiresAt,
+  getDeviceCodeExpiresAt,
 } from '../lib/setup-code.js';
 
 // Rate limit: IP -> { count, resetAt }
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
+// Poll rate limit (higher threshold for installer polling)
+const pollRateLimits = new Map<string, { count: number; resetAt: number }>();
 // Code attempt counter: code -> total attempts
 const codeAttempts = new Map<string, number>();
 // Replay cache: code -> { response, ip, expiresAt }
@@ -19,6 +23,8 @@ const replayCache = new Map<
 
 const RATE_LIMIT_PER_IP = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const POLL_RATE_LIMIT_PER_IP = 20; // ~5s interval for 15 min
+const POLL_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const CODE_MAX_ATTEMPTS = 20;
 const REPLAY_WINDOW_MS = 10 * 60 * 1000;
 
@@ -30,6 +36,18 @@ function checkRateLimit(ip: string): boolean {
     return true;
   }
   if (entry.count >= RATE_LIMIT_PER_IP) return false;
+  entry.count++;
+  return true;
+}
+
+function checkPollRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = pollRateLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    pollRateLimits.set(ip, { count: 1, resetAt: now + POLL_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= POLL_RATE_LIMIT_PER_IP) return false;
   entry.count++;
   return true;
 }
@@ -84,7 +102,7 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: 'Too many attempts. Try again in 1 minute.' });
     }
 
-    const body = req.body as { code?: string } | null;
+    const body = req.body as { code?: string; hostname?: string; os?: string; arch?: string } | null;
     if (!body?.code || !validateCodeFormat(body.code.toUpperCase())) {
       return reply
         .status(400)
@@ -92,6 +110,9 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const code = body.code.toUpperCase();
+    const deviceHostname = body.hostname || 'unknown';
+    const deviceOs = body.os || 'unknown';
+    const deviceArch = body.arch || 'unknown';
 
     // Replay cache: same IP within window gets cached response
     const cached = replayCache.get(code);
@@ -141,6 +162,22 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
     const portalUrl =
       process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
 
+    // Create device authorization record
+    const deviceCode = generateDeviceCode();
+    const deviceExpiresAt = getDeviceCodeExpiresAt();
+
+    await prisma.tenantDevice.create({
+      data: {
+        tenantId: tenant.id,
+        deviceCode,
+        hostname: deviceHostname,
+        os: deviceOs,
+        arch: deviceArch,
+        ip,
+        expiresAt: deviceExpiresAt,
+      },
+    });
+
     const response = {
       tenantId: tenant.id,
       slug: tenant.subdomain,
@@ -148,6 +185,10 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       tunnelToken: tenant.tunnelToken,
       centralApiUrl,
       portalUrl,
+      role: tenant.role,
+      deviceCode,
+      verifyUrl: `${portalUrl}/portal/devices/verify`,
+      deviceExpiresAt: deviceExpiresAt.toISOString(),
     };
 
     // Cache for replay window
@@ -166,5 +207,38 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send(response);
+  });
+
+  // Poll device approval status (public, used by installer)
+  // Higher rate limit than exchange — installer polls every 5s for up to 15 min.
+  app.post('/setup/device/poll', async (req, reply) => {
+    const ip = req.ip;
+    if (!checkPollRateLimit(ip)) {
+      return reply.status(429).send({ error: 'Too many poll attempts. Wait a moment and try again.' });
+    }
+
+    const body = req.body as { deviceCode?: string } | null;
+    if (!body?.deviceCode) {
+      return reply.status(400).send({ error: 'deviceCode required.' });
+    }
+
+    const device = await prisma.tenantDevice.findUnique({
+      where: { deviceCode: body.deviceCode.toUpperCase() },
+    });
+
+    if (!device) {
+      return reply.status(404).send({ error: 'Device code not found.' });
+    }
+
+    // Check expiry
+    if (device.status === 'pending' && device.expiresAt < new Date()) {
+      await prisma.tenantDevice.update({
+        where: { id: device.id },
+        data: { status: 'expired' },
+      });
+      return reply.send({ status: 'expired' });
+    }
+
+    return reply.send({ status: device.status });
   });
 }

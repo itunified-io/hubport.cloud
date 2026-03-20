@@ -25,3 +25,19 @@ export function getCodeExpiresAt(): Date {
 }
 
 export const SETUP_CODE_TTL_MS = CODE_TTL_MS;
+
+const DEVICE_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+export function generateDeviceCode(): string {
+  const half = (len: number) =>
+    Array.from({ length: len }, () =>
+      SETUP_CODE_ALPHABET[randomInt(SETUP_CODE_ALPHABET.length)]
+    ).join('');
+  return `${half(CODE_LENGTH)}-${half(CODE_LENGTH)}`;
+}
+
+export function getDeviceCodeExpiresAt(): Date {
+  return new Date(Date.now() + DEVICE_CODE_TTL_MS);
+}
+
+export const DEVICE_CODE_TTL_MS_EXPORT = DEVICE_CODE_TTL_MS;

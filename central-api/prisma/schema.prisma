@@ -21,6 +21,7 @@ model Tenant {
   email        String
   subdomain    String       @unique
   status       TenantStatus @default(PENDING)
+  role         String       @default("owner") // owner | operator | readonly
   rejectReason String?
   tunnelId     String?
   tunnelToken  String?
@@ -37,6 +38,7 @@ model Tenant {
   apiTokens         TenantApiToken[]
   passkeys          TenantPasskey[]
   setupCodes        SetupCode[]
+  devices           TenantDevice[]
 }
 
 model TenantAuth {
@@ -129,6 +131,24 @@ model SetupCode {
   createdAt  DateTime  @default(now())
 
   @@index([tenantId])
+}
+
+model TenantDevice {
+  id         String    @id @default(uuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  deviceCode String    @unique // ABCD-1234
+  hostname   String
+  os         String
+  arch       String
+  ip         String
+  status     String    @default("pending") // pending | approved | denied | expired
+  expiresAt  DateTime  // 15 minutes from creation
+  approvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([deviceCode])
 }
 
 model TenantAuditLog {

@@ -1,5 +1,5 @@
 import { FormattedMessage } from "react-intl";
-import { Users, Map, Calendar, Wifi, WifiOff } from "lucide-react";
+import { Users, Map, Calendar } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 
 interface StatCardProps {
@@ -30,34 +30,14 @@ function StatCard({ icon: Icon, labelId, value, color }: StatCardProps) {
   );
 }
 
-function HubStatus() {
-  const isOnline = navigator.onLine;
-
-  return (
-    <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] text-xs font-medium ${
-        isOnline
-          ? "bg-[#22c55e14] text-[var(--green)]"
-          : "bg-[#f5970b14] text-[var(--amber)]"
-      }`}
-    >
-      {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-      <FormattedMessage id={isOnline ? "hub.online" : "hub.offline"} />
-    </div>
-  );
-}
-
 export function Dashboard() {
   const { displayName } = useAuth();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-xl font-semibold text-[var(--text)]">
-          <FormattedMessage id="dashboard.welcome" values={{ name: displayName }} />
-        </h1>
-        <HubStatus />
-      </div>
+      <h1 className="text-xl font-semibold text-[var(--text)]">
+        <FormattedMessage id="dashboard.welcome" values={{ name: displayName }} />
+      </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard

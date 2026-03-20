@@ -7,19 +7,146 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ───────────────────────────────────────────────────────────
+
+/// Base congregation role — what you ARE (with inheritance).
+/// publisher ← ministerial_servant (separate branch)
+/// publisher ← elder (separate branch)
+/// An elder IS a publisher but is NOT a ministerial servant.
+enum CongregationRole {
+  publisher
+  ministerial_servant
+  elder
+}
+
+/// Member lifecycle status
+enum MemberStatus {
+  invited
+  pending_approval
+  active
+  inactive
+  rejected
+}
+
+enum Gender {
+  male
+  female
+}
+
+/// Privacy visibility level for publisher data
+enum PrivacyVisibility {
+  everyone
+  elders_only
+  nobody
+}
+
+/// Scope for app roles (which meeting types they apply to)
+enum RoleScope {
+  all
+  midweek
+  weekend
+}
+
+// ─── Publisher ────────────────────────────────────────────────────────
+
 model Publisher {
-  id        String   @id @default(uuid())
-  firstName String   /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
-  lastName  String   /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
-  email     String?  /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
-  phone     String?  /// @encrypted — AES-256-GCM, stored as iv:ciphertext:authTag
-  role      String   @default("publisher") // admin, elder, publisher, viewer
-  status    String   @default("active") // active, inactive, away
+  id               String            @id @default(uuid())
+  keycloakSub      String?           @unique /// Keycloak user ID link
+  firstName        String            /// @encrypted — AES-256-GCM
+  lastName         String            /// @encrypted — AES-256-GCM
+  displayName      String?           /// Optional display name override
+  email            String?           /// @encrypted — AES-256-GCM
+  phone            String?           /// @encrypted — AES-256-GCM
+  gender           Gender?
+  address          String?           /// @encrypted — AES-256-GCM
+  congregationRole CongregationRole  @default(publisher)
+  congregationFlags String[]         /// Additional flags: pioneer types, elder/MS sub-roles
+  role             String            @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)
+  status           MemberStatus      @default(active)
+  notes            String?           /// @encrypted — AES-256-GCM
+
+  // Privacy
+  privacyAccepted   Boolean          @default(false)
+  privacyAcceptedAt DateTime?
+  privacySettings   Json             @default("{\"contactVisibility\":\"elders_only\",\"addressVisibility\":\"elders_only\",\"notesVisibility\":\"elders_only\"}")
+
+  // Onboarding tracking
+  invitedBy  String?
+  invitedAt  DateTime?
+  approvedBy String?
+  approvedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assignments TerritoryAssignment[]
+  // Relations
+  assignments  TerritoryAssignment[]
+  appRoles     AppRoleMember[]
+  inviteCode   InviteCode?
 }
+
+// ─── App Roles (Permission Bundles) ──────────────────────────────────
+
+model AppRole {
+  id          String    @id @default(uuid())
+  name        String    @unique /// e.g. "Coordinator", "Secretary"
+  description String?
+  permissions Json      /// Array of permission keys ["app:publishers.view", ...]
+  scope       RoleScope @default(all)
+  isSystem    Boolean   @default(false) /// System roles cannot be deleted
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members AppRoleMember[]
+}
+
+model AppRoleMember {
+  id                String    @id @default(uuid())
+  roleId            String
+  publisherId       String
+  validFrom         DateTime? /// Temporal validity (e.g. Circuit Overseer visit)
+  validTo           DateTime?
+  deniedPermissions Json      @default("[]") /// Per-assignment deny overrides
+
+  role      AppRole   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, publisherId])
+  @@index([publisherId])
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String   /// Keycloak sub of the actor
+  action      String   /// e.g. "publisher.update", "role.assign"
+  objectType  String   /// e.g. "Publisher", "AppRole"
+  objectId    String?
+  beforeState Json?    /// Snapshot before mutation
+  afterState  Json?    /// Snapshot after mutation
+  createdAt   DateTime @default(now())
+
+  @@index([actorId])
+  @@index([objectType, objectId])
+  @@index([createdAt])
+}
+
+// ─── Invite Codes ────────────────────────────────────────────────────
+
+model InviteCode {
+  id          String    @id @default(uuid())
+  codeHash    String    @unique /// SHA-256 of the invite code
+  publisherId String    @unique
+  expiresAt   DateTime
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+}
+
+// ─── Existing Models ─────────────────────────────────────────────────
 
 model Territory {
   id          String   @id @default(uuid())

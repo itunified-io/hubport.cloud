@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "./auth/useAuth";
-import { RoleGuard } from "./auth/RoleGuard";
+import { PermissionGuard } from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { Dashboard } from "./pages/Dashboard";
@@ -12,6 +12,12 @@ import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
 import { Settings } from "./pages/settings/Settings";
 import { SharingPartners } from "./pages/sharing/SharingPartners";
+import { UserList } from "./pages/users/UserList";
+import { UserDetail } from "./pages/users/UserDetail";
+import { RoleList } from "./pages/users/RoleList";
+import { RoleDetail } from "./pages/users/RoleDetail";
+import { AuditLog } from "./pages/audit/AuditLog";
+import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
 
 function LoginPage() {
@@ -67,78 +73,131 @@ export function App() {
         <Route
           path="/publishers"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires={["app:publishers.view", "app:publishers.view_minimal"]} any>
               <PublisherList />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/publishers/new"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:publishers.edit">
               <PublisherForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/publishers/:id"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires={["app:publishers.view", "app:publishers.view_minimal"]} any>
               <PublisherForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
         <Route
           path="/territories"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:territories.view">
               <TerritoryList />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/territories/map"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:territories.view">
               <TerritoryMap />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
-        <Route path="/meetings" element={<MeetingList />} />
+        <Route
+          path="/meetings"
+          element={
+            <PermissionGuard requires="app:meetings.view">
+              <MeetingList />
+            </PermissionGuard>
+          }
+        />
         <Route
           path="/meetings/new"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/meetings/:id"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
-            </RoleGuard>
+            </PermissionGuard>
+          }
+        />
+
+        {/* User & Role Management */}
+        <Route
+          path="/users"
+          element={
+            <PermissionGuard requires="app:roles.view">
+              <UserList />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/users/:id"
+          element={
+            <PermissionGuard requires="app:roles.view">
+              <UserDetail />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/users/roles"
+          element={
+            <PermissionGuard requires="app:roles.edit">
+              <RoleList />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/users/roles/:id"
+          element={
+            <PermissionGuard requires="app:roles.edit">
+              <RoleDetail />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Profile (any authenticated user) */}
+        <Route path="/profile" element={<Profile />} />
+
+        {/* Audit Log */}
+        <Route
+          path="/audit"
+          element={
+            <PermissionGuard requires="app:audit.view">
+              <AuditLog />
+            </PermissionGuard>
           }
         />
 
         <Route
           path="/sharing"
           element={
-            <RoleGuard requiredRole="admin">
+            <PermissionGuard requires="app:settings.view">
               <SharingPartners />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
-
         <Route
           path="/settings"
           element={
-            <RoleGuard requiredRole="admin">
+            <PermissionGuard requires="app:settings.view">
               <Settings />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 

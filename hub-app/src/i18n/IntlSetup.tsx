@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useCallback } from "react";
+import { type ReactNode, useState, useCallback, createContext, useContext } from "react";
 import { IntlProvider } from "react-intl";
 import enUS from "./messages/en-US.json";
 import deDE from "./messages/de-DE.json";
@@ -25,16 +25,17 @@ interface LocaleContextValue {
   supportedLocales: SupportedLocale[];
 }
 
-export const LocaleContext = {
-  locale: "en-US" as SupportedLocale,
-  setLocale: (_locale: SupportedLocale) => {},
-  supportedLocales: ["en-US", "de-DE"] as SupportedLocale[],
-};
+const LocaleCtx = createContext<LocaleContextValue>({
+  locale: "en-US",
+  setLocale: () => {},
+  supportedLocales: ["en-US", "de-DE"],
+});
 
-// We export a mutable ref so components can read/set locale without React context overhead
-let localeRef = detectLocale();
-let setLocaleRef: (l: SupportedLocale) => void = () => {};
+export function useLocale(): LocaleContextValue {
+  return useContext(LocaleCtx);
+}
 
+// Legacy compat — deprecated, use useLocale() hook instead
 export function getLocaleContext(): LocaleContextValue {
   return {
     locale: localeRef,
@@ -42,6 +43,9 @@ export function getLocaleContext(): LocaleContextValue {
     supportedLocales: ["en-US", "de-DE"],
   };
 }
+
+let localeRef: SupportedLocale = detectLocale();
+let setLocaleRef: (l: SupportedLocale) => void = () => {};
 
 interface IntlSetupProps {
   children: ReactNode;
@@ -60,12 +64,14 @@ export function IntlSetup({ children }: IntlSetupProps) {
   setLocaleRef = setLocale;
 
   return (
-    <IntlProvider
-      locale={locale}
-      messages={MESSAGES[locale]}
-      defaultLocale="en-US"
-    >
-      {children}
-    </IntlProvider>
+    <LocaleCtx.Provider value={{ locale, setLocale, supportedLocales: ["en-US", "de-DE"] }}>
+      <IntlProvider
+        locale={locale}
+        messages={MESSAGES[locale]}
+        defaultLocale="en-US"
+      >
+        {children}
+      </IntlProvider>
+    </LocaleCtx.Provider>
   );
 }
