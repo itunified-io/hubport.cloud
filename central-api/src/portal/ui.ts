@@ -45,8 +45,12 @@ export function portalShell(title: string, content: string): string {
     ${content}
   </main>
   <footer class="border-t border-zinc-800 px-6 py-4 mt-12">
-    <div class="max-w-4xl mx-auto text-center text-xs text-zinc-600">
-      hubport.cloud - Self-hosted congregation management (MIT + Commons Clause)
+    <div class="max-w-4xl mx-auto flex flex-col items-center gap-2 text-xs text-zinc-600">
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/itunified-io/hubport.cloud/actions/workflows/codeql.yml" target="_blank" rel="noopener"><img src="https://github.com/itunified-io/hubport.cloud/actions/workflows/codeql.yml/badge.svg" alt="CodeQL" height="16"></a>
+        <a href="https://snyk.io/test/github/itunified-io/hubport.cloud" target="_blank" rel="noopener"><img src="https://snyk.io/test/github/itunified-io/hubport.cloud/badge.svg" alt="Snyk" height="16"></a>
+      </div>
+      <span>hubport.cloud - Self-hosted congregation management (MIT + Commons Clause)</span>
     </div>
   </footer>
 </body>
