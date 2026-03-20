@@ -15,7 +15,7 @@
   "dependencies": {
     "@fastify/cors": "^10.0.0",
     "@fastify/formbody": "^8.0.0",
-    "@prisma/client": "^6.19.2",
+    "@prisma/client": "^7.5.0",
     "@simplewebauthn/server": "^11.0.0",
     "@sinclair/typebox": "^0.34.0",
     "argon2": "^0.44.0",
