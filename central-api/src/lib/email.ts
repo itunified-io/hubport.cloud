@@ -103,6 +103,9 @@ export function onboardingEmailHtml(tenant: {
   setupUrl?: string;
 }): string {
   const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
+  // portal-uat.hubport.cloud → get-uat.hubport.cloud
+  const m = portalUrl.match(/^https:\/\/portal(-\w+)?\.hubport\.cloud$/);
+  const getUrl = m ? `https://get${m[1] || ''}.hubport.cloud` : 'https://get.hubport.cloud';
   return `
 <!DOCTYPE html>
 <html>
@@ -143,7 +146,7 @@ export function onboardingEmailHtml(tenant: {
         : `Log in to your <a href="${portalUrl}/portal/login" style="color: #d97706;">Tenant Portal</a> and complete MFA setup`}</li>
       <li>Log in to your <a href="${portalUrl}/portal/dashboard" style="color: #d97706;">Tenant Portal</a></li>
       <li>Click <strong style="color: #d97706;">Generate Setup Code</strong> on your dashboard</li>
-      <li>On your server, run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">curl -fsSL https://get.hubport.cloud | sh</code></li>
+      <li>On your server, run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">curl -fsSL ${getUrl} | sh</code></li>
       <li>Enter your setup code when prompted</li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
