@@ -36,6 +36,7 @@ model Tenant {
   sharedTalks       SharedTalk[]
   apiTokens         TenantApiToken[]
   passkeys          TenantPasskey[]
+  setupCodes        SetupCode[]
 }
 
 model TenantAuth {
@@ -115,6 +116,19 @@ model SharedTalk {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model SetupCode {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  expiresAt  DateTime
+  consumedAt DateTime?
+  consumedIp String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
 }
 
 model TenantAuditLog {
