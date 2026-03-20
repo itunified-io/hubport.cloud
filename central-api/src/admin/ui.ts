@@ -62,7 +62,11 @@ export function shell(title: string, body: string): string {
   <footer class="max-w-6xl mx-auto px-6 py-6 border-t border-white/[.04] mt-12">
     <div class="flex items-center justify-between text-xs text-zinc-600">
       <span>hubport.cloud — ITUnified UG</span>
-      <span>Admin Portal v2026.03.19</span>
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/itunified-io/hubport.cloud/actions/workflows/codeql.yml" target="_blank" rel="noopener"><img src="https://github.com/itunified-io/hubport.cloud/actions/workflows/codeql.yml/badge.svg" alt="CodeQL" height="16"></a>
+        <a href="https://snyk.io/test/github/itunified-io/hubport.cloud" target="_blank" rel="noopener"><img src="https://snyk.io/test/github/itunified-io/hubport.cloud/badge.svg" alt="Snyk" height="16"></a>
+        <span>Admin Portal v2026.03.20</span>
+      </div>
     </div>
   </footer>
 </body>
