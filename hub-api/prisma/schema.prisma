@@ -59,6 +59,7 @@ model Publisher {
   phone            String?           /// @encrypted — AES-256-GCM
   gender           Gender?
   address          String?           /// @encrypted — AES-256-GCM
+  dateOfBirth      DateTime?         /// @encrypted
   congregationRole CongregationRole  @default(publisher)
   congregationFlags String[]         /// Additional flags: pioneer types, elder/MS sub-roles
   role             String            @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)

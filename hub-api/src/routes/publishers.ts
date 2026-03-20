@@ -8,9 +8,12 @@ import { PERMISSIONS } from "../lib/permissions.js";
 const PublisherBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
   lastName: Type.String({ minLength: 1 }),
+  displayName: Type.Optional(Type.String()),
   email: Type.Optional(Type.String({ format: "email" })),
   phone: Type.Optional(Type.String()),
   gender: Type.Optional(Type.Union([Type.Literal("male"), Type.Literal("female")])),
+  dateOfBirth: Type.Optional(Type.String({ format: "date" })),
+  address: Type.Optional(Type.String()),
   congregationRole: Type.Optional(Type.Union([
     Type.Literal("publisher"),
     Type.Literal("ministerial_servant"),
@@ -21,6 +24,7 @@ const PublisherBody = Type.Object({
     Type.Literal("active"),
     Type.Literal("inactive"),
   ])),
+  notes: Type.Optional(Type.String()),
 });
 
 type PublisherBodyType = Static<typeof PublisherBody>;
@@ -61,7 +65,10 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const publisher = await prisma.publisher.findUnique({
         where: { id: request.params.id },
-        include: { assignments: { include: { territory: true } } },
+        include: {
+          assignments: { include: { territory: true } },
+          appRoles: { include: { role: true } },
+        },
       });
       if (!publisher) {
         return reply.code(404).send({ error: "Not found" });
@@ -82,8 +89,12 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: PublisherBody },
     },
     async (request, reply) => {
+      const { dateOfBirth, ...rest } = request.body;
       const publisher = await prisma.publisher.create({
-        data: request.body,
+        data: {
+          ...rest,
+          ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
+        },
       });
 
       await audit(
@@ -114,9 +125,13 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: "Not found" });
       }
 
+      const { dateOfBirth: dob, ...restBody } = request.body;
       const publisher = await prisma.publisher.update({
         where: { id: request.params.id },
-        data: request.body,
+        data: {
+          ...restBody,
+          ...(dob !== undefined ? { dateOfBirth: dob ? new Date(dob) : null } : {}),
+        },
       });
 
       await audit(

@@ -46,33 +46,30 @@ async function start(): Promise<void> {
   await app.register(onboardingRoutes);
   await app.register(auditRoutes);
 
-  // Auto-migrate on startup (deploy pending migrations)
+  // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
     const { execFileSync } = await import("node:child_process");
     try {
-      app.log.info("Running Prisma migrations...");
-      execFileSync("npx", ["prisma", "migrate", "deploy"], {
+      app.log.info("Syncing database schema...");
+      execFileSync("npx", ["prisma", "db", "push", "--accept-data-loss"], {
         stdio: "inherit",
         cwd: new URL("..", import.meta.url).pathname,
       });
-      app.log.info("Migrations complete");
+      app.log.info("Schema sync complete");
     } catch {
-      app.log.error("Migration failed — starting anyway");
+      app.log.error("Schema sync failed — starting anyway");
     }
   }
 
-  // Verify DB connection + seed system roles
+  // Verify DB connection + upsert system roles
   try {
     await prisma.$connect();
     app.log.info("Database connected");
 
-    // Seed system roles on first boot
-    const roleCount = await prisma.appRole.count();
-    if (roleCount === 0) {
-      app.log.info("No AppRoles found — seeding 12 system roles...");
-      await seedSystemRoles();
-      app.log.info("System roles seeded");
-    }
+    // Upsert system roles on every startup (idempotent — adds new roles, updates existing)
+    app.log.info("Upserting system roles...");
+    await seedSystemRoles();
+    app.log.info("System roles up to date");
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }

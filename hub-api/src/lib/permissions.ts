@@ -18,6 +18,8 @@ export const CONGREGATION_FLAGS = {
     "auxiliary_pioneer",
     "unbaptized_publisher",
     "student",
+    "anointed",
+    "special_needs",
   ],
   /** Only valid when congregationRole = elder */
   elder: [
@@ -98,6 +100,9 @@ export const PERMISSIONS = {
   PRIVILEGE_WT_READER: "privilege:wtReader",
   PRIVILEGE_PUBLIC_TALK: "privilege:publicTalk",
   PRIVILEGE_WT_CONDUCTOR: "privilege:wtConductor",
+  PRIVILEGE_ZOOM_MODERATOR: "privilege:zoomModerator",
+  PRIVILEGE_PUBLIC_TALK_LOCAL: "privilege:publicTalkLocal",
+  PRIVILEGE_SERVICE_MEETING_CONDUCTOR: "privilege:serviceMeetingConductor",
 
   // Management scopes
   MANAGE_ALL: "manage:all",
