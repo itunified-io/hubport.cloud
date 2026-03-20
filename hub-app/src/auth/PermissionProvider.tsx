@@ -1,5 +1,6 @@
 import { type ReactNode, createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface PermissionData {
   effectivePermissions: string[];
@@ -46,8 +47,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL ?? "";
-      const res = await fetch(`${apiUrl}/permissions/me`, {
+      const res = await fetch(`${getApiUrl()}/permissions/me`, {
         headers: { Authorization: `Bearer ${user.access_token}` },
       });
 

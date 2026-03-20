@@ -3,6 +3,7 @@ import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Save } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ export function PublisherForm() {
   const { user } = useAuth();
   const isEdit = Boolean(id);
 
-  const apiUrl = import.meta.env.VITE_API_URL ?? "";
+  const apiUrl = getApiUrl();
   const headers: Record<string, string> = {
     Authorization: `Bearer ${user?.access_token}`,
     "Content-Type": "application/json",

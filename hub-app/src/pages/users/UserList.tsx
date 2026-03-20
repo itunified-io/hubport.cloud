@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { FormattedMessage, useIntl } from "react-intl";
 import { Users, Plus, Shield, ChevronRight, UserCheck, UserX, Clock, Ban } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface Publisher {
   id: string;
@@ -66,7 +67,7 @@ export function UserList() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL ?? "";
+        const apiUrl = getApiUrl();
         const res = await fetch(`${apiUrl}/users`, {
           headers: { Authorization: `Bearer ${user?.access_token}` },
         });

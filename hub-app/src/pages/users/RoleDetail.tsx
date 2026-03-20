@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import { FormattedMessage } from "react-intl";
 import { ArrowLeft, Shield, Lock, Users, Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface AppRoleDetail {
   id: string;
@@ -26,7 +27,7 @@ export function RoleDetail() {
   const navigate = useNavigate();
   const [role, setRole] = useState<AppRoleDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const apiUrl = import.meta.env.VITE_API_URL ?? "";
+  const apiUrl = getApiUrl();
   const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
 
   const fetchRole = async () => {
