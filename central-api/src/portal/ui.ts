@@ -183,6 +183,28 @@ export function setupCodeSection(tenantStatus: string): string {
         </ul>
       </div>
 
+      <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-4">
+        <p class="text-sm text-zinc-400 mb-3">Need a server? We recommend Hostinger VPS:</p>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between bg-zinc-900/50 rounded-lg p-3 border border-zinc-700">
+            <div>
+              <span class="text-amber-400 font-semibold">KVM1</span>
+              <span class="text-zinc-500 text-sm ml-2">1 vCPU &middot; 4 GB &middot; 50 GB SSD</span>
+            </div>
+            <a href="https://www.hostinger.com/cart?product=vps%3Avps_kvm_1&period=24&referral_type=cart_link&REFERRALCODE=NSGBUECHEBQR&referral_id=019d04a9-d6f7-725d-a226-c08ca5d70b0b" target="_blank" rel="noopener" class="text-amber-500 text-sm font-semibold hover:underline">~$5/mo &rarr;</a>
+          </div>
+          <div class="flex items-center justify-between bg-zinc-900/50 rounded-lg p-3 border border-zinc-700">
+            <div>
+              <span class="text-amber-400 font-semibold">KVM2</span>
+              <span class="text-zinc-500 text-sm ml-2">2 vCPU &middot; 8 GB &middot; 100 GB SSD</span>
+            </div>
+            <a href="https://www.hostinger.com/cart?product=vps%3Avps_kvm_2&period=24&referral_type=cart_link&REFERRALCODE=NSGBUECHEBQR&referral_id=019d04a9-baed-70fa-b7da-b1d81e15c69a" target="_blank" rel="noopener" class="text-amber-500 text-sm font-semibold hover:underline">~$10/mo &rarr;</a>
+          </div>
+        </div>
+        <p class="text-zinc-600 text-[11px] mt-3 italic">* Affiliate links &mdash; we receive a small commission at no extra cost to you.</p>
+        <p class="text-zinc-500 text-xs mt-2"><a href="https://uat.hubport.cloud/en/faq" target="_blank" rel="noopener" class="text-amber-500 hover:underline">Read our FAQ</a> for setup help and more details.</p>
+      </div>
+
       <div id="setup-code-generate">
         <button onclick="generateSetupCode()" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg transition">
           Generate Setup Code
