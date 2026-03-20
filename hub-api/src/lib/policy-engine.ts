@@ -296,7 +296,7 @@ export async function audit(
       actorId,
       action,
       objectType,
-      objectId: objectId ?? null,
+      objectId: objectId ?? "",
       beforeState: beforeState ? (beforeState as object) : undefined,
       afterState: afterState ? (afterState as object) : undefined,
     },
