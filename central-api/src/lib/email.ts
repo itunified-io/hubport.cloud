@@ -146,7 +146,9 @@ export function onboardingEmailHtml(tenant: {
         : `Log in to your <a href="${portalUrl}/portal/login" style="color: #d97706;">Tenant Portal</a> and complete MFA setup`}</li>
       <li>Log in to your <a href="${portalUrl}/portal/dashboard" style="color: #d97706;">Tenant Portal</a></li>
       <li>Click <strong style="color: #d97706;">Generate Setup Code</strong> on your dashboard</li>
-      <li>On your server, run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">curl -fsSL ${getUrl} | sh</code></li>
+      <li>On your server, run:<br>
+        <strong style="color: #a1a1aa; font-size: 11px;">Linux / macOS:</strong> <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">curl -fsSL ${getUrl} | sh</code><br>
+        <strong style="color: #a1a1aa; font-size: 11px;">Windows (PowerShell):</strong> <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">irm ${getUrl}/windows | iex</code></li>
       <li>Enter your setup code when prompted</li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
@@ -163,7 +165,7 @@ export function onboardingEmailHtml(tenant: {
 
     <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">
       <h3 style="color: #d97706; margin-top: 0;">Need a Server?</h3>
-      <p style="font-size: 14px; margin: 8px 0;">hubport.cloud runs on any server with Docker. If your congregation doesn't have one yet, we recommend Hostinger VPS:</p>
+      <p style="font-size: 14px; margin: 8px 0;">hubport.cloud runs on any hardware with Docker — including a Synology NAS, Raspberry Pi, or your own PC. If you need a VPS, these Hostinger plans work well:</p>
       <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
         <tr>
           <td style="padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px;">
@@ -181,7 +183,7 @@ export function onboardingEmailHtml(tenant: {
           </td>
         </tr>
       </table>
-      <p style="font-size: 12px; color: #71717a; margin: 8px 0 0;">You can also run hubport.cloud on a Synology NAS, Raspberry Pi, or any computer with Docker.</p>
+      <p style="font-size: 12px; color: #71717a; margin: 8px 0 0;">* Using these links supports the hubport.cloud project at no extra cost to you.</p>
     </div>
 
     <p style="margin-top: 20px;">Need help? Visit <a href="https://hubport.cloud/docs" style="color: #d97706;">hubport.cloud/docs</a> or <a href="https://hubport.cloud/contact" style="color: #d97706;">contact us</a>.</p>
