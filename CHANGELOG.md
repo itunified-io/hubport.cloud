@@ -1,6 +1,23 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.20.2
+
+### User Management, RBAC & Publisher Onboarding (#234)
+- **PolicyEngine**: permission-based RBAC replacing flat role hierarchy — buildContext, can(), maskFields(), audit()
+- **12 preseeded AppRoles**: Coordinator, Secretary, Service Overseer, LM Overseer, WT Conductor, Technik, Ordnungsdienst, Program, Technik Responsible, Circuit Overseer, Service Overseer Assistant, Cleaning Responsible
+- **3 CongregationRoles**: publisher, ministerial_servant, elder with independent inheritance
+- **CongregationFlags**: additive flags (pioneer types, elder/MS sub-roles) with auto-assign to AppRoles
+- **Privacy gate**: mandatory privacy acceptance before API access, 3 category dropdowns (contact/address/notes visibility)
+- **Field masking**: deny rules + publisher privacy settings control field visibility
+- **Keycloak admin client**: user CRUD, role assignment, disable/enable/delete
+- **User management UI**: UserList, UserDetail, RoleList, RoleDetail pages with status pills and role badges
+- **Self-service**: profile page with privacy settings, account deactivation, GDPR delete
+- **Onboarding**: invite code redemption, privacy acceptance endpoints
+- **Audit logging**: all mutations recorded with actor + before/after state
+- **Security scanning**: Dependabot (npm, Docker, GitHub Actions), CodeQL (JS/TS), Snyk (hub-app, hub-api, central-api)
+- **Repo visibility**: changed to public (enables free security scanning)
+
 ## v2026.03.20.1
 
 ### Setup Wizard Enhancement (#23)
