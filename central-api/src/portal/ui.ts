@@ -12,6 +12,24 @@ function centralApiUrl(): string {
   return 'https://api.hubport.cloud';
 }
 
+/** Derive installer URL from PORTAL_BASE_URL so curl command is env-aware. */
+function installerUrl(): string {
+  const portalBase = process.env.PORTAL_BASE_URL || '';
+  // portal-uat.hubport.cloud → get-uat.hubport.cloud
+  const m = portalBase.match(/^https:\/\/portal(-\w+)?\.hubport\.cloud$/);
+  if (m) return `https://get${m[1] || ''}.hubport.cloud`;
+  return 'https://get.hubport.cloud';
+}
+
+/** Derive landing page URL from PORTAL_BASE_URL so links are env-aware. */
+function landingUrl(): string {
+  const portalBase = process.env.PORTAL_BASE_URL || '';
+  // portal-uat.hubport.cloud → uat.hubport.cloud
+  const m = portalBase.match(/^https:\/\/portal(-\w+)?\.hubport\.cloud$/);
+  if (m && m[1]) return `https://${m[1].slice(1)}.hubport.cloud`;
+  return 'https://hubport.cloud';
+}
+
 export function portalShell(title: string, content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -202,7 +220,7 @@ export function setupCodeSection(tenantStatus: string): string {
           </div>
         </div>
         <p class="text-zinc-600 text-[11px] mt-3 italic">* Affiliate links &mdash; we receive a small commission at no extra cost to you.</p>
-        <p class="text-zinc-500 text-xs mt-2"><a href="https://uat.hubport.cloud/en/faq" target="_blank" rel="noopener" class="text-amber-500 hover:underline">Read our FAQ</a> for setup help and more details.</p>
+        <p class="text-zinc-500 text-xs mt-2"><a href="${landingUrl()}/en/faq" target="_blank" rel="noopener" class="text-amber-500 hover:underline">Read our FAQ</a> for setup help and more details.</p>
       </div>
 
       <div id="setup-code-generate">
@@ -219,7 +237,7 @@ export function setupCodeSection(tenantStatus: string): string {
         </div>
         <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 mb-4">
           <p class="text-xs text-zinc-500 mb-1">Run on your server:</p>
-          <code class="text-sm text-amber-400 select-all">curl -fsSL https://get.hubport.cloud | sh</code>
+          <code class="text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
         </div>
         <button onclick="generateSetupCode()" class="text-sm text-zinc-500 hover:text-zinc-300 underline">
           Regenerate Code (invalidates previous)
