@@ -3,15 +3,6 @@ export function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-/** Derive CENTRAL_API_URL from PORTAL_BASE_URL so docker-compose snippet is env-aware. */
-function centralApiUrl(): string {
-  const portalBase = process.env.PORTAL_BASE_URL || '';
-  // portal-uat.hubport.cloud → api-uat.hubport.cloud
-  const m = portalBase.match(/^https:\/\/portal(-\w+)?\.hubport\.cloud$/);
-  if (m) return `https://api${m[1] || ''}.hubport.cloud`;
-  return 'https://api.hubport.cloud';
-}
-
 /** Derive installer URL from PORTAL_BASE_URL so curl command is env-aware. */
 function installerUrl(): string {
   const portalBase = process.env.PORTAL_BASE_URL || '';
@@ -372,119 +363,6 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       </table>
     </div>
 
-    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
-      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Quick Start</h3>
-      <ol class="text-sm text-zinc-300 space-y-2 list-decimal list-inside">
-        <li>Install <a href="https://docs.docker.com/get-docker/" class="text-amber-500 underline">Docker</a></li>
-        <li>Create a <code class="bg-zinc-800 px-1 rounded">docker-compose.yml</code> with your credentials</li>
-        <li>Run <code class="bg-zinc-800 px-1 rounded text-amber-400">docker compose up -d</code></li>
-        <li>Open <code class="bg-zinc-800 px-1 rounded text-amber-400">http://localhost:8080</code> for the setup wizard</li>
-      </ol>
-    </div>
-
-    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm text-zinc-500 uppercase tracking-wider">docker-compose.yml</h3>
-        <div class="flex gap-2">
-          <!-- PG password managed by setup wizard via Vault -->
-          <button onclick="copyYaml()" id="copy-btn" class="text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
-        </div>
-      </div>
-      <div id="pg-password-warning" class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-3 hidden">
-        <p class="text-xs text-red-400"><strong>Important:</strong> Save this password in a secure place now. It will not be stored or shown again. If you lose it, you will need to reset your database.</p>
-      </div>
-      <pre id="compose-yaml" class="bg-[#0a0a0c] p-4 rounded-lg text-xs text-zinc-300 overflow-x-auto select-all">services:
-  hubport:
-    image: ghcr.io/itunified-io/hubport.cloud:latest
-    ports:
-      - "3000:3000"
-      - "8080:8080"
-    environment:
-      - HUBPORT_TENANT_ID=${tenant.id}
-      - HUBPORT_API_TOKEN=<span id="yaml-api-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
-      - CENTRAL_API_URL=${escapeHtml(centralApiUrl())}
-      - CF_TUNNEL_TOKEN=<span id="yaml-token" class="text-zinc-600">&lt;reveal credentials above&gt;</span>
-      - DATABASE_URL=postgresql://hubport:<span id="yaml-dbpass" class="text-zinc-500">changeme</span>@postgres:5432/hubport
-      - VAULT_ADDR=http://vault:8200
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=hubport
-    depends_on:
-      postgres:
-        condition: service_healthy
-      vault:
-        condition: service_started
-      keycloak:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=hubport
-      - POSTGRES_USER=hubport
-      - POSTGRES_PASSWORD=<span id="yaml-pgpass" class="text-zinc-500">changeme</span>
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hubport"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-  vault:
-    image: hashicorp/vault:1.15
-    ports:
-      - "8200:8200"
-    volumes:
-      - vault-data:/vault/data
-    environment:
-      - VAULT_ADDR=http://0.0.0.0:8200
-      - VAULT_API_ADDR=http://0.0.0.0:8200
-    cap_add:
-      - IPC_LOCK
-    command: server -dev
-    restart: unless-stopped
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    ports:
-      - "8180:8080"
-    environment:
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
-      - KC_DB_USERNAME=hubport
-      - KC_DB_PASSWORD=<span id="yaml-kcpass" class="text-zinc-500">changeme</span>
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=<span id="yaml-kcadminpass" class="text-zinc-500">changeme</span>
-      - KC_HOSTNAME_STRICT=false
-      - KC_HTTP_ENABLED=true
-      - KC_PROXY_HEADERS=xforwarded
-    command: start-dev
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3&lt;&gt;/dev/tcp/localhost/8080"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    restart: unless-stopped
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel run
-    environment:
-      - TUNNEL_TOKEN=<span id="yaml-cfd-token" class="text-zinc-600">&lt;same as CF_TUNNEL_TOKEN above&gt;</span>
-    depends_on:
-      - hubport
-    restart: unless-stopped
-
-volumes:
-  pg-data:
-  vault-data:</pre>
-    </div>
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
       <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Security</h3>
@@ -618,38 +496,12 @@ volumes:
         document.getElementById('token-value').classList.remove('hidden');
         document.getElementById('token-eye').onclick = function() { toggleCred('token', data.tunnelToken); };
         document.getElementById('token-copy').classList.remove('hidden');
-        // Update docker-compose YAML with revealed token
-        document.getElementById('yaml-token').textContent = data.tunnelToken;
-        document.getElementById('yaml-token').classList.remove('text-zinc-600');
-        document.getElementById('yaml-token').classList.add('text-amber-400');
-        // Also set cloudflared TUNNEL_TOKEN
-        var cfdEl = document.getElementById('yaml-cfd-token');
-        if (cfdEl) { cfdEl.textContent = data.tunnelToken; cfdEl.classList.remove('text-zinc-600'); cfdEl.classList.add('text-amber-400'); }
         closeRevealModal();
       } catch {
         document.getElementById('reveal-error').textContent = 'Request failed';
         document.getElementById('reveal-error').classList.remove('hidden');
       }
     }
-    // PG password managed by setup wizard via Vault — no manual generation needed
-    function copyYaml() {
-      const yaml = document.getElementById('compose-yaml').textContent;
-      navigator.clipboard.writeText(yaml).then(() => {
-        const btn = document.getElementById('copy-btn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-      });
-    }
-    // Auto-populate YAML API token from displayed value
-    (function() {
-      var el = document.getElementById('api-value');
-      var yamlEl = document.getElementById('yaml-api-token');
-      if (el && yamlEl && el.dataset.token) {
-        yamlEl.textContent = el.dataset.token;
-        yamlEl.classList.remove('text-zinc-600');
-        yamlEl.classList.add('text-amber-400');
-      }
-    })();
     </script>
   `;
 }
