@@ -7,6 +7,7 @@ import { tokenRoutes } from './routes/tokens.js';
 import { adminRoutes } from './admin/index.js';
 import { portalRoutes } from './portal/index.js';
 import { setupCodeRoutes } from './routes/setup-code.js';
+import { tokenExchangeRoutes } from './routes/token-exchange.js';
 
 const app = Fastify({ logger: true });
 
@@ -18,6 +19,7 @@ await app.register(tokenRoutes, { prefix: '/api/v1/tokens' });
 await app.register(adminRoutes, { prefix: '/admin' });
 await app.register(portalRoutes, { prefix: '/portal' });
 await app.register(setupCodeRoutes);
+await app.register(tokenExchangeRoutes);
 
 // Root redirect to admin portal
 app.get('/', async (_req, reply) => reply.redirect('/admin'));
