@@ -33,7 +33,7 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
     // Generate TOTP secret
     const totp = new TOTP({
       issuer: 'hubport.cloud',
-      label: tenant.email,
+      label: tenant.name,
       algorithm: 'SHA1',
       digits: 6,
       period: 30,
