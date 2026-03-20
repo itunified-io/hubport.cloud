@@ -214,8 +214,7 @@ export function setupCodeSection(tenantStatus: string): string {
       errEl.classList.add('hidden');
       try {
         var res = await fetch('/portal/setup-code/generate', {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' }
+          method: 'POST', credentials: 'same-origin'
         });
         if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Failed'); }
         var data = await res.json();
