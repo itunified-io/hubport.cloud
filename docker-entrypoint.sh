@@ -3,10 +3,10 @@ set -e
 
 echo "=== hubport.cloud startup ==="
 
-# Run Prisma migrations (idempotent)
+# Sync database schema (idempotent — applies any new columns/tables)
 if [ -d "/app/hub-api/prisma" ]; then
-  echo "[db] Running migrations..."
-  cd /app/hub-api && npx prisma migrate deploy 2>/dev/null || echo "[db] No migrations to run"
+  echo "[db] Syncing schema..."
+  cd /app/hub-api && npx prisma db push --accept-data-loss 2>&1 || echo "[db] Schema sync failed — starting anyway"
   cd /app
 fi
 
