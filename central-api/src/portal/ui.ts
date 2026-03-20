@@ -331,23 +331,31 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       <table class="w-full text-sm">
         <tr class="border-b border-zinc-800">
           <td class="py-3 text-zinc-400">Tenant ID</td>
-          <td class="py-3 font-mono text-amber-400">${tenant.id}</td>
+          <td class="py-3">
+            <span id="tid-masked" class="font-mono text-zinc-500">${tenant.id.slice(0, 4)}${'•'.repeat(8)}</span>
+            <span id="tid-value" class="font-mono text-amber-400 break-all hidden">${tenant.id}</span>
+            <button onclick="toggleCred('tid','${tenant.id}')" id="tid-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button onclick="copyCred('${tenant.id}')" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+          </td>
         </tr>
         <tr class="border-b border-zinc-800">
           <td class="py-3 text-zinc-400">Tunnel Token</td>
           <td class="py-3">
-            <span id="token-hidden" class="text-zinc-600">Hidden for security</span>
+            <span id="token-masked" class="font-mono text-zinc-500">${'•'.repeat(12)}</span>
             <span id="token-value" class="font-mono text-amber-400 text-xs break-all hidden"></span>
-            <button id="reveal-btn" onclick="revealToken()" class="ml-2 text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Reveal</button>
+            <button onclick="revealToken()" id="token-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal (requires password)"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button id="token-copy" onclick="copyTokenValue()" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle hidden" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
           </td>
         </tr>
         <tr class="border-b border-zinc-800">
           <td class="py-3 text-zinc-400">API Token</td>
           <td class="py-3">
             ${apiToken
-              ? `<code id="api-token-value" data-token="${escapeHtml(apiToken)}" class="font-mono text-amber-400 text-xs break-all select-all">${escapeHtml(apiToken)}</code>
-                 <button onclick="copyApiToken()" class="ml-2 text-xs bg-amber-600/20 border border-amber-600/40 text-amber-400 px-3 py-1 rounded hover:bg-amber-600/30 transition">Copy</button>
-                 <p class="text-xs text-zinc-500 mt-1">This token is shown once. Save it now — it will not appear again.</p>`
+              ? `<span id="api-masked" class="font-mono text-zinc-500">${escapeHtml(apiToken.slice(0, 4))}${'•'.repeat(8)}</span>
+                 <span id="api-value" data-token="${escapeHtml(apiToken)}" class="font-mono text-amber-400 text-xs break-all hidden">${escapeHtml(apiToken)}</span>
+                 <button onclick="toggleCred('api',document.getElementById('api-value').dataset.token)" id="api-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                 <button onclick="copyCred(document.getElementById('api-value').dataset.token)" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+                 <p class="text-xs text-zinc-500 mt-1">Save this token now — it will not appear again.</p>`
               : '<span class="text-zinc-600">Token was already displayed. <a href="/portal/dashboard" class="text-amber-500 underline">Reload</a> or use <code class="bg-zinc-800 px-1 rounded">POST /api/v1/tokens/rotate</code> to generate a new one.</span>'
             }
           </td>
@@ -498,9 +506,23 @@ volumes:
     </div>
 
     <script>
-    function copyApiToken() {
-      const el = document.getElementById('api-token-value');
-      if (el) navigator.clipboard.writeText(el.dataset.token || '');
+    function toggleCred(prefix, value) {
+      var masked = document.getElementById(prefix + '-masked');
+      var shown = document.getElementById(prefix + '-value');
+      if (shown.classList.contains('hidden')) {
+        masked.classList.add('hidden');
+        shown.classList.remove('hidden');
+      } else {
+        shown.classList.add('hidden');
+        masked.classList.remove('hidden');
+      }
+    }
+    function copyCred(value) {
+      navigator.clipboard.writeText(value);
+    }
+    function copyTokenValue() {
+      var el = document.getElementById('token-value');
+      if (el) navigator.clipboard.writeText(el.textContent || '');
     }
     function disable2fa() {
       document.getElementById('disable-2fa-modal').classList.remove('hidden');
@@ -582,10 +604,11 @@ volumes:
           return;
         }
         const data = await res.json();
-        document.getElementById('token-hidden').classList.add('hidden');
+        document.getElementById('token-masked').classList.add('hidden');
         document.getElementById('token-value').textContent = data.tunnelToken;
         document.getElementById('token-value').classList.remove('hidden');
-        document.getElementById('reveal-btn').classList.add('hidden');
+        document.getElementById('token-eye').onclick = function() { toggleCred('token', data.tunnelToken); };
+        document.getElementById('token-copy').classList.remove('hidden');
         // Update docker-compose YAML with revealed token
         document.getElementById('yaml-token').textContent = data.tunnelToken;
         document.getElementById('yaml-token').classList.remove('text-zinc-600');
@@ -610,7 +633,7 @@ volumes:
     }
     // Auto-populate YAML API token from displayed value
     (function() {
-      var el = document.getElementById('api-token-value');
+      var el = document.getElementById('api-value');
       var yamlEl = document.getElementById('yaml-api-token');
       if (el && yamlEl && el.dataset.token) {
         yamlEl.textContent = el.dataset.token;
