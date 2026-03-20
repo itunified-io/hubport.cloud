@@ -35,7 +35,7 @@ function shell(title: string, body: string): string {
 </html>`;
 }
 
-export function renderWizard(steps: WizardStep[], statuses: StepStatus[]): string {
+export function renderWizard(steps: WizardStep[], statuses: StepStatus[], autoAdvance?: boolean): string {
   const stepsHtml = steps.map((step, i) => {
     const status = statuses[i]!;
     const badge = step.optional
@@ -64,11 +64,12 @@ export function renderWizard(steps: WizardStep[], statuses: StepStatus[]): strin
   return shell('Overview', `
     <h1 class="text-3xl font-bold mb-2">Setup Wizard</h1>
     <p class="text-zinc-400 mb-8">Complete each step to get your congregation platform running. Progress: ${completed}/${steps.length}</p>
+    ${autoAdvance ? '<div class="card p-4 mb-6 border-[#22c55e]/30"><p class="text-[#22c55e] font-medium">Environment check passed — start with Step 2.</p></div>' : ''}
     <div class="space-y-3">${stepsHtml}</div>
   `);
 }
 
-export function renderStep(step: WizardStep, num: number, status: StepStatus, result?: StepResult): string {
+export function renderStep(step: WizardStep, num: number, status: StepStatus, totalSteps?: number, result?: StepResult): string {
   // If the result contains a hardStop, render the credential confirmation page instead
   if (result?.hardStop) {
     return renderVaultCredentials(step, num, result.hardStop);
@@ -90,7 +91,7 @@ export function renderStep(step: WizardStep, num: number, status: StepStatus, re
           I confirm I have securely stored the encryption key
         </label>
       </div>
-      <a id="enc-continue" href="/step/5" class="inline-block mt-3 bg-zinc-700 text-zinc-300 text-sm font-semibold px-6 py-2 rounded transition pointer-events-none opacity-50">Continue to Step 5</a>
+      <a id="enc-continue" href="/step/${num + 1}" class="inline-block mt-3 bg-zinc-700 text-zinc-300 text-sm font-semibold px-6 py-2 rounded transition pointer-events-none opacity-50">Continue to Step ${num + 1}</a>
       <script>
       function downloadEncKey() {
         const data = JSON.stringify({
@@ -133,7 +134,6 @@ export function renderStep(step: WizardStep, num: number, status: StepStatus, re
     <p class="text-zinc-400 mb-6">${escape(step.description)}</p>
     ${alert}
     <form method="POST" action="/step/${num}">
-      ${step.id === 'tenant-register' ? '<div class="mb-4"><label class="block text-sm font-medium mb-1">Tenant ID</label><input name="tenantId" class="input" placeholder="from signup email"></div>' : ''}
       ${step.id === 'admin-user' ? `
         <div class="space-y-4 mb-6">
           <div><label class="block text-sm font-medium mb-1">Username</label><input name="username" class="input" required></div>
@@ -145,7 +145,7 @@ export function renderStep(step: WizardStep, num: number, status: StepStatus, re
       ${step.optional ? '<div class="mb-4"><label class="flex items-center gap-2"><input type="checkbox" name="skip" value="true"> Skip this step</label></div>' : ''}
       <div class="flex gap-3">
         <button type="submit" class="btn">${status.completed ? 'Re-run' : 'Execute'} Step ${num}</button>
-        ${num < 7 ? `<a href="/step/${num + 1}" class="btn-secondary inline-block text-center">Next &rarr;</a>` : ''}
+        ${num < (totalSteps ?? 6) ? `<a href="/step/${num + 1}" class="btn-secondary inline-block text-center">Next &rarr;</a>` : ''}
       </div>
     </form>
   `);

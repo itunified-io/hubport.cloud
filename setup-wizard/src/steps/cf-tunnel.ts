@@ -33,10 +33,30 @@ export const tunnelStep: WizardStep = {
     try {
       const res = await fetch('http://localhost:3001/health', { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
+        const warnings: string[] = [];
+
+        // Verify public URL reachability
+        const subdomain = process.env.HUBPORT_SUBDOMAIN || '';
+        if (subdomain) {
+          try {
+            const publicRes = await fetch(`https://${subdomain}.hubport.cloud`, {
+              signal: AbortSignal.timeout(10000),
+            });
+            if (publicRes.ok || publicRes.status === 502) {
+              // 200 = fully working, 502 = tunnel works but backend not ready (OK)
+            } else {
+              warnings.push(`Public URL returned ${publicRes.status} — tunnel may need time to propagate.`);
+            }
+          } catch {
+            warnings.push('Public URL check timed out — DNS propagation may still be in progress.');
+          }
+        }
+
         return {
           success: true,
           message: 'Cloudflare Tunnel is active. Your app is accessible via your subdomain.',
           credentials: { tunnel_status: 'connected' },
+          warnings: warnings.length > 0 ? warnings : undefined,
         };
       }
     } catch {

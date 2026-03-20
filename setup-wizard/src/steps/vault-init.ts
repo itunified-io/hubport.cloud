@@ -170,6 +170,60 @@ export async function vaultConfirmHandler(body: Record<string, string>): Promise
       };
     }
 
+    // 7. Bootstrap token exchange (ADR-0072) — exchange one-time bootstrap token for runtime token
+    const apiToken = process.env.HUBPORT_API_TOKEN || '';
+    const tenantId = process.env.HUBPORT_TENANT_ID || '';
+    const centralApi = process.env.CENTRAL_API_URL || 'https://api.hubport.cloud';
+    const exchangeWarnings: string[] = [];
+
+    if (apiToken && tenantId) {
+      try {
+        const exchangeRes = await fetch(`${centralApi}/tenants/${tenantId}/token-exchange`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`,
+          },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (exchangeRes.ok) {
+          const exchangeData = await exchangeRes.json() as { runtimeToken: string; expiresAt: string };
+
+          // Store runtime API token in Vault
+          const apiTokenRes = await fetch(`${VAULT_ADDR}/v1/secret/data/hubport/api-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Vault-Token': rootToken },
+            body: JSON.stringify({ data: { token: exchangeData.runtimeToken, expiresAt: exchangeData.expiresAt } }),
+          });
+          if (!apiTokenRes.ok) {
+            exchangeWarnings.push('Runtime API token obtained but failed to store in Vault.');
+          }
+        } else {
+          exchangeWarnings.push(`Bootstrap token exchange returned ${exchangeRes.status} — token may already be exchanged.`);
+        }
+      } catch {
+        exchangeWarnings.push('Central API unreachable for token exchange — offline mode. Bootstrap token still valid.');
+      }
+
+      // Store CF tunnel token in Vault
+      const tunnelToken = process.env.CF_TUNNEL_TOKEN || '';
+      if (tunnelToken) {
+        try {
+          const tunnelRes = await fetch(`${VAULT_ADDR}/v1/secret/data/hubport/tunnel-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Vault-Token': rootToken },
+            body: JSON.stringify({ data: { token: tunnelToken } }),
+          });
+          if (!tunnelRes.ok) {
+            exchangeWarnings.push('Failed to store tunnel token in Vault.');
+          }
+        } catch {
+          exchangeWarnings.push('Failed to store tunnel token in Vault — Vault may be sealed.');
+        }
+      }
+    }
+
     return {
       success: true,
       message: 'Vault initialized. Database password and encryption key secured in Vault.',
@@ -177,6 +231,7 @@ export async function vaultConfirmHandler(body: Record<string, string>): Promise
         key: encryptionKey,
         generatedAt: new Date().toISOString(),
       },
+      warnings: exchangeWarnings.length > 0 ? exchangeWarnings : undefined,
     };
   } catch (err) {
     return { success: false, message: `Vault confirm failed: ${(err as Error).message}` };
