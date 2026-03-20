@@ -202,7 +202,8 @@ export function setupCodeSection(tenantStatus: string): string {
       </div>
 
       <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-4">
-        <p class="text-sm text-zinc-400 mb-3">Need a server? We recommend Hostinger VPS:</p>
+        <p class="text-sm text-zinc-400 mb-3">Need a server? hubport.cloud runs on any hardware with Docker &mdash; including a Synology NAS, Raspberry Pi, or your own PC.</p>
+        <p class="text-sm text-zinc-400 mb-3">If you need a VPS, these Hostinger plans work well:</p>
         <div class="space-y-2">
           <div class="flex items-center justify-between bg-zinc-900/50 rounded-lg p-3 border border-zinc-700">
             <div>
@@ -219,7 +220,7 @@ export function setupCodeSection(tenantStatus: string): string {
             <a href="https://www.hostinger.com/cart?product=vps%3Avps_kvm_2&period=24&referral_type=cart_link&REFERRALCODE=NSGBUECHEBQR&referral_id=019d04a9-baed-70fa-b7da-b1d81e15c69a" target="_blank" rel="noopener" class="text-amber-500 text-sm font-semibold hover:underline">~$10/mo &rarr;</a>
           </div>
         </div>
-        <p class="text-zinc-600 text-[11px] mt-3 italic">* Affiliate links &mdash; we receive a small commission at no extra cost to you.</p>
+        <p class="text-zinc-600 text-[11px] mt-3 italic">* Affiliate links &mdash; using them supports the hubport.cloud project at no extra cost to you.</p>
         <p class="text-zinc-500 text-xs mt-2"><a href="${landingUrl()}/en/faq" target="_blank" rel="noopener" class="text-amber-500 hover:underline">Read our FAQ</a> for setup help and more details.</p>
       </div>
 
@@ -236,8 +237,15 @@ export function setupCodeSection(tenantStatus: string): string {
           <p id="setup-code-expiry" class="text-xs text-zinc-500"></p>
         </div>
         <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 mb-4">
-          <p class="text-xs text-zinc-500 mb-1">Run on your server:</p>
-          <code id="setup-code-curl" class="text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
+          <p class="text-xs text-zinc-500 mb-2">Run on your server:</p>
+          <div class="mb-2">
+            <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Linux / macOS</span>
+            <code id="setup-code-curl" class="block text-sm text-amber-400 select-all mt-1">curl -fsSL ${installerUrl()} | sh</code>
+          </div>
+          <div>
+            <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Windows (PowerShell)</span>
+            <code id="setup-code-ps" class="block text-sm text-amber-400 select-all mt-1">irm ${installerUrl()}/windows | iex</code>
+          </div>
         </div>
         <button onclick="generateSetupCode()" class="text-sm text-zinc-500 hover:text-zinc-300 underline">
           Regenerate Code (invalidates previous)
@@ -260,6 +268,7 @@ export function setupCodeSection(tenantStatus: string): string {
         var data = await res.json();
         document.getElementById('setup-code-value').textContent = data.code;
         document.getElementById('setup-code-curl').textContent = 'curl -fsSL ${installerUrl()} | sh -s -- ' + data.code;
+        document.getElementById('setup-code-ps').textContent = 'irm ${installerUrl()}/windows | iex; # then enter: ' + data.code;
         var exp = new Date(data.expiresAt);
         document.getElementById('setup-code-generate').classList.add('hidden');
         document.getElementById('setup-code-display').classList.remove('hidden');
