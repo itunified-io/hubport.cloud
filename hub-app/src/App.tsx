@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "./auth/useAuth";
-import { RoleGuard } from "./auth/RoleGuard";
+import { PermissionGuard } from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { Dashboard } from "./pages/Dashboard";
@@ -67,42 +67,48 @@ export function App() {
         <Route
           path="/publishers"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard
+              requires={["app:publishers.view", "app:publishers.view_minimal"]}
+              any
+            >
               <PublisherList />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/publishers/new"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:publishers.edit">
               <PublisherForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/publishers/:id"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard
+              requires={["app:publishers.view", "app:publishers.view_minimal"]}
+              any
+            >
               <PublisherForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
         <Route
           path="/territories"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:territories.view">
               <TerritoryList />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/territories/map"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:territories.view">
               <TerritoryMap />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
@@ -110,35 +116,35 @@ export function App() {
         <Route
           path="/meetings/new"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/meetings/:id"
           element={
-            <RoleGuard requiredRole="elder">
+            <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
         <Route
           path="/sharing"
           element={
-            <RoleGuard requiredRole="admin">
+            <PermissionGuard requires="app:settings.view">
               <SharingPartners />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 
         <Route
           path="/settings"
           element={
-            <RoleGuard requiredRole="admin">
+            <PermissionGuard requires="app:settings.view">
               <Settings />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
 

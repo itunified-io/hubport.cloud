@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { AuthProvider } from "./auth/AuthProvider";
+import { PermissionProvider } from "./auth/PermissionProvider";
 import { IntlSetup } from "./i18n/IntlSetup";
 import { App } from "./App";
 import "./index.css";
@@ -14,7 +15,9 @@ createRoot(root).render(
     <AuthProvider>
       <IntlSetup>
         <BrowserRouter>
-          <App />
+          <PermissionProvider>
+            <App />
+          </PermissionProvider>
         </BrowserRouter>
       </IntlSetup>
     </AuthProvider>

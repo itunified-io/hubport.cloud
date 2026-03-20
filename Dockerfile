@@ -30,12 +30,10 @@ WORKDIR /app
 
 RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
 
-# Copy built artifacts
-COPY --from=builder /app/hub-app/dist ./hub-app/dist/
+# Copy built artifacts (chown to hubport user for runtime config injection)
+COPY --from=builder --chown=1001:1001 /app/hub-app/dist ./hub-app/dist/
 COPY --from=builder /app/hub-api/dist ./hub-api/dist/
 COPY --from=builder /app/hub-api/prisma ./hub-api/prisma/
-COPY --from=builder /app/hub-api/node_modules/.prisma ./node_modules/.prisma/
-COPY --from=builder /app/hub-api/node_modules/@prisma ./node_modules/@prisma/
 COPY --from=builder /app/setup-wizard/dist ./setup-wizard/dist/
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/package.json ./
@@ -45,6 +43,6 @@ COPY docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 USER hubport
-EXPOSE 3000 3001 8080
+EXPOSE 3000 8080
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

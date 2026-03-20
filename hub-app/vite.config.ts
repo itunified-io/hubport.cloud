@@ -13,6 +13,11 @@ export default defineConfig({
       includeAssets: ["favicon.ico", "icons/*.png"],
       manifest: false,
       workbox: {
+        // config.js is generated at container startup (runtime env injection)
+        // — must never be cached by the service worker
+        navigateFallbackDenylist: [/^\/config\.js$/],
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
@@ -31,7 +36,9 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\.(?:js|css)$/i,
+            urlPattern: ({ url }: { url: URL }) =>
+              /\.(?:js|css)$/i.test(url.pathname) &&
+              url.pathname !== "/config.js",
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "static-resources",

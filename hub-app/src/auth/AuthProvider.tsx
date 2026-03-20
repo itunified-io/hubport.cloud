@@ -1,14 +1,11 @@
 import { type ReactNode } from "react";
 import { AuthProvider as OidcAuthProvider } from "react-oidc-context";
 import { type WebStorageStateStore } from "oidc-client-ts";
-
-const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL as string;
-const realm = import.meta.env.VITE_KEYCLOAK_REALM as string;
-const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID as string;
+import { KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } from "@/lib/config";
 
 const oidcConfig = {
-  authority: `${keycloakUrl}/realms/${realm}`,
-  client_id: clientId,
+  authority: `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}`,
+  client_id: KEYCLOAK_CLIENT_ID,
   redirect_uri: window.location.origin,
   post_logout_redirect_uri: window.location.origin,
   scope: "openid profile email",

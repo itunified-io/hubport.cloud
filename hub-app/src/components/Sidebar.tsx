@@ -7,47 +7,76 @@ import {
   Calendar,
   Handshake,
   Settings as SettingsIcon,
+  ScrollText,
 } from "lucide-react";
-import { useAuth } from "@/auth/useAuth";
+import { usePermissions } from "@/auth/PermissionProvider";
 
 interface NavItem {
   to: string;
   labelId: string;
   icon: React.ElementType;
-  minRole: "viewer" | "publisher" | "elder" | "admin";
+  requiredPermission?: string | string[];
+  any?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/", labelId: "nav.dashboard", icon: LayoutDashboard, minRole: "viewer" },
-  { to: "/publishers", labelId: "nav.publishers", icon: Users, minRole: "elder" },
-  { to: "/territories", labelId: "nav.territories", icon: Map, minRole: "elder" },
-  { to: "/meetings", labelId: "nav.meetings", icon: Calendar, minRole: "publisher" },
-  { to: "/sharing", labelId: "nav.sharing", icon: Handshake, minRole: "admin" },
-  { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, minRole: "admin" },
+  { to: "/", labelId: "nav.dashboard", icon: LayoutDashboard },
+  {
+    to: "/publishers",
+    labelId: "nav.publishers",
+    icon: Users,
+    requiredPermission: ["app:publishers.view", "app:publishers.view_minimal"],
+    any: true,
+  },
+  {
+    to: "/territories",
+    labelId: "nav.territories",
+    icon: Map,
+    requiredPermission: "app:territories.view",
+  },
+  {
+    to: "/meetings",
+    labelId: "nav.meetings",
+    icon: Calendar,
+    requiredPermission: "app:meetings.view",
+  },
+  {
+    to: "/sharing",
+    labelId: "nav.sharing",
+    icon: Handshake,
+    requiredPermission: "app:settings.view",
+  },
+  {
+    to: "/audit",
+    labelId: "nav.audit",
+    icon: ScrollText,
+    requiredPermission: "app:audit.view",
+  },
+  {
+    to: "/settings",
+    labelId: "nav.settings",
+    icon: SettingsIcon,
+    requiredPermission: "app:settings.view",
+  },
 ];
-
-const ROLE_LEVELS: Record<string, number> = {
-  viewer: 0,
-  publisher: 1,
-  elder: 2,
-  admin: 3,
-};
 
 interface SidebarProps {
   onNavigate?: () => void;
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { roles } = useAuth();
+  const { can, canAny, isLoaded } = usePermissions();
 
-  const userLevel = Math.max(
-    ...roles.map((r) => ROLE_LEVELS[r] ?? 0),
-    0,
-  );
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (!item.requiredPermission) return true;
+    if (!isLoaded) return false;
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => userLevel >= (ROLE_LEVELS[item.minRole] ?? 0),
-  );
+    const perms = Array.isArray(item.requiredPermission)
+      ? item.requiredPermission
+      : [item.requiredPermission];
+
+    return item.any ? canAny(...perms) : perms.every(can);
+  });
 
   return (
     <nav className="flex flex-col gap-1 p-3">

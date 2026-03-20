@@ -19,6 +19,14 @@ export async function tenantRoutes(app: FastifyInstance) {
 
     const existing = await prisma.tenant.findUnique({ where: { subdomain } });
     if (existing) {
+      // Allow re-signup if tenant was REJECTED or DECOMMISSIONED — reset to PENDING
+      if (existing.status === 'REJECTED') {
+        const updated = await prisma.tenant.update({
+          where: { id: existing.id },
+          data: { name, email, status: 'PENDING', rejectReason: null, tunnelId: null, tunnelToken: null, ztAppId: null, activatedAt: null },
+        });
+        return reply.status(201).send({ id: updated.id, status: updated.status });
+      }
       return reply.status(409).send({ error: 'Subdomain already taken' });
     }
 

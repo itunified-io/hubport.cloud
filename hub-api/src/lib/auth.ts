@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import fjwt from "@fastify/jwt";
+import buildGetJwks from "get-jwks";
 
 export interface UserPayload {
   sub: string;
@@ -39,14 +40,28 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
   if (secret) {
     await app.register(fjwt, { secret });
   } else if (jwksUrl) {
-    // Dynamic JWKS verification — fetch public keys from Keycloak
+    // JWKS verification — fetch public keys from Keycloak via get-jwks
+    // Use internal Docker URL (KEYCLOAK_JWKS_URL) since JWT iss is the external URL
+    // which is unreachable from inside the container
+    const internalDomain = jwksUrl.replace(/\/protocol\/openid-connect\/certs$/, "");
+    const getJwks = buildGetJwks({
+      providerDiscovery: false,
+      jwksPath: "/protocol/openid-connect/certs",
+      issuersWhitelist: [internalDomain],
+    });
+    const secretCallback = async (
+      _request: FastifyRequest,
+      token: { header: { kid?: string; alg?: string } },
+    ): Promise<string> => {
+      return getJwks.getPublicKey({
+        kid: token.header.kid,
+        alg: token.header.alg ?? "RS256",
+        domain: internalDomain,
+      });
+    };
     await app.register(fjwt, {
       decode: { complete: true },
-      secret: async (_request: FastifyRequest) => {
-        const res = await fetch(jwksUrl);
-        const jwks = await res.json() as { keys: unknown[] };
-        return { keys: jwks.keys } as unknown as string;
-      },
+      secret: secretCallback as unknown as string,
     });
   } else {
     app.log.warn("No JWT_SECRET or KEYCLOAK_JWKS_URL — auth disabled (dev mode)");
@@ -63,7 +78,11 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
   }
 
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
-    if (request.url.startsWith("/health")) return;
+    // Only require auth for API routes — SPA static files are public
+    // (the SPA itself handles auth via Keycloak OIDC in the browser)
+    const API_PREFIXES = ["/publishers", "/territories", "/meetings", "/permissions", "/onboarding", "/roles"];
+    const path = request.url.split("?")[0];
+    if (!API_PREFIXES.some((p) => path.startsWith(p))) return;
 
     try {
       const decoded = await request.jwtVerify<Record<string, unknown>>();

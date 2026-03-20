@@ -7,18 +7,81 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Enums ---
+
+enum CongregationRole {
+  publisher
+  ministerial_servant
+  elder
+}
+
+enum MemberStatus {
+  invited
+  pending_approval
+  active
+  inactive
+  rejected
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum RoleScope {
+  all
+  midweek
+  weekend
+}
+
+// --- Core Models ---
+
 model Publisher {
   id        String   @id @default(uuid())
   firstName String
   lastName  String
-  email     String?
-  phone     String?
-  role      String   @default("publisher") // admin, elder, publisher, viewer
-  status    String   @default("active") // active, inactive, away
+  displayName String?
+
+  // Identity — links to Keycloak user (null = offline/not-yet-invited)
+  keycloakSub String? @unique
+  email       String?
+  phone       String?
+
+  // Profile
+  gender      Gender?
+  dateOfBirth DateTime?
+  address     String?  // encrypted at rest
+
+  // Congregation
+  congregationRole  CongregationRole @default(publisher)
+  congregationFlags String[]         // additive flags: coordinator, regular_pioneer, etc.
+  status            MemberStatus     @default(active)
+
+  // Keycloak role (admin/elder/publisher/viewer) — kept for backward compat
+  role String @default("publisher")
+
+  // Privacy
+  privacyAccepted   Boolean  @default(false)
+  privacyAcceptedAt  DateTime?
+  privacySettings    Json     @default("{\"contactVisibility\":\"elders_only\",\"addressVisibility\":\"elders_only\",\"notesVisibility\":\"elders_only\"}")
+
+  // Onboarding audit trail
+  invitedBy  String?
+  invitedAt  DateTime?
+  approvedBy String?
+  approvedAt DateTime?
+
+  // Notes
+  notes String?
+
+  // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
   assignments TerritoryAssignment[]
+  appRoles    AppRoleMember[]
+  inviteCode  InviteCode?
 }
 
 model Territory {
@@ -41,7 +104,7 @@ model TerritoryAssignment {
   returnedAt  DateTime?
 
   territory Territory @relation(fields: [territoryId], references: [id])
-  publisher Publisher @relation(fields: [publisherId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
   @@index([territoryId])
   @@index([publisherId])
@@ -58,4 +121,65 @@ model Meeting {
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- RBAC Models ---
+
+model AppRole {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  permissions Json    // string[] of permission keys
+  scope       RoleScope @default(all)
+  isSystem    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members AppRoleMember[]
+}
+
+model AppRoleMember {
+  id                String    @id @default(uuid())
+  roleId            String
+  publisherId       String
+  validFrom         DateTime?
+  validTo           DateTime?
+  deniedPermissions Json      @default("[]") // string[] of denied permission keys
+
+  createdAt DateTime @default(now())
+
+  role      AppRole   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, publisherId])
+  @@index([publisherId])
+}
+
+// --- Audit & Onboarding ---
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  objectType String
+  objectId   String
+  beforeState Json?
+  afterState  Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([objectType, objectId])
+  @@index([createdAt])
+}
+
+model InviteCode {
+  id          String    @id @default(uuid())
+  codeHash    String    @unique // SHA-256 hash of the invite code
+  publisherId String    @unique
+  expiresAt   DateTime
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 }

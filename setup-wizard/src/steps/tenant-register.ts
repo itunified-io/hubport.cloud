@@ -2,6 +2,7 @@ import type { WizardStep, StepStatus, StepResult } from './types.js';
 
 const CENTRAL_API = process.env.CENTRAL_API_URL || 'https://api.hubport.cloud';
 const TENANT_ID = process.env.TENANT_ID || '';
+const API_TOKEN = process.env.HUBPORT_API_TOKEN || '';
 
 export const tenantStep: WizardStep = {
   number: 1,
@@ -14,7 +15,7 @@ export const tenantStep: WizardStep = {
     if (!TENANT_ID) return { completed: false };
 
     try {
-      const res = await fetch(`${CENTRAL_API}/tenants/${TENANT_ID}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`${CENTRAL_API}/tenants/${TENANT_ID}/status`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return { completed: false, details: { error: 'Tenant not found' } };
       const tenant = await res.json() as { status: string; subdomain: string };
       return {
@@ -31,9 +32,15 @@ export const tenantStep: WizardStep = {
     const tenantId = input.tenantId || TENANT_ID;
     if (!tenantId) return { success: false, message: 'Tenant ID is required' };
 
+    const token = input.apiToken || API_TOKEN;
+
     try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${CENTRAL_API}/tenants/${tenantId}/activate`, {
         method: 'POST',
+        headers,
         signal: AbortSignal.timeout(5000),
       });
 
