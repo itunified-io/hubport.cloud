@@ -78,7 +78,12 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) return reply.status(404).type('text/html').send(shell('Not Found', '<p>Tenant not found.</p>'));
-    reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant)));
+    const devices = await prisma.tenantDevice.findMany({
+      where: { tenantId: id, status: 'approved' },
+      orderBy: { approvedAt: 'desc' },
+      select: { id: true, hostname: true, os: true, arch: true, ip: true, approvedAt: true },
+    });
+    reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant, devices)));
   });
 
   // Internal-only endpoint for MCP skill to provision auth (setup token)

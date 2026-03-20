@@ -35,7 +35,10 @@ export function portalShell(title: string, content: string): string {
   <nav class="border-b border-zinc-800 px-6 py-4">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <a href="/portal/dashboard" class="text-xl font-bold text-amber-500">hubport.cloud</a>
-      <span class="text-sm text-zinc-500">Tenant Portal</span>
+      <div class="flex items-center gap-4">
+        <a href="/portal/dashboard" class="text-sm text-zinc-400 hover:text-zinc-200 transition">Dashboard</a>
+        <a href="/portal/docs" class="text-sm text-zinc-400 hover:text-zinc-200 transition">Docs</a>
+      </div>
     </div>
   </nav>
   <main class="max-w-4xl mx-auto px-6 py-8">
@@ -231,11 +234,17 @@ export function setupCodeSection(tenantStatus: string): string {
           <p class="text-xs text-zinc-500 mb-2">Run on your server:</p>
           <div class="mb-2">
             <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Linux / macOS</span>
-            <code id="setup-code-curl" class="block text-sm text-amber-400 select-all mt-1">curl -fsSL ${installerUrl()} | sh</code>
+            <div class="flex items-center gap-2 mt-1">
+              <code id="setup-code-curl" class="flex-1 text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
+              <button onclick="copyCred(document.getElementById('setup-code-curl').textContent, event)" class="p-1 text-zinc-500 hover:text-amber-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+            </div>
           </div>
           <div>
             <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Windows (PowerShell)</span>
-            <code id="setup-code-ps" class="block text-sm text-amber-400 select-all mt-1">irm ${installerUrl()}/windows | iex</code>
+            <div class="flex items-center gap-2 mt-1">
+              <code id="setup-code-ps" class="flex-1 text-sm text-amber-400 select-all">irm ${installerUrl()}/windows | iex</code>
+              <button onclick="copyCred(document.getElementById('setup-code-ps').textContent, event)" class="p-1 text-zinc-500 hover:text-amber-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+            </div>
           </div>
         </div>
         <button onclick="generateSetupCode()" class="text-sm text-zinc-500 hover:text-zinc-300 underline">
@@ -327,73 +336,121 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     ${setupCodeSection(tenant.status)}
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
-      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Your Credentials</h3>
-      <table class="w-full text-sm">
-        <tr class="border-b border-zinc-800">
-          <td class="py-3 text-zinc-400">Tenant ID</td>
-          <td class="py-3">
-            <span id="tid-masked" class="font-mono text-zinc-500">${tenant.id.slice(0, 4)}${'•'.repeat(8)}</span>
-            <span id="tid-value" class="font-mono text-amber-400 break-all hidden">${tenant.id}</span>
-            <button onclick="toggleCred('tid','${tenant.id}')" id="tid-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button onclick="copyCred('${tenant.id}')" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
-          </td>
-        </tr>
-        <tr class="border-b border-zinc-800">
-          <td class="py-3 text-zinc-400">Tunnel Token</td>
-          <td class="py-3">
-            <span id="token-masked" class="font-mono text-zinc-500">${'•'.repeat(12)}</span>
-            <span id="token-value" class="font-mono text-amber-400 text-xs break-all hidden"></span>
-            <button onclick="revealToken()" id="token-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal (requires password)"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button id="token-copy" onclick="copyTokenValue()" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle hidden" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
-          </td>
-        </tr>
-        <tr class="border-b border-zinc-800">
-          <td class="py-3 text-zinc-400">API Token</td>
-          <td class="py-3">
-            ${apiToken
-              ? `<span id="api-masked" class="font-mono text-zinc-500">${escapeHtml(apiToken.slice(0, 4))}${'•'.repeat(8)}</span>
-                 <span id="api-value" data-token="${escapeHtml(apiToken)}" class="font-mono text-amber-400 text-xs break-all hidden">${escapeHtml(apiToken)}</span>
-                 <button onclick="toggleCred('api',document.getElementById('api-value').dataset.token)" id="api-eye" class="ml-2 p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Reveal"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                 <button onclick="copyCred(document.getElementById('api-value').dataset.token)" class="p-1 text-zinc-500 hover:text-amber-400 transition align-middle" title="Copy"><svg class="inline w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
-                 <p class="text-xs text-zinc-500 mt-1">Save this token now — it will not appear again.</p>`
-              : '<span class="text-zinc-600">Token was already displayed. <a href="/portal/dashboard" class="text-amber-500 underline">Reload</a> or use <code class="bg-zinc-800 px-1 rounded">POST /api/v1/tokens/rotate</code> to generate a new one.</span>'
-            }
-          </td>
-        </tr>
-      </table>
-    </div>
+      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4">Your Credentials</h3>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between py-3 border-b border-zinc-800/50">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <p class="text-xs text-zinc-500">Tenant ID</p>
+              <p class="font-mono text-sm">
+                <span id="tid-masked" class="text-zinc-300">${tenant.id.slice(0, 4)}<span class="text-zinc-600">${'•'.repeat(Math.max(0, tenant.id.length - 8))}</span>${tenant.id.slice(-4)}</span>
+                <span id="tid-value" class="text-amber-400 break-all hidden">${tenant.id}</span>
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="toggleCred('tid')" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Reveal"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button onclick="copyCred('${tenant.id}', event)" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+          </div>
+        </div>
 
+        <div class="flex items-center justify-between py-3 border-b border-zinc-800/50">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div>
+              <p class="text-xs text-zinc-500">Tunnel Token</p>
+              <p class="font-mono text-sm">
+                <span id="token-masked" class="text-zinc-300">${'•'.repeat(4)}<span class="text-zinc-600">${'•'.repeat(16)}</span>${'•'.repeat(4)}</span>
+                <span id="token-value" class="text-amber-400 text-xs break-all hidden"></span>
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="revealToken()" id="token-eye" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Reveal (requires password)"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button id="token-copy" onclick="copyTokenValue(event)" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition hidden" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between py-3">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </div>
+            <div>
+              <p class="text-xs text-zinc-500">API Token</p>
+              ${apiToken
+                ? `<p class="font-mono text-sm">
+                    <span id="api-masked" class="text-zinc-300">${escapeHtml(apiToken.slice(0, 4))}<span class="text-zinc-600">${'•'.repeat(Math.max(0, apiToken.length - 8))}</span>${escapeHtml(apiToken.slice(-4))}</span>
+                    <span id="api-value" data-token="${escapeHtml(apiToken)}" class="text-amber-400 text-xs break-all hidden">${escapeHtml(apiToken)}</span>
+                  </p>
+                  <p class="text-[11px] text-zinc-600 mt-0.5">Save this token now — it will not appear again.</p>`
+                : '<p class="text-sm text-zinc-600">Already displayed. <a href="/portal/dashboard" class="text-amber-500 hover:underline">Reload</a> or rotate via API.</p>'
+              }
+            </div>
+          </div>
+          ${apiToken
+            ? `<div class="flex items-center gap-1">
+                <button onclick="toggleCred('api')" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Reveal"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button onclick="copyCred(document.getElementById('api-value').dataset.token, event)" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              </div>`
+            : ''
+          }
+        </div>
+      </div>
+    </div>
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
-      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Security</h3>
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-zinc-200 font-semibold">Two-Factor Authentication</p>
-          <p class="text-sm text-zinc-400">${tenant.auth?.totpEnabled ? 'Enabled — your account is protected' : 'Not enabled — add an extra layer of security'}</p>
+      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4">Security</h3>
+
+      <div class="space-y-4">
+        <div class="flex items-center justify-between py-3 border-b border-zinc-800/50">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg ${tenant.auth?.totpEnabled ? 'bg-green-900/30' : 'bg-zinc-800'} flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 ${tenant.auth?.totpEnabled ? 'text-green-400' : 'text-zinc-400'}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </div>
+            <div>
+              <p class="text-sm text-zinc-200 font-medium">Authenticator App (TOTP)</p>
+              <p class="text-xs ${tenant.auth?.totpEnabled ? 'text-green-400' : 'text-zinc-500'}">${tenant.auth?.totpEnabled ? 'Enabled' : 'Not configured'}</p>
+            </div>
+          </div>
+          ${tenant.auth?.totpEnabled
+            ? '<a href="/portal/totp/enroll" class="text-xs text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition">Change</a>'
+            : '<a href="/portal/totp/enroll" class="text-xs text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">Enable</a>'
+          }
         </div>
-        ${tenant.auth?.totpEnabled
-          ? '<button type="button" onclick="disable2fa()" class="text-sm bg-red-600/20 border border-red-600/40 text-red-400 px-4 py-2 rounded-lg hover:bg-red-600/30 transition">Disable</button>'
-          : '<a href="/portal/totp/enroll" class="text-sm bg-amber-600/20 border border-amber-600/40 text-amber-400 px-4 py-2 rounded-lg hover:bg-amber-600/30 transition">Enable 2FA</a>'
-        }
+
+        <div class="py-3">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
+              </div>
+              <div>
+                <p class="text-sm text-zinc-200 font-medium">Passkeys</p>
+                <p class="text-xs text-zinc-500" id="passkey-count">Loading...</p>
+              </div>
+            </div>
+            <button onclick="registerPasskey()" class="text-xs text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">Add Passkey</button>
+          </div>
+          <div id="passkey-list" class="space-y-2 ml-11"></div>
+          <div id="passkey-error" class="text-xs text-red-400 ml-11 mt-2 hidden"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Disable 2FA modal -->
-    <div id="disable-2fa-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
-      <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg text-amber-500 mb-4">Disable Two-Factor Authentication</h3>
-        <p class="text-sm text-zinc-400 mb-4">Enter your password to confirm disabling 2FA.</p>
-        <input type="password" id="disable-2fa-password" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none mb-4" placeholder="Password">
-        <div id="disable-2fa-error" class="text-sm text-red-400 mb-3 hidden"></div>
-        <div class="flex gap-3">
-          <button onclick="closeDisable2faModal()" class="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 py-2 rounded-lg transition">Cancel</button>
-          <button onclick="submitDisable2fa()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition">Disable 2FA</button>
-        </div>
-      </div>
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
+      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4">Authorized Devices</h3>
+      <div id="device-list" class="space-y-2"></div>
+      <p id="device-empty" class="text-sm text-zinc-600 hidden">No devices authorized yet.</p>
     </div>
 
     <script>
-    function toggleCred(prefix, value) {
+    function toggleCred(prefix) {
       var masked = document.getElementById(prefix + '-masked');
       var shown = document.getElementById(prefix + '-value');
       if (shown.classList.contains('hidden')) {
@@ -404,43 +461,171 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
         masked.classList.remove('hidden');
       }
     }
-    function copyCred(value) {
-      navigator.clipboard.writeText(value);
+    function copyCred(value, event) {
+      navigator.clipboard.writeText(value).then(function() {
+        var btn = event && event.currentTarget ? event.currentTarget : null;
+        if (!btn) return;
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+        setTimeout(function() { btn.innerHTML = orig; }, 1500);
+      });
     }
-    function copyTokenValue() {
+    function copyTokenValue(event) {
       var el = document.getElementById('token-value');
-      if (el) navigator.clipboard.writeText(el.textContent || '');
-    }
-    function disable2fa() {
-      document.getElementById('disable-2fa-modal').classList.remove('hidden');
-      document.getElementById('disable-2fa-modal').classList.add('flex');
-      document.getElementById('disable-2fa-password').focus();
-    }
-    function closeDisable2faModal() {
-      document.getElementById('disable-2fa-modal').classList.add('hidden');
-      document.getElementById('disable-2fa-modal').classList.remove('flex');
-      document.getElementById('disable-2fa-password').value = '';
-      document.getElementById('disable-2fa-error').classList.add('hidden');
-    }
-    async function submitDisable2fa() {
-      const password = document.getElementById('disable-2fa-password').value;
-      if (!password) return;
-      try {
-        const res = await fetch('/portal/totp/disable', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password }),
+      if (el) {
+        navigator.clipboard.writeText(el.textContent || '').then(function() {
+          var btn = event && event.currentTarget ? event.currentTarget : null;
+          if (!btn) return;
+          var orig = btn.innerHTML;
+          btn.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+          setTimeout(function() { btn.innerHTML = orig; }, 1500);
         });
-        if (!res.ok) {
-          document.getElementById('disable-2fa-error').textContent = 'Invalid password';
-          document.getElementById('disable-2fa-error').classList.remove('hidden');
+      }
+    }
+
+    // --- Passkey management ---
+    async function loadPasskeys() {
+      try {
+        var res = await fetch('/portal/passkey/list', { credentials: 'same-origin' });
+        if (!res.ok) return;
+        var data = await res.json();
+        var list = document.getElementById('passkey-list');
+        var count = document.getElementById('passkey-count');
+        count.textContent = data.passkeys.length + ' registered';
+        list.innerHTML = '';
+        data.passkeys.forEach(function(pk) {
+          var created = new Date(pk.createdAt).toLocaleDateString();
+          var div = document.createElement('div');
+          div.className = 'flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2 border border-zinc-700/50';
+          div.innerHTML = '<div class="flex items-center gap-2">' +
+            '<svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 7h2a5 5 0 010 10h-2m-6 0H7A5 5 0 017 7h2"/><path d="M8 12h8"/></svg>' +
+            '<span class="text-xs text-zinc-300">' + (pk.name || 'Passkey') + '</span>' +
+            '<span class="text-[10px] text-zinc-600 ml-1">added ' + created + '</span>' +
+            '</div>' +
+            '<button onclick="deletePasskey(\\'' + pk.id + '\\')" class="p-1 text-zinc-600 hover:text-red-400 transition" title="Remove passkey">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' +
+            '</button>';
+          list.appendChild(div);
+        });
+      } catch {}
+    }
+    loadPasskeys();
+
+    async function registerPasskey() {
+      var errEl = document.getElementById('passkey-error');
+      errEl.classList.add('hidden');
+      try {
+        var optRes = await fetch('/portal/passkey/register-options', { credentials: 'same-origin' });
+        if (!optRes.ok) throw new Error('Failed to get options');
+        var options = await optRes.json();
+        options.challenge = _b64ToBuf(options.challenge);
+        options.user.id = _b64ToBuf(options.user.id);
+        if (options.excludeCredentials) {
+          options.excludeCredentials = options.excludeCredentials.map(function(c) {
+            return Object.assign({}, c, { id: _b64ToBuf(c.id) });
+          });
+        }
+        var cred = await navigator.credentials.create({ publicKey: options });
+        if (!cred) throw new Error('No credential returned');
+        var verifyRes = await fetch('/portal/passkey/register-verify', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cred.id, rawId: _bufToB64(cred.rawId), type: cred.type,
+            response: {
+              clientDataJSON: _bufToB64(cred.response.clientDataJSON),
+              attestationObject: _bufToB64(cred.response.attestationObject),
+            },
+            clientExtensionResults: cred.getClientExtensionResults(),
+          }),
+        });
+        if (!verifyRes.ok) { var e = await verifyRes.json(); throw new Error(e.error || 'Registration failed'); }
+        loadPasskeys();
+      } catch (e) {
+        errEl.textContent = e.message || 'Passkey registration failed';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    async function deletePasskey(id) {
+      if (!confirm('Remove this passkey?')) return;
+      var pw = prompt('Enter your password to confirm:');
+      if (!pw) return;
+      var errEl = document.getElementById('passkey-error');
+      errEl.classList.add('hidden');
+      try {
+        var res = await fetch('/portal/passkey/delete', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credentialId: id, password: pw }),
+        });
+        if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Delete failed'); }
+        loadPasskeys();
+      } catch (e) {
+        errEl.textContent = e.message || 'Failed to delete passkey';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // --- Device management ---
+    async function loadDevices() {
+      try {
+        var res = await fetch('/portal/devices', { credentials: 'same-origin' });
+        if (!res.ok) return;
+        var data = await res.json();
+        var list = document.getElementById('device-list');
+        var empty = document.getElementById('device-empty');
+        list.textContent = '';
+        if (data.devices.length === 0) {
+          empty.classList.remove('hidden');
           return;
         }
-        window.location.href = '/portal/dashboard';
-      } catch {
-        document.getElementById('disable-2fa-error').textContent = 'Request failed';
-        document.getElementById('disable-2fa-error').classList.remove('hidden');
-      }
+        empty.classList.add('hidden');
+        data.devices.forEach(function(d) {
+          var approved = d.approvedAt ? new Date(d.approvedAt).toLocaleDateString() : '';
+          var div = document.createElement('div');
+          div.className = 'flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2.5 border border-zinc-700/50';
+          var infoDiv = document.createElement('div');
+          infoDiv.className = 'flex items-center gap-3';
+          var iconDiv = document.createElement('div');
+          iconDiv.className = 'w-8 h-8 rounded-lg bg-green-900/30 flex items-center justify-center flex-shrink-0';
+          iconDiv.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>';
+          var textDiv = document.createElement('div');
+          var hostEl = document.createElement('span');
+          hostEl.className = 'text-sm text-zinc-200 font-mono';
+          hostEl.textContent = d.hostname;
+          var metaEl = document.createElement('span');
+          metaEl.className = 'text-[10px] text-zinc-600 ml-2';
+          metaEl.textContent = d.os + '/' + d.arch + ' \u00b7 ' + d.ip + ' \u00b7 approved ' + approved;
+          textDiv.appendChild(hostEl);
+          textDiv.appendChild(metaEl);
+          infoDiv.appendChild(iconDiv);
+          infoDiv.appendChild(textDiv);
+          var revokeBtn = document.createElement('button');
+          revokeBtn.className = 'p-1 text-zinc-600 hover:text-red-400 transition';
+          revokeBtn.title = 'Revoke device';
+          revokeBtn.setAttribute('data-id', d.id);
+          revokeBtn.onclick = function() { revokeDevice(d.id); };
+          revokeBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+          div.appendChild(infoDiv);
+          div.appendChild(revokeBtn);
+          list.appendChild(div);
+        });
+      } catch {}
+    }
+    loadDevices();
+
+    async function revokeDevice(id) {
+      if (!confirm('Revoke this device?')) return;
+      try {
+        var res = await fetch('/portal/devices/revoke', {
+          method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({deviceId: id}),
+        });
+        if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
+        loadDevices();
+      } catch {}
     }
     </script>
 
@@ -491,10 +676,13 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
           return;
         }
         const data = await res.json();
+        var token = data.tunnelToken;
         document.getElementById('token-masked').classList.add('hidden');
-        document.getElementById('token-value').textContent = data.tunnelToken;
+        document.getElementById('token-value').textContent = token;
         document.getElementById('token-value').classList.remove('hidden');
-        document.getElementById('token-eye').onclick = function() { toggleCred('token', data.tunnelToken); };
+        document.getElementById('token-eye').onclick = function() { toggleCred('token'); };
+        // Update masked to show first4••••last4 pattern
+        document.getElementById('token-masked').innerHTML = '<span class="text-zinc-300">' + token.slice(0,4) + '<span class="text-zinc-600">' + '\u2022'.repeat(Math.min(16, token.length - 8)) + '</span>' + token.slice(-4) + '</span>';
         document.getElementById('token-copy').classList.remove('hidden');
         closeRevealModal();
       } catch {
@@ -503,5 +691,185 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       }
     }
     </script>
+  `;
+}
+
+export function docsPage(): string {
+  return `
+    <h2 class="text-2xl text-amber-500 mb-6">Documentation</h2>
+
+    <div class="space-y-8">
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Quick Start
+        </h3>
+        <ol class="space-y-3 text-sm text-zinc-300 list-decimal list-inside">
+          <li><strong class="text-zinc-200">Generate a Setup Code</strong> on your <a href="/portal/dashboard" class="text-amber-500 hover:underline">Dashboard</a></li>
+          <li><strong class="text-zinc-200">Run the installer</strong> on your server:
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 mt-2 text-amber-400 text-xs font-mono overflow-x-auto">curl -fsSL https://get.hubport.cloud | sh</pre>
+          </li>
+          <li><strong class="text-zinc-200">Enter the setup code</strong> when prompted</li>
+          <li><strong class="text-zinc-200">Approve the device</strong> in the portal when the device code appears</li>
+          <li><strong class="text-zinc-200">Done!</strong> Your hub is running at <code class="text-amber-400">http://localhost:3000</code></li>
+        </ol>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+          Server Requirements
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div class="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+            <p class="text-zinc-500 text-xs uppercase tracking-wider mb-1">CPU</p>
+            <p class="text-zinc-200">1 vCPU minimum</p>
+          </div>
+          <div class="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+            <p class="text-zinc-500 text-xs uppercase tracking-wider mb-1">RAM</p>
+            <p class="text-zinc-200">4 GB minimum</p>
+          </div>
+          <div class="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+            <p class="text-zinc-500 text-xs uppercase tracking-wider mb-1">Disk</p>
+            <p class="text-zinc-200">20 GB minimum</p>
+          </div>
+        </div>
+        <p class="text-xs text-zinc-500 mt-3">Works on any Docker-compatible OS: Ubuntu, Debian, macOS, Windows (Docker Desktop), Raspberry Pi, Synology NAS.</p>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+          Common Commands
+        </h3>
+        <div class="space-y-3">
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Start services</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">cd ~/hubport.cloud/&lt;slug&gt; &amp;&amp; docker compose up -d</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Stop services</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">cd ~/hubport.cloud/&lt;slug&gt; &amp;&amp; docker compose down</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">View logs</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">cd ~/hubport.cloud/&lt;slug&gt; &amp;&amp; docker compose logs -f</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">View specific service logs</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">docker compose logs -f hubport    # app + api
+docker compose logs -f keycloak   # auth server
+docker compose logs -f vault      # secrets
+docker compose logs -f cloudflared # tunnel</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Restart a service</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">docker compose restart hubport</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Update to latest version</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-amber-400 text-xs font-mono">docker compose pull &amp;&amp; docker compose up -d</pre>
+          </div>
+          <div>
+            <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Full reinstall (destroys data)</p>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-red-400 text-xs font-mono">curl -fsSL https://get.hubport.cloud | sh -s -- &lt;CODE&gt; --force</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Architecture
+        </h3>
+        <div class="text-sm text-zinc-300 space-y-2">
+          <p>Your hub runs as Docker containers on your own server:</p>
+          <table class="w-full text-xs mt-3">
+            <thead><tr class="border-b border-zinc-700"><th class="text-left py-2 text-zinc-500">Service</th><th class="text-left py-2 text-zinc-500">Port</th><th class="text-left py-2 text-zinc-500">Description</th></tr></thead>
+            <tbody class="text-zinc-300">
+              <tr class="border-b border-zinc-800/50"><td class="py-2 font-mono">hubport</td><td class="py-2">3000, 3001</td><td class="py-2">Hub app (SPA) + API</td></tr>
+              <tr class="border-b border-zinc-800/50"><td class="py-2 font-mono">keycloak</td><td class="py-2">8080</td><td class="py-2">Authentication (OIDC, RBAC)</td></tr>
+              <tr class="border-b border-zinc-800/50"><td class="py-2 font-mono">vault</td><td class="py-2">8200</td><td class="py-2">Secrets management</td></tr>
+              <tr class="border-b border-zinc-800/50"><td class="py-2 font-mono">postgres</td><td class="py-2">5432</td><td class="py-2">Database</td></tr>
+              <tr><td class="py-2 font-mono">cloudflared</td><td class="py-2">&mdash;</td><td class="py-2">Cloudflare Tunnel (secure ingress)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Security
+        </h3>
+        <div class="text-sm text-zinc-300 space-y-3">
+          <div class="flex items-start gap-3">
+            <span class="text-green-400 mt-0.5">&#10003;</span>
+            <div><strong class="text-zinc-200">End-to-end encryption</strong><p class="text-zinc-500 text-xs">All traffic runs through Cloudflare Tunnel &mdash; no open ports, no public IP needed.</p></div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-green-400 mt-0.5">&#10003;</span>
+            <div><strong class="text-zinc-200">Your data stays on your server</strong><p class="text-zinc-500 text-xs">Database, files, and secrets never leave your infrastructure.</p></div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-green-400 mt-0.5">&#10003;</span>
+            <div><strong class="text-zinc-200">Vault-managed secrets</strong><p class="text-zinc-500 text-xs">Database passwords and encryption keys stored in HashiCorp Vault.</p></div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-green-400 mt-0.5">&#10003;</span>
+            <div><strong class="text-zinc-200">RBAC via Keycloak</strong><p class="text-zinc-500 text-xs">Roles: admin, elder, publisher, viewer. Managed through Keycloak at <code class="text-amber-400">localhost:8080</code>.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+          Troubleshooting
+        </h3>
+        <div class="space-y-4 text-sm">
+          <div>
+            <p class="text-zinc-200 font-medium">Hub app not loading?</p>
+            <p class="text-zinc-500 text-xs mt-1">Check if all services are running: <code class="text-amber-400">docker compose ps</code>. If keycloak shows "unhealthy", wait 1-2 minutes &mdash; it needs time to start.</p>
+          </div>
+          <div>
+            <p class="text-zinc-200 font-medium">Authentication error on localhost:3000?</p>
+            <p class="text-zinc-500 text-xs mt-1">Keycloak may still be starting. Check <code class="text-amber-400">docker compose logs keycloak</code> and wait for "Listening on: http://0.0.0.0:8080".</p>
+          </div>
+          <div>
+            <p class="text-zinc-200 font-medium">Tunnel not connecting?</p>
+            <p class="text-zinc-500 text-xs mt-1">Verify your server has internet access. Check <code class="text-amber-400">docker compose logs cloudflared</code> for errors. The tunnel token is in <code class="text-amber-400">.secrets/.env</code>.</p>
+          </div>
+          <div>
+            <p class="text-zinc-200 font-medium">Forgot admin credentials?</p>
+            <p class="text-zinc-500 text-xs mt-1">Credentials are stored in <code class="text-amber-400">~/hubport.cloud/&lt;slug&gt;/.secrets/</code>. Keycloak admin password is in <code class="text-amber-400">.env</code> as <code class="text-amber-400">KC_ADMIN_PASSWORD</code>.</p>
+          </div>
+          <div>
+            <p class="text-zinc-200 font-medium">Need a fresh start?</p>
+            <p class="text-zinc-500 text-xs mt-1">Generate a new setup code and run the installer with <code class="text-amber-400">--force</code>. This destroys all data and starts clean.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+        <h3 class="text-lg text-amber-400 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Getting Help
+        </h3>
+        <div class="text-sm text-zinc-300 space-y-2">
+          <p>hubport.cloud is open-source (MIT + Commons Clause).</p>
+          <div class="flex flex-wrap gap-3 mt-3">
+            <a href="https://github.com/itunified-io/hubport.cloud" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+              GitHub
+            </a>
+            <a href="https://hubport.cloud/en/faq" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition">FAQ</a>
+            <a href="https://hubport.cloud/en/contact" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition">Contact</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
   `;
 }

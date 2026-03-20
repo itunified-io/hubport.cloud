@@ -1,0 +1,190 @@
+import { useState, useEffect } from "react";
+import { FormattedMessage } from "react-intl";
+import { User, Shield, AlertTriangle, Trash2 } from "lucide-react";
+import { useAuth } from "@/auth/useAuth";
+
+interface PublisherProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  congregationRole: string;
+  congregationFlags: string[];
+  privacyAccepted: boolean;
+  privacySettings: {
+    contactVisibility: string;
+    addressVisibility: string;
+    notesVisibility: string;
+  };
+  appRoles: { role: { name: string } }[];
+}
+
+const VISIBILITY_OPTIONS = ["everyone", "elders_only", "nobody"] as const;
+
+export function Profile() {
+  const { user, signOut } = useAuth();
+  const [profile, setProfile] = useState<PublisherProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [privacy, setPrivacy] = useState({
+    contactVisibility: "elders_only",
+    addressVisibility: "elders_only",
+    notesVisibility: "elders_only",
+  });
+  const apiUrl = import.meta.env.VITE_API_URL ?? "";
+  const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/publishers/me`, { headers });
+        if (res.ok) {
+          const data = await res.json() as PublisherProfile;
+          setProfile(data);
+          if (data.privacySettings) {
+            setPrivacy(data.privacySettings);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [user?.access_token]);
+
+  const savePrivacy = async () => {
+    setSaving(true);
+    try {
+      await fetch(`${apiUrl}/publishers/me/privacy`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(privacy),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deactivate = async () => {
+    if (!confirm("Are you sure you want to deactivate your account?")) return;
+    await fetch(`${apiUrl}/publishers/me/deactivate`, { method: "POST", headers });
+    signOut();
+  };
+
+  const gdprDelete = async () => {
+    if (!confirm("This will permanently delete your account and all data. This cannot be undone. Continue?")) return;
+    await fetch(`${apiUrl}/publishers/me`, { method: "DELETE", headers });
+    signOut();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-6 h-6 border-2 border-[var(--amber)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return <p className="text-[var(--text-muted)]">No profile found</p>;
+  }
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      <h1 className="text-xl font-semibold text-[var(--text)]">
+        <FormattedMessage id="profile.title" />
+      </h1>
+
+      {/* Profile info */}
+      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[var(--glass-2)] flex items-center justify-center">
+            <User size={20} className="text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <p className="text-[var(--text)] font-medium">
+              {profile.displayName ?? `${profile.firstName} ${profile.lastName}`}
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              {profile.congregationRole.replace("_", " ")}
+              {profile.congregationFlags.length > 0 && ` · ${profile.congregationFlags.join(", ")}`}
+            </p>
+          </div>
+        </div>
+
+        {profile.appRoles.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {profile.appRoles.map((ar) => (
+              <span
+                key={ar.role.name}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--amber)] bg-[#d9770614]"
+              >
+                <Shield size={10} />
+                {ar.role.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Privacy settings */}
+      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+        <h2 className="text-sm font-medium text-[var(--text)]">
+          <FormattedMessage id="privacy.title" />
+        </h2>
+
+        {(["contactVisibility", "addressVisibility", "notesVisibility"] as const).map((key) => (
+          <div key={key} className="flex items-center justify-between">
+            <label className="text-sm text-[var(--text-muted)]">
+              <FormattedMessage id={`privacy.${key}`} />
+            </label>
+            <select
+              value={privacy[key]}
+              onChange={(e) => setPrivacy((prev) => ({ ...prev, [key]: e.target.value }))}
+              className="px-3 py-1.5 text-sm bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
+            >
+              {VISIBILITY_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt.replace("_", " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+        <button
+          onClick={savePrivacy}
+          disabled={saving}
+          className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {saving ? "..." : <FormattedMessage id="common.save" />}
+        </button>
+      </div>
+
+      {/* Danger zone */}
+      <div className="p-4 border border-[var(--red)] border-opacity-30 rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
+        <h2 className="text-sm font-medium text-[var(--red)] flex items-center gap-2">
+          <AlertTriangle size={14} />
+          <FormattedMessage id="profile.danger" />
+        </h2>
+        <div className="flex gap-3">
+          <button
+            onClick={deactivate}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:text-[var(--red)] hover:border-[var(--red)] transition-colors cursor-pointer"
+          >
+            <FormattedMessage id="profile.deactivate" />
+          </button>
+          <button
+            onClick={gdprDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--red)] border border-[var(--red)] border-opacity-30 rounded-[var(--radius-sm)] hover:bg-[#ef444414] transition-colors cursor-pointer"
+          >
+            <Trash2 size={14} />
+            <FormattedMessage id="profile.delete" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

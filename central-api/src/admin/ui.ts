@@ -156,7 +156,16 @@ function dnsBadge(tunnelId: string | null | undefined): string {
   return `<span class="badge badge-decommissioned">Not Provisioned</span>`;
 }
 
-export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tunnelToken?: string | null; activatedAt?: Date | null; updatedAt?: Date | null }): string {
+interface DeviceLike {
+  id: string;
+  hostname: string;
+  os: string;
+  arch: string;
+  ip: string;
+  approvedAt: Date | null;
+}
+
+export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tunnelToken?: string | null; activatedAt?: Date | null; updatedAt?: Date | null }, devices: DeviceLike[] = []): string {
   const decomm = isDecommissioned(tenant);
 
   return `
@@ -236,6 +245,35 @@ export function tenantDetail(tenant: TenantLike & { tunnelId?: string | null; tu
           <div class="text-[#f87171]">${esc(tenant.rejectReason)}</div>
         </div>
       ` : ''}
+    </div>
+
+    <!-- Authorized Devices -->
+    <div class="mb-8">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Authorized Devices
+        <span class="text-xs text-zinc-500 font-normal">(${devices.length})</span>
+      </h2>
+      ${devices.length > 0 ? `
+        <div class="space-y-3">
+          ${devices.map(d => `
+            <div class="card p-4 flex items-center gap-4">
+              <div class="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-white font-mono truncate">${esc(d.hostname)}</div>
+                <div class="text-xs text-zinc-500">${esc(d.os)} / ${esc(d.arch)} &middot; ${esc(d.ip)}</div>
+              </div>
+              <div class="text-xs text-zinc-600">${d.approvedAt ? timeAgo(d.approvedAt) : ''}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div class="card p-5">
+          <p class="text-zinc-500 text-sm">No authorized devices.</p>
+        </div>
+      `}
     </div>
   `;
 }

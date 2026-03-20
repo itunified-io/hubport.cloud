@@ -1,0 +1,465 @@
+import type { FastifyInstance } from "fastify";
+import { Type, type Static } from "@sinclair/typebox";
+import { randomBytes, createHash } from "node:crypto";
+import prisma from "../lib/prisma.js";
+import { requirePermission } from "../lib/rbac.js";
+import { audit } from "../lib/policy-engine.js";
+import { PERMISSIONS, FLAG_TO_APP_ROLE, CONGREGATION_FLAGS } from "../lib/permissions.js";
+import {
+  createKeycloakUser,
+  disableKeycloakUser,
+  enableKeycloakUser,
+  deleteKeycloakUser,
+  logoutKeycloakUser,
+} from "../lib/keycloak-admin.js";
+
+const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
+type IdParamsType = Static<typeof IdParams>;
+
+const InviteBody = Type.Object({
+  firstName: Type.String({ minLength: 1 }),
+  lastName: Type.String({ minLength: 1 }),
+  email: Type.Optional(Type.String({ format: "email" })),
+  gender: Type.Optional(Type.Union([Type.Literal("male"), Type.Literal("female")])),
+  congregationRole: Type.Optional(Type.Union([
+    Type.Literal("publisher"),
+    Type.Literal("ministerial_servant"),
+    Type.Literal("elder"),
+  ])),
+  congregationFlags: Type.Optional(Type.Array(Type.String())),
+});
+type InviteBodyType = Static<typeof InviteBody>;
+
+function validateFlags(role: string, flags: string[]): string[] {
+  const validCommon = CONGREGATION_FLAGS.common as readonly string[];
+  const validRole = role === "elder"
+    ? (CONGREGATION_FLAGS.elder as readonly string[])
+    : role === "ministerial_servant"
+      ? (CONGREGATION_FLAGS.ministerial_servant as readonly string[])
+      : [];
+
+  return flags.filter(
+    (f) => validCommon.includes(f) || validRole.includes(f),
+  );
+}
+
+export async function userRoutes(app: FastifyInstance): Promise<void> {
+  // ─── List Users ──────────────────────────────────────────────────
+
+  app.get(
+    "/users",
+    { preHandler: requirePermission(PERMISSIONS.ROLES_VIEW) },
+    async () => {
+      return prisma.publisher.findMany({
+        orderBy: { lastName: "asc" },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          email: true,
+          congregationRole: true,
+          congregationFlags: true,
+          status: true,
+          role: true,
+          createdAt: true,
+          invitedAt: true,
+          approvedAt: true,
+          appRoles: {
+            include: { role: { select: { name: true, scope: true } } },
+          },
+        },
+      });
+    },
+  );
+
+  // ─── Invite User ─────────────────────────────────────────────────
+
+  app.post<{ Body: InviteBodyType }>(
+    "/users/invite",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { body: InviteBody },
+    },
+    async (request, reply) => {
+      const {
+        firstName, lastName, email, gender,
+        congregationRole = "publisher",
+        congregationFlags = [],
+      } = request.body;
+
+      const validFlags = validateFlags(congregationRole, congregationFlags);
+
+      // Create publisher record in invited status
+      const publisher = await prisma.publisher.create({
+        data: {
+          firstName,
+          lastName,
+          email,
+          gender,
+          congregationRole,
+          congregationFlags: validFlags,
+          status: "invited",
+          invitedBy: request.user.sub,
+          invitedAt: new Date(),
+        },
+      });
+
+      // Generate invite code (6 alphanumeric chars, URL-safe)
+      const code = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+      const codeHash = createHash("sha256").update(code).digest("hex");
+
+      await prisma.inviteCode.create({
+        data: {
+          codeHash,
+          publisherId: publisher.id,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        },
+      });
+
+      // Optionally create Keycloak user if email provided
+      let keycloakUserId: string | undefined;
+      if (email) {
+        try {
+          keycloakUserId = await createKeycloakUser(email, firstName, lastName);
+          await prisma.publisher.update({
+            where: { id: publisher.id },
+            data: { keycloakSub: keycloakUserId },
+          });
+        } catch {
+          // Non-critical — user can register manually via invite code
+        }
+      }
+
+      // Auto-assign AppRoles based on congregation flags
+      for (const flag of validFlags) {
+        const appRoleName = FLAG_TO_APP_ROLE[flag];
+        if (appRoleName) {
+          const appRole = await prisma.appRole.findUnique({
+            where: { name: appRoleName },
+          });
+          if (appRole) {
+            await prisma.appRoleMember.create({
+              data: { roleId: appRole.id, publisherId: publisher.id },
+            });
+          }
+        }
+      }
+
+      await audit(
+        "user.invite",
+        request.user.sub,
+        "Publisher",
+        publisher.id,
+        undefined,
+        { firstName, lastName, congregationRole, congregationFlags: validFlags },
+      );
+
+      return reply.code(201).send({
+        publisher,
+        inviteCode: code,
+        keycloakUserId,
+      });
+    },
+  );
+
+  // ─── Approve User ────────────────────────────────────────────────
+
+  app.post<{ Params: IdParamsType }>(
+    "/users/:id/approve",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!publisher) return reply.code(404).send({ error: "Not found" });
+      if (publisher.status !== "pending_approval" && publisher.status !== "invited") {
+        return reply.code(400).send({ error: `Cannot approve from status: ${publisher.status}` });
+      }
+
+      const updated = await prisma.publisher.update({
+        where: { id: request.params.id },
+        data: {
+          status: "active",
+          approvedBy: request.user.sub,
+          approvedAt: new Date(),
+        },
+      });
+
+      await audit(
+        "user.approve",
+        request.user.sub,
+        "Publisher",
+        publisher.id,
+        { status: publisher.status },
+        { status: "active" },
+      );
+
+      return updated;
+    },
+  );
+
+  // ─── Reject User ─────────────────────────────────────────────────
+
+  app.post<{ Params: IdParamsType }>(
+    "/users/:id/reject",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!publisher) return reply.code(404).send({ error: "Not found" });
+      if (publisher.status !== "pending_approval" && publisher.status !== "invited") {
+        return reply.code(400).send({ error: `Cannot reject from status: ${publisher.status}` });
+      }
+
+      const updated = await prisma.publisher.update({
+        where: { id: request.params.id },
+        data: { status: "rejected" },
+      });
+
+      await audit(
+        "user.reject",
+        request.user.sub,
+        "Publisher",
+        publisher.id,
+        { status: publisher.status },
+        { status: "rejected" },
+      );
+
+      return updated;
+    },
+  );
+
+  // ─── Deactivate User ─────────────────────────────────────────────
+
+  app.post<{ Params: IdParamsType }>(
+    "/users/:id/deactivate",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!publisher) return reply.code(404).send({ error: "Not found" });
+      if (publisher.status !== "active") {
+        return reply.code(400).send({ error: `Cannot deactivate from status: ${publisher.status}` });
+      }
+
+      // Disable in Keycloak
+      if (publisher.keycloakSub) {
+        try {
+          await disableKeycloakUser(publisher.keycloakSub);
+          await logoutKeycloakUser(publisher.keycloakSub);
+        } catch {
+          // Log but continue — DB state is authoritative
+        }
+      }
+
+      const updated = await prisma.publisher.update({
+        where: { id: request.params.id },
+        data: { status: "inactive" },
+      });
+
+      await audit(
+        "user.deactivate",
+        request.user.sub,
+        "Publisher",
+        publisher.id,
+        { status: "active" },
+        { status: "inactive" },
+      );
+
+      return updated;
+    },
+  );
+
+  // ─── Reactivate User ─────────────────────────────────────────────
+
+  app.post<{ Params: IdParamsType }>(
+    "/users/:id/reactivate",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!publisher) return reply.code(404).send({ error: "Not found" });
+      if (publisher.status !== "inactive") {
+        return reply.code(400).send({ error: `Cannot reactivate from status: ${publisher.status}` });
+      }
+
+      // Re-enable in Keycloak
+      if (publisher.keycloakSub) {
+        try {
+          await enableKeycloakUser(publisher.keycloakSub);
+        } catch {
+          // Log but continue
+        }
+      }
+
+      const updated = await prisma.publisher.update({
+        where: { id: request.params.id },
+        data: { status: "active" },
+      });
+
+      await audit(
+        "user.reactivate",
+        request.user.sub,
+        "Publisher",
+        publisher.id,
+        { status: "inactive" },
+        { status: "active" },
+      );
+
+      return updated;
+    },
+  );
+
+  // ─── Self-Service Routes ──────────────────────────────────────────
+
+  // Get own profile
+  app.get("/publishers/me", async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
+
+    return prisma.publisher.findUnique({
+      where: { id: ctx.publisherId },
+      include: {
+        appRoles: { include: { role: { select: { name: true, scope: true } } } },
+      },
+    });
+  });
+
+  // Update own profile
+  app.put("/publishers/me", {
+    schema: {
+      body: Type.Object({
+        displayName: Type.Optional(Type.String()),
+        phone: Type.Optional(Type.String()),
+        email: Type.Optional(Type.String({ format: "email" })),
+      }),
+    },
+  }, async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
+
+    const body = request.body as { displayName?: string; phone?: string; email?: string };
+    const before = await prisma.publisher.findUnique({ where: { id: ctx.publisherId } });
+
+    const updated = await prisma.publisher.update({
+      where: { id: ctx.publisherId },
+      data: {
+        ...(body.displayName !== undefined && { displayName: body.displayName }),
+        ...(body.phone !== undefined && { phone: body.phone }),
+        ...(body.email !== undefined && { email: body.email }),
+      },
+    });
+
+    await audit("publisher.self.update", ctx.userId, "Publisher", ctx.publisherId, before, updated);
+
+    return updated;
+  });
+
+  // Update own privacy settings
+  app.put("/publishers/me/privacy", {
+    schema: {
+      body: Type.Object({
+        contactVisibility: Type.Union([
+          Type.Literal("everyone"),
+          Type.Literal("elders_only"),
+          Type.Literal("nobody"),
+        ]),
+        addressVisibility: Type.Union([
+          Type.Literal("everyone"),
+          Type.Literal("elders_only"),
+          Type.Literal("nobody"),
+        ]),
+        notesVisibility: Type.Union([
+          Type.Literal("everyone"),
+          Type.Literal("elders_only"),
+          Type.Literal("nobody"),
+        ]),
+      }),
+    },
+  }, async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
+
+    const body = request.body as Record<string, string>;
+    const updated = await prisma.publisher.update({
+      where: { id: ctx.publisherId },
+      data: {
+        privacySettings: body,
+        privacyAccepted: true,
+        privacyAcceptedAt: new Date(),
+      },
+    });
+
+    await audit("publisher.privacy.update", ctx.userId, "Publisher", ctx.publisherId, undefined, body);
+
+    return updated;
+  });
+
+  // Self-deactivate
+  app.post("/publishers/me/deactivate", async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
+
+    const publisher = await prisma.publisher.findUnique({ where: { id: ctx.publisherId } });
+    if (!publisher) return reply.code(404).send({ error: "Not found" });
+
+    if (publisher.keycloakSub) {
+      try {
+        await disableKeycloakUser(publisher.keycloakSub);
+        await logoutKeycloakUser(publisher.keycloakSub);
+      } catch {
+        // Continue
+      }
+    }
+
+    await prisma.publisher.update({
+      where: { id: ctx.publisherId },
+      data: { status: "inactive" },
+    });
+
+    await audit("publisher.self.deactivate", ctx.userId, "Publisher", ctx.publisherId);
+
+    return { ok: true, message: "Account deactivated" };
+  });
+
+  // GDPR hard delete
+  app.delete("/publishers/me", async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
+
+    const publisher = await prisma.publisher.findUnique({ where: { id: ctx.publisherId } });
+    if (!publisher) return reply.code(404).send({ error: "Not found" });
+
+    // Delete from Keycloak
+    if (publisher.keycloakSub) {
+      try {
+        await deleteKeycloakUser(publisher.keycloakSub);
+      } catch {
+        // Continue — DB delete is more important
+      }
+    }
+
+    // Cascade delete (AppRoleMember, InviteCode cascade via onDelete)
+    await prisma.publisher.delete({ where: { id: ctx.publisherId } });
+
+    await audit("publisher.self.gdpr_delete", ctx.userId, "Publisher", ctx.publisherId, publisher);
+
+    return reply.code(204).send();
+  });
+}

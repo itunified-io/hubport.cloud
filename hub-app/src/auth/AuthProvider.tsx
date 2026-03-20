@@ -2,9 +2,14 @@ import { type ReactNode } from "react";
 import { AuthProvider as OidcAuthProvider } from "react-oidc-context";
 import { type WebStorageStateStore } from "oidc-client-ts";
 
-const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL as string;
-const realm = import.meta.env.VITE_KEYCLOAK_REALM as string;
-const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID as string;
+// Runtime config (injected by docker-entrypoint.sh) takes precedence over build-time VITE_ vars
+const runtimeConfig = (window as unknown as Record<string, unknown>).__HUBPORT_CONFIG__ as
+  | { keycloakUrl?: string; keycloakRealm?: string; keycloakClientId?: string; apiUrl?: string }
+  | undefined;
+
+const keycloakUrl = runtimeConfig?.keycloakUrl || (import.meta.env.VITE_KEYCLOAK_URL as string);
+const realm = runtimeConfig?.keycloakRealm || (import.meta.env.VITE_KEYCLOAK_REALM as string);
+const clientId = runtimeConfig?.keycloakClientId || (import.meta.env.VITE_KEYCLOAK_CLIENT_ID as string);
 
 const oidcConfig = {
   authority: `${keycloakUrl}/realms/${realm}`,

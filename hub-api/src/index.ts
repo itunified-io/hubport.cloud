@@ -1,12 +1,18 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { registerAuth } from "./lib/auth.js";
+import { registerPolicyContext, requirePrivacyAccepted } from "./lib/rbac.js";
 import { healthRoutes } from "./routes/health.js";
 import { publisherRoutes } from "./routes/publishers.js";
 import { territoryRoutes } from "./routes/territories.js";
 import { meetingRoutes } from "./routes/meetings.js";
+import { permissionRoutes } from "./routes/permissions.js";
+import { userRoutes } from "./routes/users.js";
+import { onboardingRoutes } from "./routes/onboarding.js";
+import { auditRoutes } from "./routes/audit.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
+import { seedSystemRoles } from "./lib/seed-roles.js";
 
 const app = Fastify({
   logger: {
@@ -24,11 +30,21 @@ async function start(): Promise<void> {
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);
 
+  // Policy context (builds permission context per request)
+  registerPolicyContext(app);
+
+  // Privacy acceptance gate (blocks API if privacy not accepted)
+  app.addHook("preHandler", requirePrivacyAccepted());
+
   // Routes
   await app.register(healthRoutes);
   await app.register(publisherRoutes);
   await app.register(territoryRoutes);
   await app.register(meetingRoutes);
+  await app.register(permissionRoutes);
+  await app.register(userRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(auditRoutes);
 
   // Auto-migrate on startup (deploy pending migrations)
   if (process.env.AUTO_MIGRATE !== "false") {
@@ -45,10 +61,18 @@ async function start(): Promise<void> {
     }
   }
 
-  // Verify DB connection
+  // Verify DB connection + seed system roles
   try {
     await prisma.$connect();
     app.log.info("Database connected");
+
+    // Seed system roles on first boot
+    const roleCount = await prisma.appRole.count();
+    if (roleCount === 0) {
+      app.log.info("No AppRoles found — seeding 12 system roles...");
+      await seedSystemRoles();
+      app.log.info("System roles seeded");
+    }
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }

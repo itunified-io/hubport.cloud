@@ -38,6 +38,9 @@ COPY --from=builder /app/setup-wizard/dist ./setup-wizard/dist/
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/package.json ./
 
+# Allow runtime user to write runtime-config.js into hub-app/dist
+RUN chown -R hubport:hubport /app/hub-app/dist
+
 # Entrypoint: auto-migrate + start all services
 COPY docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh

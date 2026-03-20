@@ -6,7 +6,7 @@ interface RealmAccess {
   roles?: string[];
 }
 
-interface KeycloakToken {
+interface TokenPayload {
   realm_access?: RealmAccess;
   preferred_username?: string;
   given_name?: string;
@@ -14,8 +14,19 @@ interface KeycloakToken {
   email?: string;
 }
 
-function parseRoles(profile: KeycloakToken | undefined): AppRole[] {
-  const keycloakRoles = profile?.realm_access?.roles ?? [];
+function decodeJwtPayload(token: string): TokenPayload | undefined {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+    const payload = atob(parts[1]!.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload) as TokenPayload;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseRoles(payload: TokenPayload | undefined): AppRole[] {
+  const keycloakRoles = payload?.realm_access?.roles ?? [];
   const appRoles: AppRole[] = [];
 
   for (const role of keycloakRoles) {
@@ -35,7 +46,16 @@ function parseRoles(profile: KeycloakToken | undefined): AppRole[] {
 export function useAuth() {
   const auth = useOidcAuth();
 
-  const tokenPayload = auth.user?.profile as KeycloakToken | undefined;
+  // Keycloak puts realm_access in the access token, not the ID token.
+  // Decode the access token JWT to get roles.
+  const accessTokenPayload = auth.user?.access_token
+    ? decodeJwtPayload(auth.user.access_token)
+    : undefined;
+
+  // Fallback to ID token profile if access token decoding fails
+  const idTokenPayload = auth.user?.profile as TokenPayload | undefined;
+  const tokenPayload = accessTokenPayload ?? idTokenPayload;
+
   const roles = parseRoles(tokenPayload);
 
   const isAdmin = roles.includes("admin");
@@ -44,8 +64,9 @@ export function useAuth() {
   const isViewer = roles.includes("viewer") || isPublisher;
 
   const displayName =
-    tokenPayload?.given_name ??
-    tokenPayload?.preferred_username ??
+    idTokenPayload?.given_name ??
+    idTokenPayload?.preferred_username ??
+    accessTokenPayload?.preferred_username ??
     auth.user?.profile?.name ??
     "User";
 
@@ -60,6 +81,7 @@ export function useAuth() {
     isPublisher,
     isViewer,
     displayName,
+    email: idTokenPayload?.email ?? accessTokenPayload?.email,
     signIn: () => auth.signinRedirect(),
     signOut: () => auth.signoutRedirect(),
   };
