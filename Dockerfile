@@ -1,7 +1,7 @@
 # hubport.cloud — Multi-stage Docker build
 # Bundles: hub-app (React SPA) + hub-api (Fastify) + setup-wizard
 
-FROM node:20-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 
 # Copy all package files for workspace install
@@ -25,7 +25,7 @@ COPY setup-wizard/ ./setup-wizard/
 RUN npm run build --workspace=setup-wizard
 
 # --- Runtime ---
-FROM node:20-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 
 RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
