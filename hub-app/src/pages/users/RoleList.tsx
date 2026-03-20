@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { FormattedMessage } from "react-intl";
 import { Shield, Plus, Lock, ChevronRight, Users } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface AppRole {
   id: string;
@@ -22,7 +23,7 @@ export function RoleList() {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL ?? "";
+        const apiUrl = getApiUrl();
         const res = await fetch(`${apiUrl}/roles`, {
           headers: { Authorization: `Bearer ${user?.access_token}` },
         });

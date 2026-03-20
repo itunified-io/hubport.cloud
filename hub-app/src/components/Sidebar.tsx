@@ -33,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, requiredPermission: "app:settings.view" },
 ];
 
-const APP_VERSION = "2026.03.20.5";
+const APP_VERSION = "2026.03.20.6";
 
 interface SidebarProps {
   onNavigate?: () => void;

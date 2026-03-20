@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FormattedMessage } from "react-intl";
 import { User, Shield, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface PublisherProfile {
   id: string;
@@ -33,7 +34,7 @@ export function Profile() {
     addressVisibility: "elders_only",
     notesVisibility: "elders_only",
   });
-  const apiUrl = import.meta.env.VITE_API_URL ?? "";
+  const apiUrl = getApiUrl();
   const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
 
   useEffect(() => {

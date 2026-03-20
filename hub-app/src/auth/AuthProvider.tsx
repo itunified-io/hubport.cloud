@@ -4,7 +4,7 @@ import { type WebStorageStateStore } from "oidc-client-ts";
 
 // Runtime config (injected by docker-entrypoint.sh) takes precedence over build-time VITE_ vars
 const runtimeConfig = (window as unknown as Record<string, unknown>).__HUBPORT_CONFIG__ as
-  | { keycloakUrl?: string; keycloakRealm?: string; keycloakClientId?: string; apiUrl?: string }
+  | { keycloakUrl?: string; keycloakRealm?: string; keycloakClientId?: string }
   | undefined;
 
 const keycloakUrl = runtimeConfig?.keycloakUrl || (import.meta.env.VITE_KEYCLOAK_URL as string);
