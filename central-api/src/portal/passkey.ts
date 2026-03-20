@@ -195,6 +195,86 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Discoverable credential auth options (no email needed — passkey-first login)
+  app.get('/passkey/auth-options-discoverable', async (_req, reply) => {
+    const options = await generateAuthenticationOptions({
+      rpID,
+      userVerification: 'preferred',
+      // No allowCredentials — browser discovers from resident keys
+    });
+
+    const sessionId = Buffer.from(
+      globalThis.crypto.getRandomValues(new Uint8Array(16))
+    ).toString('hex');
+    challenges.set(`disc:${sessionId}`, options.challenge);
+    setTimeout(() => challenges.delete(`disc:${sessionId}`), 300000);
+
+    return reply.send({ ...options, sessionId });
+  });
+
+  // Verify discoverable credential (passkey-first login)
+  app.post('/passkey/auth-verify-discoverable', async (req, reply) => {
+    const body = req.body as AuthenticationResponseJSON & { sessionId?: string };
+
+    if (!body.sessionId) {
+      return reply.status(400).send({ error: 'sessionId required' });
+    }
+
+    const expectedChallenge = challenges.get(`disc:${body.sessionId}`);
+    if (!expectedChallenge) {
+      return reply.status(400).send({ error: 'Challenge expired' });
+    }
+
+    // Find passkey by credential ID
+    const credentialIdBuffer = Buffer.from(body.id, 'base64url');
+    const passkey = await prisma.tenantPasskey.findFirst({
+      where: { credentialId: credentialIdBuffer },
+      include: { tenant: true },
+    });
+
+    if (!passkey) return reply.status(401).send({ error: 'Passkey not found' });
+
+    try {
+      const verification = await verifyAuthenticationResponse({
+        response: body,
+        expectedChallenge,
+        expectedOrigin: getExpectedOrigin(),
+        expectedRPID: rpID,
+        credential: {
+          id: bytesToBase64URL(passkey.credentialId),
+          publicKey: new Uint8Array(passkey.publicKey),
+          counter: Number(passkey.counter),
+          transports: passkey.transports as AuthenticatorTransportFuture[],
+        },
+      });
+
+      if (!verification.verified) return reply.status(401).send({ error: 'Verification failed' });
+
+      await prisma.tenantPasskey.update({
+        where: { id: passkey.id },
+        data: { counter: BigInt(verification.authenticationInfo.newCounter) },
+      });
+
+      await prisma.tenantAuth.updateMany({
+        where: { tenantId: passkey.tenantId },
+        data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+      });
+
+      challenges.delete(`disc:${body.sessionId}`);
+
+      const tenant = passkey.tenant;
+      const accessToken = await createAccessToken({ tenantId: tenant.id, email: tenant.email });
+      const refreshToken = await createRefreshToken({ tenantId: tenant.id });
+
+      reply
+        .header('Set-Cookie', `hubport_refresh=${refreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${7 * 24 * 60 * 60}`)
+        .header('Set-Cookie', `hubport_access=${accessToken}; HttpOnly; Secure; SameSite=Strict; Path=/portal; Max-Age=${15 * 60}`)
+        .send({ verified: true, redirect: '/portal/dashboard' });
+    } catch (error) {
+      return reply.status(401).send({ error: error instanceof Error ? error.message : 'Verification failed' });
+    }
+  });
+
   app.get('/passkey/list', { preHandler: portalAuth }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const passkeys = await prisma.tenantPasskey.findMany({

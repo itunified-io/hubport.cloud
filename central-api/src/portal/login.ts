@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { TOTP } from 'otpauth';
 import { prisma } from '../lib/prisma.js';
 import { verifyPassword, verifyToken, createAccessToken, createRefreshToken } from '../lib/crypto.js';
-import { portalShell, loginPage } from './ui.js';
+import { portalShell, loginPage, passkeyFirstLoginPage } from './ui.js';
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -10,7 +10,7 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 export async function loginRoutes(app: FastifyInstance): Promise<void> {
   // GET /portal/login — show login form
   app.get('/login', async (_req, reply) => {
-    reply.type('text/html').send(portalShell('Log In', loginPage()));
+    reply.type('text/html').send(portalShell('Sign In', passkeyFirstLoginPage()));
   });
 
   // POST /portal/login — authenticate

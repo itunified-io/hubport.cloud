@@ -61,6 +61,190 @@ export function loginPage(error?: string): string {
   `;
 }
 
+export function passkeyFirstLoginPage(error?: string): string {
+  return `
+    <div class="max-w-md mx-auto">
+      <h2 class="text-2xl text-amber-500 mb-6 text-center">Sign In</h2>
+      ${error ? `<div class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-4 text-sm text-red-400">${escapeHtml(error)}</div>` : ''}
+      <div id="passkey-error" class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mb-4 text-sm text-red-400 hidden"></div>
+
+      <div id="passkey-section" class="mb-6">
+        <button id="passkey-btn" onclick="loginWithPasskeyDirect()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2">
+          <span class="text-xl">&#128274;</span> Sign in with Passkey
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex-1 h-px bg-zinc-700"></div>
+        <span class="text-xs text-zinc-500 uppercase tracking-wider">or use email &amp; password</span>
+        <div class="flex-1 h-px bg-zinc-700"></div>
+      </div>
+
+      <form method="POST" action="/portal/login" class="space-y-4">
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Email</label>
+          <input type="email" name="email" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none" placeholder="you@example.com" required>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Password</label>
+          <input type="password" name="password" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none" required>
+        </div>
+        <button type="submit" class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white font-semibold py-3 rounded-lg transition">Log In</button>
+      </form>
+
+      <p class="text-center mt-4">
+        <a href="/portal/setup" class="text-sm text-zinc-500 hover:text-zinc-300">First time? Set up your account</a>
+      </p>
+    </div>
+
+    <script>
+    if (!window.PublicKeyCredential || !navigator.credentials) {
+      var ps = document.getElementById('passkey-section');
+      if (ps) ps.style.display = 'none';
+    }
+
+    async function loginWithPasskeyDirect() {
+      var btn = document.getElementById('passkey-btn');
+      var errEl = document.getElementById('passkey-error');
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Waiting for passkey...';
+      try {
+        var optRes = await fetch('/portal/passkey/auth-options-discoverable');
+        if (!optRes.ok) throw new Error('Passkey not available');
+        var options = await optRes.json();
+        var sessionId = options.sessionId;
+        options.challenge = _b64ToBuf(options.challenge);
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(function(c) {
+            return Object.assign({}, c, {id: _b64ToBuf(c.id)});
+          });
+        }
+        var assertion = await navigator.credentials.get({ publicKey: options });
+        if (!assertion) throw new Error('No credential returned');
+        var verifyRes = await fetch('/portal/passkey/auth-verify-discoverable', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'same-origin',
+          body: JSON.stringify({
+            id: assertion.id, rawId: _bufToB64(assertion.rawId), sessionId: sessionId,
+            response: {
+              clientDataJSON: _bufToB64(assertion.response.clientDataJSON),
+              authenticatorData: _bufToB64(assertion.response.authenticatorData),
+              signature: _bufToB64(assertion.response.signature),
+              userHandle: assertion.response.userHandle ? _bufToB64(assertion.response.userHandle) : null
+            },
+            type: assertion.type,
+            clientExtensionResults: assertion.getClientExtensionResults(),
+          }),
+        });
+        if (verifyRes.ok) {
+          var data = await verifyRes.json();
+          window.location.href = data.redirect || '/portal/dashboard';
+        } else {
+          var err = await verifyRes.json();
+          throw new Error(err.error || 'Verification failed');
+        }
+      } catch (e) {
+        var msg = e.message === 'Passkey not available'
+          ? 'No passkeys registered yet. Use email & password below.'
+          : 'Passkey failed: ' + e.message;
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Sign in with Passkey';
+      }
+    }
+
+    function _b64ToBuf(b) {
+      var s = b.replace(/-/g,'+').replace(/_/g,'/');
+      var p = s.length % 4 === 0 ? '' : '='.repeat(4 - s.length % 4);
+      return Uint8Array.from(atob(s+p), function(c){return c.charCodeAt(0)}).buffer;
+    }
+    function _bufToB64(buf) {
+      var bytes = new Uint8Array(buf); var s = '';
+      for (var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+      return btoa(s).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+    }
+    </script>
+  `;
+}
+
+export function setupCodeSection(tenantStatus: string): string {
+  if (tenantStatus !== 'APPROVED' && tenantStatus !== 'ACTIVE') return '';
+  return `
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
+      <h3 class="text-lg text-amber-500 mb-4">Deploy Your Hub</h3>
+
+      <div class="text-sm text-zinc-400 mb-4">
+        <p class="mb-2"><strong>Server Requirements:</strong></p>
+        <ul class="list-disc list-inside space-y-1 text-zinc-500">
+          <li>1 vCPU, 4 GB RAM, 20 GB disk minimum</li>
+          <li>Ubuntu 22.04+ / Debian 12+ (any Docker-compatible OS)</li>
+          <li>Internet access (for Cloudflare Tunnel)</li>
+        </ul>
+      </div>
+
+      <div id="setup-code-generate">
+        <button onclick="generateSetupCode()" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg transition">
+          Generate Setup Code
+        </button>
+      </div>
+
+      <div id="setup-code-display" class="hidden">
+        <div class="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-4 text-center">
+          <p class="text-xs text-zinc-500 mb-2">Your Setup Code</p>
+          <p id="setup-code-value" class="text-3xl font-mono text-amber-400 tracking-widest mb-2"></p>
+          <p id="setup-code-expiry" class="text-xs text-zinc-500"></p>
+        </div>
+        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 mb-4">
+          <p class="text-xs text-zinc-500 mb-1">Run on your server:</p>
+          <code class="text-sm text-amber-400 select-all">curl -fsSL https://get.hubport.cloud | sh</code>
+        </div>
+        <button onclick="generateSetupCode()" class="text-sm text-zinc-500 hover:text-zinc-300 underline">
+          Regenerate Code (invalidates previous)
+        </button>
+      </div>
+
+      <div id="setup-code-error" class="hidden text-sm text-red-400 mt-2"></div>
+    </div>
+
+    <script>
+    var _setupCodeInterval;
+    async function generateSetupCode() {
+      var errEl = document.getElementById('setup-code-error');
+      errEl.classList.add('hidden');
+      try {
+        var res = await fetch('/portal/setup-code/generate', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Failed'); }
+        var data = await res.json();
+        document.getElementById('setup-code-value').textContent = data.code;
+        var exp = new Date(data.expiresAt);
+        document.getElementById('setup-code-generate').classList.add('hidden');
+        document.getElementById('setup-code-display').classList.remove('hidden');
+        if (_setupCodeInterval) clearInterval(_setupCodeInterval);
+        _setupCodeInterval = setInterval(function() {
+          var remaining = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+          if (remaining <= 0) {
+            clearInterval(_setupCodeInterval);
+            document.getElementById('setup-code-expiry').textContent = 'Expired. Click Regenerate.';
+            return;
+          }
+          var min = Math.floor(remaining / 60);
+          var sec = remaining % 60;
+          document.getElementById('setup-code-expiry').textContent =
+            'Expires in ' + min + ':' + (sec < 10 ? '0' : '') + sec;
+        }, 1000);
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.classList.remove('hidden');
+      }
+    }
+    </script>
+  `;
+}
+
 export function setupPage(tenantName: string, token: string): string {
   return `
     <div class="max-w-md mx-auto">
@@ -99,6 +283,8 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
         <p class="text-sm text-zinc-400 mt-1">Since ${tenant.createdAt.toISOString().split('T')[0]}</p>
       </div>
     </div>
+
+    ${setupCodeSection(tenant.status)}
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
       <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-3">Your Credentials</h3>
