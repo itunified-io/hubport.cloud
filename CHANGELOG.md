@@ -1,6 +1,23 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.20.1
+
+### Setup Wizard Enhancement (#23)
+- **Setup code**: XXXX-XXXX code generation (31-char non-ambiguous alphabet, 30 min TTL, single-use)
+- **Setup code exchange**: POST /setup/exchange with rate limiting (5/IP/min, 20/code total)
+- **Bootstrap token exchange**: POST /tenants/:id/token-exchange (ADR-0072)
+- **Passkey-first login**: WebAuthn discoverable credentials as primary auth, email/password as fallback
+- **TOTP label**: Shows tenant name instead of email
+- **Onboarding email**: Simplified — no docker-compose YAML, no raw tokens, setup-code-based flow
+- **Wizard consolidation**: 9 steps → 6 (env-check, db-init, vault-init, keycloak, admin-user, cf-tunnel)
+- **db-init**: P3005 auto-baseline fallback for non-empty databases
+- **vault-init**: Bootstrap token exchange + tunnel token stored in Vault
+- **cf-tunnel**: Public URL verification
+- **Test API**: UAT-only endpoints with auto-rotating key (30 min TTL, 5 min overlap)
+- **Email ring buffer**: In-memory buffer for test observability (10 entries)
+- **Setup code UI**: Dashboard card with code generation, countdown timer, curl command
+
 ## v2026.03.19.1
 
 ### Admin Portal Read-Only + License Change (#10)
