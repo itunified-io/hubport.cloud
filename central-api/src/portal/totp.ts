@@ -148,6 +148,9 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'Account not found' });
     }
 
+    if (!auth.passwordHash) {
+      return reply.status(401).send({ error: 'Account setup not completed' });
+    }
     const valid = await verifyPassword(auth.passwordHash, body.password);
     if (!valid) {
       return reply.status(401).send({ error: 'Invalid password' });

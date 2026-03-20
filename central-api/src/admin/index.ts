@@ -62,6 +62,47 @@ export async function adminRoutes(app: FastifyInstance) {
     reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant)));
   });
 
+  // Internal-only endpoint for MCP skill to provision auth (setup token)
+  // Called during tenant approval — creates or resets TenantAuth with a fresh setup token.
+  app.post('/internal/provision-auth', async (req, reply) => {
+    const body = req.body as { tenantId: string } | null;
+    if (!body?.tenantId) {
+      return reply.status(400).send({ error: 'Missing tenantId' });
+    }
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
+    if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
+
+    const { randomBytes } = await import('node:crypto');
+    const setupToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Upsert: create if missing, reset if exists (for re-approve cycles)
+    await prisma.tenantAuth.upsert({
+      where: { tenantId: body.tenantId },
+      create: {
+        tenantId: body.tenantId,
+        setupToken,
+        setupTokenExpiresAt: expiresAt,
+      },
+      update: {
+        passwordHash: null,
+        totpSecret: null,
+        totpEnabled: false,
+        mfaCompleted: false,
+        setupToken,
+        setupTokenExpiresAt: expiresAt,
+        failedAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    const portalBase = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
+    const setupUrl = `${portalBase}/portal/setup?token=${setupToken}`;
+
+    return reply.send({ ok: true, setupToken, setupUrl });
+  });
+
   // Internal-only endpoint for MCP skill to send emails
   app.post('/internal/send-email', async (req, reply) => {
     const body = req.body as {
@@ -85,6 +126,7 @@ export async function adminRoutes(app: FastifyInstance) {
           name: string;
           subdomain: string;
           id: string;
+          setupUrl?: string;
         });
       } else if (body.templateName === 'rejection') {
         html = rejectionEmailHtml(
