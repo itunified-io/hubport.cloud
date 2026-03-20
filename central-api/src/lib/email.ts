@@ -102,6 +102,7 @@ export function onboardingEmailHtml(tenant: {
   id: string;
   setupUrl?: string;
 }): string {
+  const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
   return `
 <!DOCTYPE html>
 <html>
@@ -131,112 +132,30 @@ export function onboardingEmailHtml(tenant: {
     </div>
     ` : `
     <div style="background: rgba(217,119,6,0.1); border: 1px solid rgba(217,119,6,0.3); border-radius: 10px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0 0 8px; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> are available in your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706; font-weight: 600;">Tenant Portal</a>.</p>
+      <p style="margin: 0 0 8px; font-size: 14px;"><strong style="color: #d97706;">Your setup credentials</strong> are available in your <a href="${portalUrl}/portal/login" style="color: #d97706; font-weight: 600;">Tenant Portal</a>.</p>
     </div>
     `}
 
     <h3 style="color: #e4e4e7;">Quick Start</h3>
     <ol style="line-height: 1.8;">
-      <li>Install <a href="https://docs.docker.com/get-docker/" style="color: #d97706;">Docker</a> on your server</li>
-      <li>Create a <code>docker-compose.yml</code> file (see below)</li>
       <li>${tenant.setupUrl
-        ? 'Click the setup button above to create your password and enable MFA'
-        : `Log in to your <a href="${process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud'}/portal/login" style="color: #d97706;">Tenant Portal</a> and complete MFA setup`} to retrieve your credentials</li>
-      <li>Fill in <code>HUBPORT_TENANT_ID</code>, <code>CF_TUNNEL_TOKEN</code>, and <code>HUBPORT_API_TOKEN</code> in the compose file</li>
-      <li>Run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">docker compose up -d</code></li>
+        ? 'Click the button above to create your password and enable MFA'
+        : `Log in to your <a href="${portalUrl}/portal/login" style="color: #d97706;">Tenant Portal</a> and complete MFA setup`}</li>
+      <li>Log in to your <a href="${portalUrl}/portal/dashboard" style="color: #d97706;">Tenant Portal</a></li>
+      <li>Click <strong style="color: #d97706;">Generate Setup Code</strong> on your dashboard</li>
+      <li>On your server, run: <code style="background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; color: #f59e0b;">curl -fsSL https://get.hubport.cloud | sh</code></li>
+      <li>Enter your setup code when prompted</li>
       <li>Open <code style="color: #f59e0b;">http://localhost:8080</code> to complete the setup wizard</li>
     </ol>
 
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px; margin: 20px 0;">
-      <h4 style="color: #d97706; margin-top: 0; font-size: 14px;">docker-compose.yml</h4>
-      <pre style="background: #0a0a0c; padding: 12px; border-radius: 6px; font-size: 12px; color: #e4e4e7; overflow-x: auto; white-space: pre; line-height: 1.5;">services:
-  hubport:
-    image: ghcr.io/itunified-io/hubport.cloud:latest
-    ports:
-      - "3000:3000"
-      - "8080:8080"
-    environment:
-      - HUBPORT_TENANT_ID=your-tenant-id       # from Tenant Portal
-      - HUBPORT_API_TOKEN=your-api-token        # from Tenant Portal
-      - CF_TUNNEL_TOKEN=your-tunnel-token       # from Tenant Portal
-      - DATABASE_URL=postgresql://hubport:changeme@postgres:5432/hubport
-      - VAULT_ADDR=http://vault:8200
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=hubport
-    depends_on:
-      postgres:
-        condition: service_healthy
-      vault:
-        condition: service_started
-      keycloak:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=hubport
-      - POSTGRES_USER=hubport
-      - POSTGRES_PASSWORD=changeme
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hubport"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-  vault:
-    image: hashicorp/vault:1.15
-    ports:
-      - "8200:8200"
-    volumes:
-      - vault-data:/vault/data
-    environment:
-      - VAULT_ADDR=http://0.0.0.0:8200
-      - VAULT_API_ADDR=http://0.0.0.0:8200
-    cap_add:
-      - IPC_LOCK
-    command: server -dev
-    restart: unless-stopped
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    ports:
-      - "8180:8080"
-    environment:
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/hubport
-      - KC_DB_USERNAME=hubport
-      - KC_DB_PASSWORD=changeme
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=changeme
-      - KC_HOSTNAME_STRICT=false
-      - KC_HTTP_ENABLED=true
-      - KC_PROXY_HEADERS=xforwarded
-    command: start-dev
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3&lt;&gt;/dev/tcp/localhost/8080"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    restart: unless-stopped
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel run --token your-tunnel-token
-    depends_on:
-      - hubport
-    restart: unless-stopped
-
-volumes:
-  pg-data:
-  vault-data:</pre>
+      <h4 style="color: #d97706; margin-top: 0; font-size: 14px;">Server Requirements</h4>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tr><td style="padding: 4px 0; color: #a1a1aa;">CPU</td><td style="padding: 4px 0; color: #e4e4e7;">1 vCPU (minimum)</td></tr>
+        <tr><td style="padding: 4px 0; color: #a1a1aa;">RAM</td><td style="padding: 4px 0; color: #e4e4e7;">4 GB</td></tr>
+        <tr><td style="padding: 4px 0; color: #a1a1aa;">Disk</td><td style="padding: 4px 0; color: #e4e4e7;">20 GB</td></tr>
+        <tr><td style="padding: 4px 0; color: #a1a1aa;">Software</td><td style="padding: 4px 0; color: #e4e4e7;"><a href="https://docs.docker.com/get-docker/" style="color: #d97706;">Docker</a> + Docker Compose</td></tr>
+      </table>
     </div>
 
     <div style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 20px; margin: 24px 0;">

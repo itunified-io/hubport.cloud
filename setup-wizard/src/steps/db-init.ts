@@ -38,7 +38,30 @@ export const dbStep: WizardStep = {
         credentials: { database: 'hubport', host: 'postgres:5432', user: 'hubport' },
       };
     } catch (err) {
-      return { success: false, message: `Migration failed: ${(err as Error).message}` };
+      const errMsg = (err as Error).message || '';
+      // P3005: non-empty database — auto-baseline the initial migration and retry
+      if (errMsg.includes('P3005')) {
+        try {
+          await execFileAsync('npx', ['prisma', 'migrate', 'resolve', '--applied', '0001_init'], {
+            cwd: '/app/hub-api',
+            timeout: 30000,
+          });
+          const { stdout: retryOut } = await execFileAsync('npx', ['prisma', 'migrate', 'deploy'], {
+            cwd: '/app/hub-api',
+            timeout: 60000,
+          });
+          const applied = (retryOut.match(/applied/gi) || []).length;
+          return {
+            success: true,
+            message: `Database auto-baselined and migrations applied (${applied} migration${applied !== 1 ? 's' : ''}).`,
+            credentials: { database: 'hubport', host: 'postgres:5432', user: 'hubport' },
+            warnings: ['P3005: Existing database detected — initial migration was auto-baselined.'],
+          };
+        } catch (retryErr) {
+          return { success: false, message: `Auto-baseline retry failed: ${(retryErr as Error).message}` };
+        }
+      }
+      return { success: false, message: `Migration failed: ${errMsg}` };
     }
   },
 };

@@ -10,6 +10,25 @@ import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../lib/email.js';
 import { shell, tenantRow, tenantDetail, statsCard, readOnlyBanner } from './ui.js';
 
+interface SentEmail {
+  to: string;
+  subject: string;
+  html: string;
+  sentAt: string;
+}
+
+const sentEmails: SentEmail[] = [];
+const MAX_SENT_EMAILS = 10;
+
+export function recordSentEmail(email: SentEmail): void {
+  sentEmails.push(email);
+  if (sentEmails.length > MAX_SENT_EMAILS) sentEmails.shift();
+}
+
+export function getLastSentEmail(): SentEmail | null {
+  return sentEmails.length > 0 ? sentEmails[sentEmails.length - 1]! : null;
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   // Dashboard — overview with stats + pending requests
   app.get('/', async (_req, reply) => {
@@ -138,10 +157,17 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       await sendEmail(body.to, body.subject, html);
+      recordSentEmail({ to: body.to, subject: body.subject, html, sentAt: new Date().toISOString() });
       return reply.send({ ok: true });
     } catch (err) {
       app.log.error({ err }, 'Internal send-email failed');
       return reply.status(500).send({ error: (err as Error).message });
     }
   });
+
+  // Register test routes conditionally (UAT only)
+  if (process.env.NODE_ENV !== 'production') {
+    const { testRoutes } = await import('./test-routes.js');
+    await app.register(testRoutes, { prefix: '/internal' });
+  }
 }
