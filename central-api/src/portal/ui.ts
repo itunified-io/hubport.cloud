@@ -237,7 +237,7 @@ export function setupCodeSection(tenantStatus: string): string {
         </div>
         <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 mb-4">
           <p class="text-xs text-zinc-500 mb-1">Run on your server:</p>
-          <code class="text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
+          <code id="setup-code-curl" class="text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
         </div>
         <button onclick="generateSetupCode()" class="text-sm text-zinc-500 hover:text-zinc-300 underline">
           Regenerate Code (invalidates previous)
@@ -259,6 +259,7 @@ export function setupCodeSection(tenantStatus: string): string {
         if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Failed'); }
         var data = await res.json();
         document.getElementById('setup-code-value').textContent = data.code;
+        document.getElementById('setup-code-curl').textContent = 'curl -fsSL ${installerUrl()} | sh -s -- ' + data.code;
         var exp = new Date(data.expiresAt);
         document.getElementById('setup-code-generate').classList.add('hidden');
         document.getElementById('setup-code-display').classList.remove('hidden');
