@@ -1,6 +1,25 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.20.6
+
+### Runtime Config Fix (#74)
+- **Bug fix**: All API calls used build-time `VITE_API_URL` (empty in Docker), causing `/permissions/me` and all fetch calls to hit the static server (port 3000) instead of hub-api (port 3001)
+- **Shared config helper**: `getApiUrl()` in `hub-app/src/lib/config.ts` reads `window.__HUBPORT_CONFIG__.apiUrl` (runtime) with fallback to `VITE_API_URL` (dev mode)
+- **8 files updated**: PermissionProvider, PublisherForm, UserDetail, UserList, RoleList, RoleDetail, AuditLog, Profile
+- **Result**: Sidebar now shows all nav items for admin user in tenant Docker mode
+
+### Publisher Form Polish (#72, #73)
+- **Full rewrite** of `PublisherForm.tsx`: Personal Info, Contact, Congregation, Duties, Program, Notes sections
+- **New congregation flags**: `anointed`, `special_needs`
+- **6 new duty AppRoles**: Mikrofon, Zoom Ordner, Video PC, Audio Anlage, Sound, Vortragsplaner
+- **3 new permissions**: `privilege:zoomModerator`, `privilege:publicTalkLocal`, `privilege:serviceMeetingConductor`
+- **Program assignments**: midweek (LM Overseer, Program) and weekend (WT Conductor, Program, Vortragsplaner) toggle switches
+- **Duties section**: toggle switches for 9 duty AppRoles grouped by Technical, Service, Planning
+- **API extended**: `dateOfBirth`, `displayName`, `address`, `notes` fields on Publisher; `appRoles` included in GET response
+- **i18n**: 43 new keys in both `en-US.json` and `de-DE.json`
+- **GHCR workflow**: Fixed CalVer tag pattern (`type=match` instead of `type=semver`)
+
 ## v2026.03.20.2
 
 ### User Management, RBAC & Publisher Onboarding (#234)
