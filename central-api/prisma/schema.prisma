@@ -42,7 +42,7 @@ model TenantAuth {
   id                  String    @id @default(uuid())
   tenantId            String    @unique
   tenant              Tenant    @relation(fields: [tenantId], references: [id])
-  passwordHash        String
+  passwordHash        String?
   totpSecret          String?
   totpEnabled         Boolean   @default(false)
   setupToken          String?   @unique

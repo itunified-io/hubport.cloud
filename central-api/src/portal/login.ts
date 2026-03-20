@@ -38,7 +38,7 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
       return reply.type('text/html').send(portalShell('Log In', loginPage(`Account locked. Try again in ${remainingMin} minutes.`)));
     }
 
-    const valid = await verifyPassword(auth.passwordHash, body.password);
+    const valid = await verifyPassword(auth.passwordHash!, body.password);
 
     if (!valid) {
       const attempts = auth.failedAttempts + 1;

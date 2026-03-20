@@ -213,6 +213,7 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     const auth = await prisma.tenantAuth.findUnique({ where: { tenantId } });
     if (!auth) return reply.status(404).send({ error: 'Account not found' });
 
+    if (!auth.passwordHash) return reply.status(401).send({ error: 'Account setup not completed' });
     const valid = await verifyPassword(auth.passwordHash, body.password);
     if (!valid) return reply.status(401).send({ error: 'Invalid password' });
 
