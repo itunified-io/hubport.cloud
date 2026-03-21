@@ -64,7 +64,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Create cleaning duty
-  app.post(
+  app.post<{ Body: { name: string; category?: "grundreinigung" | "sichtreinigung" | "monatsreinigung" | "custom" } }>(
     "/cleaning/duties",
     {
       schema: {
@@ -79,8 +79,9 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
     },
     async (request) => {
+      const { name, category } = request.body;
       const duty = await prisma.cleaningDuty.create({
-        data: { ...request.body, category: request.body.category ?? "custom" },
+        data: { name, category: category ?? "custom" },
       });
       await audit("cleaning_duty.create", request.user.sub, "CleaningDuty", duty.id, null, duty);
       return duty;
@@ -126,7 +127,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Generate rotation schedule
-  app.post(
+  app.post<{ Body: { dutyId: string; startDate: string; endDate: string; frequency: "weekly" | "biweekly" | "monthly" } }>(
     "/cleaning/schedules/generate",
     {
       schema: {
@@ -180,7 +181,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Update schedule entry (status, reassign)
-  app.put<{ Params: IdParamsType }>(
+  app.put<{ Params: IdParamsType; Body: { status?: "scheduled" | "completed" | "skipped"; serviceGroupId?: string; notes?: string } }>(
     "/cleaning/schedules/:id",
     {
       schema: {
@@ -199,7 +200,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
       if (!before) return reply.code(404).send({ error: "Schedule not found" });
       const updated = await prisma.cleaningSchedule.update({
         where: { id: request.params.id },
-        data: request.body,
+        data: request.body as { status?: "scheduled" | "completed" | "skipped"; serviceGroupId?: string; notes?: string },
       });
       await audit("cleaning_schedule.update", request.user.sub, "CleaningSchedule", request.params.id, before, updated);
       return updated;
@@ -237,7 +238,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Create garden duty
-  app.post(
+  app.post<{ Body: { name: string; type?: "rasen" | "winterdienst" | "custom" } }>(
     "/cleaning/garden",
     {
       schema: {
@@ -251,15 +252,16 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
     },
     async (request) => {
+      const { name, type } = request.body;
       const duty = await prisma.gardenDuty.create({
-        data: { ...request.body, type: request.body.type ?? "custom" },
+        data: { name, type: type ?? "custom" },
       });
       return duty;
     },
   );
 
   // Assign publisher to garden duty
-  app.post<{ Params: IdParamsType }>(
+  app.post<{ Params: IdParamsType; Body: { publisherId: string } }>(
     "/cleaning/garden/:id/members",
     {
       schema: { body: Type.Object({ publisherId: Type.String({ format: "uuid" }) }) },
