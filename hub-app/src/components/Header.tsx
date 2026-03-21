@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { FormattedMessage } from "react-intl";
-import { LogOut, Globe, Menu, Wifi, WifiOff, User, ChevronDown, Bell, Shield, Sun, Moon } from "lucide-react";
+import { LogOut, Globe, Menu, Wifi, WifiOff, User, ChevronDown, Bell, Shield, Sun, Moon, KeyRound } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/auth/useAuth";
 import { useLocale } from "@/i18n/IntlSetup";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -13,6 +14,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const { displayName, roles, signOut } = useAuth();
   const { locale, setLocale, supportedLocales } = useLocale();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const isOnline = navigator.onLine;
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -127,6 +129,16 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
               {/* Actions */}
               <div className="p-1">
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/profile");
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-[var(--radius-sm)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+                >
+                  <KeyRound size={14} />
+                  <FormattedMessage id="nav.profile.security" />
+                </button>
                 <button
                   onClick={() => {
                     setProfileOpen(false);

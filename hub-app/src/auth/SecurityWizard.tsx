@@ -121,7 +121,7 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
         const data = await registerRes.json();
         throw new Error(data.error || "Passkey registration failed");
       }
-      onComplete();
+      setStep("totp");
     } catch (err) {
       if ((err as Error).name === "NotAllowedError") {
         setError(
@@ -249,6 +249,8 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
             <div className="space-y-4">
               <input
                 type="password"
+                name="current-password"
+                autoComplete="current-password"
                 placeholder={intl.formatMessage({
                   id: "security.wizard.password.current",
                 })}
@@ -258,6 +260,8 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
               />
               <input
                 type="password"
+                name="new-password"
+                autoComplete="new-password"
                 placeholder={intl.formatMessage({
                   id: "security.wizard.password.new",
                 })}
@@ -267,6 +271,8 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
               />
               <input
                 type="password"
+                name="confirm-password"
+                autoComplete="new-password"
                 placeholder={intl.formatMessage({
                   id: "security.wizard.password.confirm",
                 })}
@@ -338,12 +344,9 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
                       id: "security.wizard.passkey.register",
                     })}
               </button>
-              <button
-                onClick={() => setStep("totp")}
-                className="w-full py-2 text-[var(--text-muted)] hover:text-[var(--text)] text-sm cursor-pointer"
-              >
-                <FormattedMessage id="security.wizard.passkey.skip" />
-              </button>
+              <p className="text-xs text-[var(--text-muted)] text-center">
+                <FormattedMessage id="security.wizard.passkey.required" />
+              </p>
             </div>
           </>
         )}

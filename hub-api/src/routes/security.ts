@@ -79,7 +79,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
       passwordChanged,
       passkeyRegistered,
       totpConfigured,
-      setupComplete: passwordChanged && (passkeyRegistered || totpConfigured),
+      setupComplete: passwordChanged && passkeyRegistered && totpConfigured,
     };
   });
 

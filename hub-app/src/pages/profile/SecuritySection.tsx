@@ -121,6 +121,8 @@ function PasswordChange({
           )}
           <input
             type="password"
+            name="current-password"
+            autoComplete="current-password"
             placeholder={intl.formatMessage({ id: "security.wizard.password.current" })}
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
@@ -128,6 +130,8 @@ function PasswordChange({
           />
           <input
             type="password"
+            name="new-password"
+            autoComplete="new-password"
             placeholder={intl.formatMessage({ id: "security.wizard.password.new" })}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -135,6 +139,8 @@ function PasswordChange({
           />
           <input
             type="password"
+            name="confirm-password"
+            autoComplete="new-password"
             placeholder={intl.formatMessage({ id: "security.wizard.password.confirm" })}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
