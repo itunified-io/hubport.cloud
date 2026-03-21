@@ -11,6 +11,7 @@
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
     "lucide-react": "^0.400.0",
+    "matrix-js-sdk": "^41.2.0-rc.0",
     "oidc-client-ts": "^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
