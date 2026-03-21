@@ -3,8 +3,8 @@
  * Shows message bubbles (sender left, own right) with avatars.
  */
 import { useState, useEffect, useRef } from "react";
-import { Phone, Video } from "lucide-react";
 import { MessageInput } from "./MessageInput";
+import { CallControls } from "./CallControls";
 import {
   getRoomMessages,
   sendMessage,
@@ -82,22 +82,7 @@ export function MessageThread({ room }: Props) {
             {room.memberCount} Mitglieder
           </p>
         </div>
-        <div className="flex gap-1">
-          <button
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
-            style={{ background: "rgba(255,255,255,0.04)" }}
-            title="Anrufen"
-          >
-            <Phone size={13} />
-          </button>
-          <button
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
-            style={{ background: "rgba(255,255,255,0.04)" }}
-            title="Videoanruf"
-          >
-            <Video size={13} />
-          </button>
-        </div>
+        <CallControls roomId={room.id} roomName={room.name} isDirect={room.isDirect} />
       </div>
 
       {/* Messages */}

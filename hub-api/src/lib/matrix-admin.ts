@@ -90,6 +90,29 @@ export async function deactivateMatrixUser(localpart: string): Promise<void> {
   });
 }
 
+// ─── Media Upload ───────────────────────────────────────────────────
+
+export async function uploadMatrixMedia(
+  buffer: Buffer,
+  contentType: string,
+  filename: string,
+): Promise<string> {
+  const { adminUrl } = getMatrixConfig();
+  const token = await getAdminToken();
+
+  const res = await fetch(
+    `${adminUrl}/_matrix/media/v3/upload?filename=${encodeURIComponent(filename)}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
+      body: buffer,
+    },
+  );
+
+  if (!res.ok) throw new Error(`Synapse media upload failed: ${res.status}`);
+  return ((await res.json()) as { content_uri: string }).content_uri;
+}
+
 // ─── Rooms / Spaces ──────────────────────────────────────────────────
 
 export async function createRoom(opts: {
