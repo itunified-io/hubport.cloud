@@ -98,13 +98,22 @@ export function PublisherList() {
         <h1 className="text-xl font-semibold text-[var(--text)]">
           <FormattedMessage id="publishers.title" />
         </h1>
-        <button
-          onClick={() => navigate("/publishers/new")}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--amber)] text-black text-sm font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
-        >
-          <UserPlus size={16} />
-          <FormattedMessage id="publishers.invite" />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate("/publishers/service-groups")}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+          >
+            <Users size={14} />
+            <FormattedMessage id="serviceGroups.title" />
+          </button>
+          <button
+            onClick={() => navigate("/publishers/new")}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--amber)] text-black text-sm font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
+          >
+            <UserPlus size={16} />
+            <FormattedMessage id="publishers.invite" />
+          </button>
+        </div>
       </div>
 
       {/* Search filter */}
