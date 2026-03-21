@@ -1,6 +1,17 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.12
+
+### Status Management + Service Groups + Invite Flow (#91, #95)
+- PublisherForm: status management bar (approve/reject/deactivate/reactivate)
+- PublisherForm: info card (email, status, gender, privacy at a glance)
+- PublisherForm: create mode uses invite flow (`POST /users/invite`), shows invite code + email send
+- PublisherForm: All Roles section — full role assignment list with add/remove
+- Service Groups page (`/publishers/service-groups`): card grid, member management, seed defaults
+- "Dienstgruppen" button in PublisherList header
+- 8 new serviceGroups i18n keys (EN + DE)
+
 ## v2026.03.21.11
 
 ### Matrix Chat — Element Embed + Synapse Admin Library (#91, #94)
