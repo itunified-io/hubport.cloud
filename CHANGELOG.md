@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.5
+
+### Distinguish TOTP Labels Between Portal and Tenant Hub (#83)
+- Portal TOTP issuer: `hubport.cloud Portal` (was `hubport.cloud`)
+- Tenant Hub TOTP issuer: `{tenant-name} Hub` (was `Hubport`)
+- `HUBPORT_TENANT_NAME` env var passed to hub container via docker-compose
+- Users can now distinguish portal and tenant TOTP entries in their authenticator app
+
 ## v2026.03.21.4
 
 ### Danger Zone Card in Tenant Portal (#81)

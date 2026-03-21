@@ -30,9 +30,9 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
       `));
     }
 
-    // Generate TOTP secret
+    // Generate TOTP secret — label distinguishes portal from tenant hub
     const totp = new TOTP({
-      issuer: 'hubport.cloud',
+      issuer: 'hubport.cloud Portal',
       label: tenant.name,
       algorithm: 'SHA1',
       digits: 6,
@@ -99,7 +99,7 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const totp = new TOTP({
-      issuer: 'hubport.cloud',
+      issuer: 'hubport.cloud Portal',
       label: '',
       algorithm: 'SHA1',
       digits: 6,
