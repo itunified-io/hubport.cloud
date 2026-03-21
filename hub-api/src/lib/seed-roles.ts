@@ -185,10 +185,34 @@ const SYSTEM_ROLES: SeedRole[] = [
       P.MANAGE_PROGRAM, P.PRIVILEGE_PUBLIC_TALK, P.PUBLISHERS_VIEW_MINIMAL, P.MEETINGS_VIEW,
     ],
   },
+  {
+    name: "Grundreinigung",
+    description: "Deep cleaning team member",
+    scope: "all",
+    permissions: [P.PRIVILEGE_CLEANING_DEEP, P.CLEANING_VIEW],
+  },
+  {
+    name: "Sichtreinigung",
+    description: "Visual / spot cleaning team member",
+    scope: "all",
+    permissions: [P.PRIVILEGE_CLEANING_VISUAL, P.CLEANING_VIEW],
+  },
+  {
+    name: "Rasen",
+    description: "Lawn care team member",
+    scope: "all",
+    permissions: [P.PRIVILEGE_GARDEN_LAWN, P.CLEANING_VIEW],
+  },
+  {
+    name: "Winterdienst",
+    description: "Snow clearing / winter service team member",
+    scope: "all",
+    permissions: [P.PRIVILEGE_GARDEN_WINTER, P.CLEANING_VIEW],
+  },
 ];
 
 /**
- * Upsert all 12 system roles. Safe to call multiple times.
+ * Upsert all 22 system roles. Safe to call multiple times.
  */
 export async function seedSystemRoles(): Promise<void> {
   for (const role of SYSTEM_ROLES) {

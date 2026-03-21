@@ -13,8 +13,6 @@ import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
 import { Settings } from "./pages/settings/Settings";
 import { SharingPartners } from "./pages/sharing/SharingPartners";
-import { UserList } from "./pages/users/UserList";
-import { UserDetail } from "./pages/users/UserDetail";
 import { RoleList } from "./pages/users/RoleList";
 import { RoleDetail } from "./pages/users/RoleDetail";
 import { AuditLog } from "./pages/audit/AuditLog";
@@ -72,6 +70,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
 
+        {/* Publishers (unified — replaces old /users pages) */}
         <Route
           path="/publishers"
           element={
@@ -139,25 +138,9 @@ export function App() {
           }
         />
 
-        {/* User & Role Management */}
+        {/* Role Management (moved from /users/roles to /settings/roles) */}
         <Route
-          path="/users"
-          element={
-            <PermissionGuard requires="app:roles.view">
-              <UserList />
-            </PermissionGuard>
-          }
-        />
-        <Route
-          path="/users/:id"
-          element={
-            <PermissionGuard requires="app:roles.view">
-              <UserDetail />
-            </PermissionGuard>
-          }
-        />
-        <Route
-          path="/users/roles"
+          path="/settings/roles"
           element={
             <PermissionGuard requires="app:roles.edit">
               <RoleList />
@@ -165,7 +148,7 @@ export function App() {
           }
         />
         <Route
-          path="/users/roles/:id"
+          path="/settings/roles/:id"
           element={
             <PermissionGuard requires="app:roles.edit">
               <RoleDetail />
@@ -202,6 +185,11 @@ export function App() {
             </PermissionGuard>
           }
         />
+
+        {/* Backward compatibility redirects */}
+        <Route path="/users" element={<Navigate to="/publishers" replace />} />
+        <Route path="/users/roles" element={<Navigate to="/settings/roles" replace />} />
+        <Route path="/users/roles/:id" element={<Navigate to="/settings/roles" replace />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
