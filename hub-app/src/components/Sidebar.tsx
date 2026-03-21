@@ -3,13 +3,12 @@ import { FormattedMessage } from "react-intl";
 import {
   LayoutDashboard,
   Users,
-  UserCog,
   Map,
   Calendar,
   Handshake,
   Settings as SettingsIcon,
   ClipboardList,
-  Shield,
+  Sparkles,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
 
@@ -26,14 +25,13 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/publishers", labelId: "nav.publishers", icon: Users, requiredPermission: "app:publishers.view" },
   { to: "/territories", labelId: "nav.territories", icon: Map, requiredPermission: "app:territories.view" },
   { to: "/meetings", labelId: "nav.meetings", icon: Calendar, requiredPermission: "app:meetings.view" },
-  { to: "/users", labelId: "nav.users", icon: UserCog, requiredPermission: "app:roles.view" },
-  { to: "/users/roles", labelId: "nav.roles", icon: Shield, requiredPermission: "app:roles.edit" },
+  { to: "/cleaning", labelId: "nav.cleaning", icon: Sparkles, requiredPermission: "app:cleaning.view" },
   { to: "/sharing", labelId: "nav.sharing", icon: Handshake, requiredPermission: "app:settings.view" },
   { to: "/audit", labelId: "nav.audit", icon: ClipboardList, requiredPermission: "app:audit.view" },
   { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, requiredPermission: "app:settings.view" },
 ];
 
-const APP_VERSION = "2026.03.21.8";
+const APP_VERSION = "2026.03.21.9";
 
 interface SidebarProps {
   onNavigate?: () => void;

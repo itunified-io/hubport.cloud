@@ -65,14 +65,22 @@ const MS_FLAGS = [
 
 /** Duty roles shown in Duties section (toggle switches) */
 const DUTY_ROLE_NAMES = [
+  // Technical
   "Mikrofon",
   "Zoom Ordner",
   "Video PC",
   "Audio Anlage",
   "Sound",
   "Technik Responsible",
+  // Service
   "Ordnungsdienst",
   "Cleaning Responsible",
+  // Cleaning & Garden
+  "Grundreinigung",
+  "Sichtreinigung",
+  "Rasen",
+  "Winterdienst",
+  // Planning
   "Vortragsplaner",
 ];
 
