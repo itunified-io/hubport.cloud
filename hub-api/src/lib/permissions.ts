@@ -110,6 +110,10 @@ export const PERMISSIONS = {
   PRIVILEGE_GARDEN_LAWN: "privilege:gardenLawn",
   PRIVILEGE_GARDEN_WINTER: "privilege:gardenWinter",
 
+  // Sharing
+  SHARING_VIEW: "app:sharing.view",
+  SHARING_EDIT: "app:sharing.edit",
+
   // Cleaning module
   CLEANING_VIEW: "app:cleaning.view",
 

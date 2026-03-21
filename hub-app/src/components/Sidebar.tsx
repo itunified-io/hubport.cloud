@@ -28,12 +28,12 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/meetings", labelId: "nav.meetings", icon: Calendar, requiredPermission: "app:meetings.view" },
   { to: "/cleaning", labelId: "nav.cleaning", icon: Sparkles, requiredPermission: "app:cleaning.view" },
   { to: "/chat", labelId: "nav.chat", icon: MessageCircle, requiredPermission: null },
-  { to: "/sharing", labelId: "nav.sharing", icon: Handshake, requiredPermission: "app:settings.view" },
+  { to: "/sharing", labelId: "nav.sharing", icon: Handshake, requiredPermission: "app:sharing.view" },
   { to: "/audit", labelId: "nav.audit", icon: ClipboardList, requiredPermission: "app:audit.view" },
   { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, requiredPermission: "app:settings.view" },
 ];
 
-const APP_VERSION = "2026.03.21.13";
+const APP_VERSION = "2026.03.21.14";
 
 interface SidebarProps {
   onNavigate?: () => void;
