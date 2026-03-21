@@ -1,6 +1,20 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.10
+
+### Service Groups + Cleaning & Garden Duty Module (#91, #93)
+- Prisma models: ServiceGroup, CleaningDuty, CleaningSchedule, GardenDuty, GardenDutyMember
+- Publisher.serviceGroupId FK — publishers belong to service groups (default 5)
+- Cleaning duties (Grundreinigung, Sichtreinigung, Monatsreinigung) assigned to service groups on rotation
+- Garden duties (Rasen mähen, Winterdienst) assigned to individual publishers
+- Auto-generate rotation schedules: weekly/biweekly/monthly round-robin across service groups
+- CleaningDashboard UI: duty cards, schedule table with status management, garden member lists
+- Service group CRUD with member assignment API
+- Seed defaults endpoint for first setup
+- Auth middleware: /service-groups, /cleaning added to API_PREFIXES
+- 16 new i18n keys (EN + DE)
+
 ## v2026.03.21.9
 
 ### Unified Publisher Page + Cleaning/Garden AppRoles (#91, #92)
