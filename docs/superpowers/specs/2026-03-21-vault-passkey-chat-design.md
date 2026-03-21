@@ -222,10 +222,18 @@ Password-only login is **blocked** once 2FA credentials exist in Keycloak.
 
 **Special Preaching Campaigns:**
 - Created by Elder or Service Overseer (`chat:createCampaign`)
-- Examples: "Gedenkmahleinladung 2026", "Sonderpionier April", "Sonderaktion Flüchtlingshilfe"
-- All active publishers auto-joined
+- **Invite-based** (not auto-join): All active publishers receive invitation notification
+- Each publisher responds: **Teilnehmen** (accept) / **Nicht verfügbar** (unavailable)
+- Only accepted publishers are added to the campaign space
+- Creator sees participation overview (accepted / declined / pending)
 - Contains: campaign goals, schedule, territory assignments, progress updates
 - Auto-delete 7 days after campaign end date
+
+**Campaign Templates:**
+- Gedächtnismahleinladung (annual memorial invitation)
+- Einladung Kongress (regional/circuit convention invitation)
+- Predigtdienstaktion `<Datum>` (special preaching action with date)
+- Benutzerdefiniert (custom title + date range)
 
 **Territory Campaigns:**
 - Auto-created when territory assigned to a group/publisher
