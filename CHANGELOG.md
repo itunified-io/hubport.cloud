@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.11
+
+### Matrix Chat — Element Embed + Synapse Admin Library (#91, #94)
+- Chat page: Element Web iframe embed with full-height layout
+- Chat nav item in sidebar (MessageCircle icon, visible to all authenticated)
+- matrix-admin.ts: Synapse Admin API client for auto-provisioning users/rooms
+- Default rooms: #general, #elders, #service, #technik, #ordnungsdienst, #reinigung
+- i18n: nav.chat, chat.notConfigured, chat.openExternal (EN + DE)
+- Bump APP_VERSION to v2026.03.21.11
+
 ## v2026.03.21.10
 
 ### Service Groups + Cleaning & Garden Duty Module (#91, #93)
