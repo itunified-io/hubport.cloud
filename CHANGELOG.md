@@ -1,6 +1,19 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.9
+
+### Unified Publisher Page + Cleaning/Garden AppRoles (#91, #92)
+- Rewrite PublisherList: full data table with status pills, congregation role badges, app role pills, search filter
+- Remove Benutzer + Rollen nav items from sidebar
+- Add Reinigung & Garten nav item
+- 4 new cleaning/garden AppRoles: Grundreinigung, Sichtreinigung, Rasen, Winterdienst
+- Include appRoles in GET /publishers list response
+- Add POST /users/invite-email relay endpoint (sends via central API)
+- Route cleanup: /users → /publishers redirect, /settings/roles for role management
+- Add cleaning.view permission to base publisher role
+- i18n: 20+ new keys (EN + DE) for publishers, settings, cleaning
+
 ## v2026.03.21.8
 
 ### Mandatory Passkey + TOTP, Password Manager Support, Profile Menu (#88)
