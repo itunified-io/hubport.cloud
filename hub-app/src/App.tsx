@@ -16,6 +16,7 @@ import { SharingPartners } from "./pages/sharing/SharingPartners";
 import { RoleList } from "./pages/users/RoleList";
 import { RoleDetail } from "./pages/users/RoleDetail";
 import { AuditLog } from "./pages/audit/AuditLog";
+import { CleaningDashboard } from "./pages/cleaning/CleaningDashboard";
 import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
 
@@ -134,6 +135,16 @@ export function App() {
           element={
             <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Cleaning & Garden */}
+        <Route
+          path="/cleaning"
+          element={
+            <PermissionGuard requires="app:cleaning.view">
+              <CleaningDashboard />
             </PermissionGuard>
           }
         />
