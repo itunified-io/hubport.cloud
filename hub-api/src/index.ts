@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import { registerAuth } from "./lib/auth.js";
 import { registerPolicyContext, requirePrivacyAccepted } from "./lib/rbac.js";
 import { healthRoutes } from "./routes/health.js";
@@ -29,6 +30,9 @@ async function start(): Promise<void> {
     origin: process.env.CORS_ORIGIN ?? true,
     credentials: true,
   });
+
+  // Multipart (file uploads, max 2MB)
+  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
 
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);

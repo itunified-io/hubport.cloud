@@ -12,6 +12,7 @@ import {
   deleteKeycloakUser,
   logoutKeycloakUser,
 } from "../lib/keycloak-admin.js";
+import { ensureMatrixUser, uploadMatrixMedia } from "../lib/matrix-admin.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
 type IdParamsType = Static<typeof IdParams>;
@@ -369,6 +370,48 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     await audit("publisher.self.update", ctx.userId, "Publisher", ctx.publisherId, before, updated);
 
     return updated;
+  });
+
+  // Upload profile picture
+  app.post("/publishers/me/avatar", async (request, reply) => {
+    const ctx = request.policyCtx;
+    if (!ctx?.publisherId) return reply.code(403).send({ error: "Not a publisher" });
+
+    const data = await request.file();
+    if (!data) return reply.code(400).send({ error: "No file uploaded" });
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(data.mimetype)) {
+      return reply.code(400).send({ error: "Only JPEG, PNG, WebP, and GIF images are allowed" });
+    }
+
+    const buffer = await data.toBuffer();
+    if (buffer.length > 2 * 1024 * 1024) {
+      return reply.code(400).send({ error: "Image must be under 2MB" });
+    }
+
+    // Upload to Synapse media store → mxc:// URL
+    const mxcUrl = await uploadMatrixMedia(buffer, data.mimetype, data.filename || "avatar.jpg");
+
+    // Update publisher record
+    const before = await prisma.publisher.findUnique({ where: { id: ctx.publisherId } });
+    const updated = await prisma.publisher.update({
+      where: { id: ctx.publisherId },
+      data: { avatarUrl: mxcUrl },
+    });
+
+    // Sync avatar to Matrix user profile
+    const localpart = updated.id;
+    try {
+      await ensureMatrixUser(localpart, updated.displayName ?? `${updated.firstName} ${updated.lastName}`, mxcUrl);
+    } catch {
+      // Non-fatal — avatar is stored in DB even if Synapse sync fails
+      request.log.warn("Failed to sync avatar to Synapse");
+    }
+
+    await audit("publisher.avatar.update", ctx.userId, "Publisher", ctx.publisherId, before, updated);
+
+    return reply.send({ avatarUrl: mxcUrl });
   });
 
   // Update own privacy settings
