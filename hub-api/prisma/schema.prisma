@@ -65,6 +65,7 @@ model Publisher {
   role             String            @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)
   status           MemberStatus      @default(active)
   notes            String?           /// @encrypted — AES-256-GCM
+  avatarUrl        String?           /// Profile picture URL
 
   // Privacy
   privacyAccepted   Boolean          @default(false)
@@ -86,7 +87,8 @@ model Publisher {
   inviteCode      InviteCode?
   serviceGroup    ServiceGroup?       @relation(fields: [serviceGroupId], references: [id])
   serviceGroupId  String?
-  gardenDuties    GardenDutyMember[]
+  gardenDuties       GardenDutyMember[]
+  campaignInvites    CampaignInvite[]
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -319,5 +321,53 @@ model GardenDutyMember {
   createdAt   DateTime  @default(now())
 
   @@unique([dutyId, publisherId])
+  @@index([publisherId])
+}
+
+// ─── Chat ────────────────────────────────────────────────────────────
+
+model ChatSettings {
+  id           String   @id @default(uuid())
+  dmsEnabled   Boolean  @default(true)
+  callsEnabled Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+}
+
+enum CampaignTemplate {
+  gedaechtnismahl
+  kongress
+  predigtdienstaktion
+  custom
+}
+
+enum CampaignInviteStatus {
+  pending
+  accepted
+  unavailable
+}
+
+model Campaign {
+  id           String             @id @default(uuid())
+  title        String
+  template     CampaignTemplate
+  startDate    DateTime
+  endDate      DateTime
+  matrixRoomId String?
+  createdBy    String             /// keycloakSub of creator
+  invitations  CampaignInvite[]
+  createdAt    DateTime           @default(now())
+  deletedAt    DateTime?          /// auto-delete 7 days after endDate
+}
+
+model CampaignInvite {
+  id          String               @id @default(uuid())
+  campaign    Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String
+  publisher   Publisher            @relation(fields: [publisherId], references: [id])
+  publisherId String
+  status      CampaignInviteStatus @default(pending)
+  respondedAt DateTime?
+
+  @@unique([campaignId, publisherId])
   @@index([publisherId])
 }
