@@ -182,6 +182,7 @@ export function PublisherForm() {
   const [_approvedAt, setApprovedAt] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const { can } = usePermissions();
   const canManageUsers = can("app:roles.edit");
 
@@ -321,6 +322,7 @@ export function PublisherForm() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setFormError(null);
     try {
       if (isEdit) {
         // Update existing publisher — send all fields
@@ -353,7 +355,7 @@ export function PublisherForm() {
           return;
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown error" })) as { error?: string };
-          alert(err.error || `Error: ${res.status}`);
+          setFormError(err.error || `Error: ${res.status}`);
         }
       }
     } finally {
@@ -461,6 +463,14 @@ export function PublisherForm() {
             <p className="text-xs text-[var(--text-muted)]">Privacy</p>
             <p className="text-sm text-[var(--text)]">{privacyAccepted ? "✓" : "—"}</p>
           </div>
+        </div>
+      )}
+
+      {/* ── Error Banner ────────────────────────────────────────── */}
+      {formError && (
+        <div className="flex items-center justify-between p-4 bg-[var(--red)]/10 border border-[var(--red)]/30 rounded-[var(--radius)] text-[var(--red)] text-sm">
+          <span>{formError}</span>
+          <button onClick={() => setFormError(null)} className="ml-4 text-[var(--red)] hover:opacity-70 cursor-pointer font-bold">✕</button>
         </div>
       )}
 
