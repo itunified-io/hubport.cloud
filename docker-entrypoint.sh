@@ -34,6 +34,14 @@ EOF
     sed -i 's|<title>|<script src="/runtime-config.js"></script>\n    <title>|' /app/hub-app/dist/index.html
     echo "[config] Injected runtime-config.js script tag into index.html"
   fi
+  # Prevent Cloudflare from caching runtime-config.js (it changes per container start)
+  cat > /app/hub-app/dist/serve.json << 'SERVEJSON'
+{
+  "headers": [
+    { "source": "runtime-config.js", "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }] }
+  ]
+}
+SERVEJSON
   echo "[config] Runtime config generated for hub-app"
 fi
 
