@@ -20,7 +20,9 @@ window.__HUBPORT_CONFIG__ = {
   keycloakUrl: "${KC_BROWSER_URL}",
   keycloakRealm: "hubport",
   keycloakClientId: "hub-app",
-  apiUrl: "${HUB_API_URL:-http://localhost:3001}"
+  apiUrl: "${HUB_API_URL:-http://localhost:3001}",
+  rpId: "${WEBAUTHN_RP_ID:-}",
+  chatUrl: "${WEBAUTHN_RP_ID:+https://chat-${WEBAUTHN_RP_ID}}"
 };
 EOF
   # Inject runtime-config.js script tag if Vite stripped it during build
