@@ -59,6 +59,15 @@ export const keycloakStep: WizardStep = {
           registrationAllowed: false,
           loginWithEmailAllowed: true,
           duplicateEmailsAllowed: false,
+          // ADR-0077: Password policy — 12+ chars, upper, lower, digit, special, not username, history 5
+          passwordPolicy: 'length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername() and passwordHistory(5)',
+          // ADR-0077: Brute force protection — 5 failures, 60s wait, 15min max
+          bruteForceProtected: true,
+          maxFailureWaitSeconds: 900,
+          minimumQuickLoginWaitSeconds: 60,
+          waitIncrementSeconds: 60,
+          maxDeltaTimeSeconds: 43200,
+          failureFactor: 5,
         }),
       });
 
@@ -69,8 +78,8 @@ export const keycloakStep: WizardStep = {
         return { success: false, message: `Failed to create realm: ${realmRes.statusText}` };
       }
 
-      // Create OIDC client for hub-app
-      const clientRes = await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
+      // Create OIDC public client for hub-app (SPA)
+      await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,6 +88,23 @@ export const keycloakStep: WizardStep = {
           directAccessGrantsEnabled: true,
           redirectUris: ['*'],
           webOrigins: ['*'],
+          protocol: 'openid-connect',
+        }),
+      });
+
+      // Create OIDC confidential client for hub-api (password verification via direct grant)
+      const apiClientSecret = process.env.KC_API_CLIENT_SECRET || crypto.randomUUID();
+      await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'hub-api',
+          publicClient: false,
+          secret: apiClientSecret,
+          serviceAccountsEnabled: true,
+          directAccessGrantsEnabled: true,
+          redirectUris: [],
+          webOrigins: [],
           protocol: 'openid-connect',
         }),
       });
@@ -95,11 +121,16 @@ export const keycloakStep: WizardStep = {
 
       return {
         success: true,
-        message: 'Keycloak realm created with OIDC client and RBAC roles.',
+        message: 'Keycloak realm created with OIDC clients, RBAC roles, password policy, and brute force protection.',
         credentials: {
           realm: REALM,
-          client_id: 'hub-app',
-          client_type: 'public',
+          app_client_id: 'hub-app',
+          app_client_type: 'public',
+          api_client_id: 'hub-api',
+          api_client_type: 'confidential',
+          api_client_secret: apiClientSecret,
+          password_policy: '12+ chars, upper, lower, digit, special, not-username, history 5',
+          brute_force: '5 failures → 60s lockout (max 15min)',
           roles: roles.join(', '),
         },
       };
