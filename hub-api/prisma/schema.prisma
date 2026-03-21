@@ -187,3 +187,39 @@ model Meeting {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─── Security (ADR-0077) ──────────────────────────────────────────────
+
+/// WebAuthn passkey credentials — stored in our DB, not Keycloak.
+/// Keycloak 24 Admin API doesn't support reliable WebAuthn CRUD.
+model WebAuthnCredential {
+  id           String   @id @default(cuid())
+  keycloakSub  String   /// Keycloak user ID (sub claim)
+  credentialId String   @unique /// Base64url-encoded credential ID from browser
+  publicKey    Bytes    /// COSE public key
+  counter      BigInt   @default(0) /// Signature counter for clone detection
+  deviceType   String   @default("platform") /// "platform" or "cross-platform"
+  backedUp     Boolean  @default(false) /// Whether credential is backed up
+  transports   String[] /// e.g., ["internal", "hybrid"]
+  label        String   @default("Passkey") /// User-facing name
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([keycloakSub])
+  @@map("webauthn_credentials")
+}
+
+/// Tracks security setup completion per user.
+/// passwordChanged flag avoids relying on Keycloak credential timestamps.
+model SecuritySetup {
+  id                String    @id @default(cuid())
+  keycloakSub       String    @unique /// Keycloak user ID
+  passwordChanged   Boolean   @default(false)
+  passwordChangedAt DateTime?
+  totpSecret        String?   /// TOTP secret (base32) — stored here for reliable verification
+  totpEnabledAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("security_setup")
+}
