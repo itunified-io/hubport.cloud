@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.2
+
+### Exchange Response Includes Tenant Email
+- Added `email` field to `/setup/exchange` response
+- Installer uses tenant owner's registration email for Keycloak admin user creation
+
 ## v2026.03.21.1
 
 ### Passkey-First Authentication (#74)
