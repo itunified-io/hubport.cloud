@@ -1,6 +1,21 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.1
+
+### Passkey-First Authentication (#74)
+- **SecurityGate**: Full-screen wizard blocks all app navigation until password changed + second factor (passkey or TOTP) configured
+- **SecurityWizard**: 3-step setup — password change → passkey registration → TOTP authenticator app
+- **Profile SecuritySection**: Self-service credential management — change password, add/remove passkeys, set up/remove TOTP, view/revoke active sessions
+- **Security API routes**: `/security/*` endpoints for password, TOTP, WebAuthn passkeys, and session management
+- **Prisma models**: `WebAuthnCredential` (credentialId, publicKey, counter, transports) and `SecuritySetup` (passwordChanged, totpSecret)
+- **Password policy**: 12+ chars, upper/lower/digit/special, not username, common password blocklist
+- **Keycloak realm policy**: Password policy enforced server-side, brute force protection (5 failures → 60s lockout, 15min max)
+- **Real-person onboarding**: Setup wizard creates real user (not generic "admin") with random temp password + Publisher record
+- **hub-api client**: New `hub-api` confidential OIDC client for password verification via direct grant
+- **i18n**: 50+ new keys in both `en-US.json` and `de-DE.json` for wizard + profile security sections
+- **Dependencies**: `@simplewebauthn/server`, `@simplewebauthn/browser`, `otpauth`, `qrcode`, `cbor-x`
+
 ## v2026.03.20.6
 
 ### Runtime Config Fix (#74)
