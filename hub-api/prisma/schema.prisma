@@ -81,9 +81,12 @@ model Publisher {
   updatedAt DateTime @updatedAt
 
   // Relations
-  assignments  TerritoryAssignment[]
-  appRoles     AppRoleMember[]
-  inviteCode   InviteCode?
+  assignments     TerritoryAssignment[]
+  appRoles        AppRoleMember[]
+  inviteCode      InviteCode?
+  serviceGroup    ServiceGroup?       @relation(fields: [serviceGroupId], references: [id])
+  serviceGroupId  String?
+  gardenDuties    GardenDutyMember[]
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -222,4 +225,99 @@ model SecuritySetup {
   updatedAt         DateTime  @updatedAt
 
   @@map("security_setup")
+}
+
+// ─── Service Groups ─────────────────────────────────────────────────
+
+/// Field service groups — publishers are assigned to one group.
+/// Default: 5 groups, configurable by admin.
+model ServiceGroup {
+  id          String      @id @default(uuid())
+  name        String      @unique /// e.g. "Gruppe 1", "Gruppe 2"
+  overseer    String?     /// Keycloak sub of group overseer
+  assistant   String?     /// Keycloak sub of assistant
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  members            Publisher[]
+  cleaningSchedules  CleaningSchedule[]
+}
+
+// ─── Cleaning & Garden ──────────────────────────────────────────────
+
+enum CleaningCategory {
+  grundreinigung
+  sichtreinigung
+  monatsreinigung
+  custom
+}
+
+/// Cleaning duty types — assigned to SERVICE GROUPS on a rotating schedule.
+/// Admin creates named types (e.g., "Penzberg Nord Grund").
+model CleaningDuty {
+  id        String           @id @default(uuid())
+  name      String           /// Free-text name (e.g. "Penzberg Nord Grund")
+  category  CleaningCategory @default(custom)
+  isDefault Boolean          @default(false) /// True for auto-created defaults
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  schedules CleaningSchedule[]
+}
+
+/// Cleaning schedule — maps a duty to a service group on a specific date.
+model CleaningSchedule {
+  id             String         @id @default(uuid())
+  duty           CleaningDuty   @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  dutyId         String
+  serviceGroup   ServiceGroup   @relation(fields: [serviceGroupId], references: [id], onDelete: Cascade)
+  serviceGroupId String
+  date           DateTime       /// Scheduled date
+  status         ScheduleStatus @default(scheduled)
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([date])
+  @@index([dutyId, date])
+}
+
+enum ScheduleStatus {
+  scheduled
+  completed
+  skipped
+}
+
+enum GardenDutyType {
+  rasen
+  winterdienst
+  custom
+}
+
+/// Garden duties — assigned to INDIVIDUAL PUBLISHERS (not service groups).
+model GardenDuty {
+  id        String         @id @default(uuid())
+  name      String         /// e.g. "Rasen mähen", "Winterdienst"
+  type      GardenDutyType @default(custom)
+  isDefault Boolean        @default(false)
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  members GardenDutyMember[]
+}
+
+/// Publisher assignment to a garden duty.
+model GardenDutyMember {
+  id          String    @id @default(uuid())
+  duty        GardenDuty @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  dutyId      String
+  publisher   Publisher  @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  publisherId String
+  createdAt   DateTime  @default(now())
+
+  @@unique([dutyId, publisherId])
+  @@index([publisherId])
 }
