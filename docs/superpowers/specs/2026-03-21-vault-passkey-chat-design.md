@@ -195,6 +195,7 @@ Password-only login is **blocked** once 2FA credentials exist in Keycloak.
 - **Jitsi Meet** self-hosted in tenant Docker stack
 - **1:1 calls**: Native WebRTC via Jitsi widget in DM thread
 - **Group calls**: Jitsi conference room created per space
+- **Elder toggle**: Settings page toggle to enable/disable video calls for entire tenant (default: enabled)
 - **Installer**: Adds `jitsi` container to docker-compose
 
 ### Chat RBAC Permissions
