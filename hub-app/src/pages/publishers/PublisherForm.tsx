@@ -322,35 +322,38 @@ export function PublisherForm() {
     e.preventDefault();
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
-        firstName,
-        lastName,
-        congregationRole,
-        congregationFlags,
-        status,
-      };
-      if (displayName) body.displayName = displayName;
-      if (email) body.email = email;
-      if (phone) body.phone = phone;
-      if (gender) body.gender = gender;
-      if (dateOfBirth) body.dateOfBirth = dateOfBirth;
-      if (address) body.address = address;
-      if (notes) body.notes = notes;
-
       if (isEdit) {
-        // Update existing publisher
+        // Update existing publisher — send all fields
+        const body: Record<string, unknown> = {
+          firstName, lastName, congregationRole, congregationFlags, status,
+        };
+        if (displayName) body.displayName = displayName;
+        if (email) body.email = email;
+        if (phone) body.phone = phone;
+        if (gender) body.gender = gender;
+        if (dateOfBirth) body.dateOfBirth = dateOfBirth;
+        if (address) body.address = address;
+        if (notes) body.notes = notes;
         await fetch(`${apiUrl}/publishers/${id}`, { method: "PUT", headers, body: JSON.stringify(body) });
       } else {
-        // Create via invite flow — creates publisher + generates invite code
+        // Create via invite flow — only send fields accepted by POST /users/invite
+        const inviteBody: Record<string, unknown> = { firstName, lastName };
+        if (email) inviteBody.email = email;
+        if (gender) inviteBody.gender = gender;
+        if (congregationRole !== "publisher") inviteBody.congregationRole = congregationRole;
+        if (congregationFlags.length > 0) inviteBody.congregationFlags = congregationFlags;
+
         const res = await fetch(`${apiUrl}/users/invite`, {
-          method: "POST", headers, body: JSON.stringify(body),
+          method: "POST", headers, body: JSON.stringify(inviteBody),
         });
         if (res.ok) {
           const data = await res.json() as { publisher: Publisher; inviteCode: string };
           setInviteCode(data.inviteCode);
-          // Navigate to the new publisher's edit page
           navigate(`/publishers/${data.publisher.id}`);
-          return; // Don't fall through — invite code modal will show
+          return;
+        } else {
+          const err = await res.json().catch(() => ({ error: "Unknown error" })) as { error?: string };
+          alert(err.error || `Error: ${res.status}`);
         }
       }
     } finally {
