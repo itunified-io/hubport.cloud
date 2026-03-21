@@ -90,9 +90,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {/* Messages */}
+        {/* Messages — toggles ChatWidget via custom event */}
         <button
-          onClick={() => navigate("/chat")}
+          onClick={() => window.dispatchEvent(new CustomEvent("hubport:toggle-chat"))}
           className="relative p-2 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--amber)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
           title="Chat"
         >

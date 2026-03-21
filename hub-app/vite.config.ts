@@ -18,6 +18,8 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/config\.js$/],
         skipWaiting: true,
         clientsClaim: true,
+        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        maximumFileSizeToCacheInBytes: 5_000_000, // 5MB — matrix-js-sdk is large
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,

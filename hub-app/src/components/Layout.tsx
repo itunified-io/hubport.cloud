@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { ChatWidget } from "./chat/ChatWidget";
 
 interface LayoutProps {
   children: ReactNode;
@@ -53,6 +54,9 @@ export function Layout({ children }: LayoutProps) {
         <Header onMenuToggle={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
+
+      {/* Chat widget — bottom-right popup */}
+      <ChatWidget />
     </div>
   );
 }

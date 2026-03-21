@@ -18,7 +18,7 @@ import { RoleList } from "./pages/users/RoleList";
 import { RoleDetail } from "./pages/users/RoleDetail";
 import { AuditLog } from "./pages/audit/AuditLog";
 import { CleaningDashboard } from "./pages/cleaning/CleaningDashboard";
-import { Chat } from "./pages/chat/Chat";
+// Chat is now a global widget in Layout.tsx (ChatWidget), not a page route
 import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
 
@@ -159,8 +159,7 @@ export function App() {
           }
         />
 
-        {/* Chat (Element Web iframe) */}
-        <Route path="/chat" element={<Chat />} />
+        {/* Chat is now a global widget (ChatWidget in Layout), not a routed page */}
 
         {/* Role Management (moved from /users/roles to /settings/roles) */}
         <Route
