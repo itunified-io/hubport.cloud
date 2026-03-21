@@ -1,7 +1,7 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
-## v2026.03.21.5
+## v2026.03.21.6
 
 ### Distinguish TOTP Labels Between Portal and Tenant Hub (#83)
 - Portal TOTP issuer: `hubport.cloud Portal` (was `hubport.cloud`)
