@@ -10,6 +10,7 @@ import { permissionRoutes } from "./routes/permissions.js";
 import { userRoutes } from "./routes/users.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { auditRoutes } from "./routes/audit.js";
+import { securityRoutes } from "./routes/security.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
@@ -45,6 +46,7 @@ async function start(): Promise<void> {
   await app.register(userRoutes);
   await app.register(onboardingRoutes);
   await app.register(auditRoutes);
+  await app.register(securityRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
