@@ -633,6 +633,66 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     }
     </script>
 
+    <!-- Danger Zone -->
+    <div class="bg-red-950/20 border border-red-900/40 rounded-xl p-6 mb-8">
+      <h3 class="text-sm text-red-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Danger Zone
+      </h3>
+
+      <div id="danger-zone-collapsed">
+        <p class="text-sm text-zinc-400 mb-4">Reset your installation to start fresh. This will <strong class="text-red-400">permanently delete</strong> all local data including the database, Keycloak config, and Vault secrets.</p>
+        <button onclick="document.getElementById('danger-zone-collapsed').classList.add('hidden'); document.getElementById('danger-zone-expanded').classList.remove('hidden');" class="text-sm text-red-400 hover:text-red-300 px-4 py-2 rounded-lg border border-red-900/40 hover:border-red-800/60 bg-red-950/30 hover:bg-red-950/50 transition">
+          Show Reset Commands
+        </button>
+      </div>
+
+      <div id="danger-zone-expanded" class="hidden">
+        <div class="bg-red-950/30 border border-red-900/30 rounded-lg p-4 mb-4">
+          <div class="flex items-start gap-3 mb-4">
+            <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="text-sm">
+              <p class="text-red-400 font-semibold mb-1">Warning: This cannot be undone!</p>
+              <ul class="text-zinc-400 space-y-1 list-disc list-inside text-xs">
+                <li>All Docker volumes (database, Keycloak, Vault) will be destroyed</li>
+                <li>All user accounts, publishers, territories, and meetings will be lost</li>
+                <li>You will need to generate a new setup code to reinstall</li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="text-xs text-zinc-500 mb-2">Run these commands on your server:</p>
+
+          <div class="space-y-3">
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 1: Stop and remove all containers + volumes</span>
+              <div class="flex items-center gap-2 mt-1">
+                <code id="danger-cmd-1" class="flex-1 text-sm text-red-400 font-mono select-all bg-zinc-900/50 rounded px-2 py-1.5">docker compose -p ${escapeHtml(tenant.subdomain)} down -v --remove-orphans</code>
+                <button onclick="copyCred(document.getElementById('danger-cmd-1').textContent, event)" class="p-1 text-zinc-500 hover:text-red-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              </div>
+            </div>
+
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 2: Remove project directory</span>
+              <div class="flex items-center gap-2 mt-1">
+                <code id="danger-cmd-2" class="flex-1 text-sm text-red-400 font-mono select-all bg-zinc-900/50 rounded px-2 py-1.5">rm -rf ~/hubport.cloud/${escapeHtml(tenant.subdomain)}</code>
+                <button onclick="copyCred(document.getElementById('danger-cmd-2').textContent, event)" class="p-1 text-zinc-500 hover:text-red-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              </div>
+            </div>
+
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 3: Reinstall</span>
+              <p class="text-xs text-zinc-500 mt-1">Generate a new setup code above, then run the installer again.</p>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="document.getElementById('danger-zone-expanded').classList.add('hidden'); document.getElementById('danger-zone-collapsed').classList.remove('hidden');" class="text-xs text-zinc-600 hover:text-zinc-400 transition">
+          Hide
+        </button>
+      </div>
+    </div>
+
     <div class="mt-8 text-center">
       <form method="POST" action="/portal/logout">
         <button type="submit" class="text-sm text-zinc-500 hover:text-zinc-300 transition">Log Out</button>
