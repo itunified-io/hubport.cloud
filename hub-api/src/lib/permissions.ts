@@ -117,6 +117,12 @@ export const PERMISSIONS = {
   // Cleaning module
   CLEANING_VIEW: "app:cleaning.view",
 
+  // Chat
+  CHAT_VIEW: "app:chat.view",
+  CHAT_SEND: "app:chat.send",
+  CHAT_CREATE_SPACE: "app:chat.createSpace",
+  CHAT_CROSS_TENANT: "chat:crossTenant",
+
   // Management scopes
   MANAGE_ALL: "manage:all",
   MANAGE_TECHNIK: "manage:technik",
@@ -142,6 +148,8 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.MEETINGS_VIEW,
     PERMISSIONS.TERRITORIES_VIEW,
     PERMISSIONS.CLEANING_VIEW,
+    PERMISSIONS.CHAT_VIEW,
+    PERMISSIONS.CHAT_SEND,
   ],
   elder: [
     PERMISSIONS.PUBLISHERS_VIEW,
@@ -155,6 +163,10 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.SETTINGS_VIEW,
     PERMISSIONS.ROLES_VIEW,
     PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.CHAT_VIEW,
+    PERMISSIONS.CHAT_SEND,
+    PERMISSIONS.CHAT_CREATE_SPACE,
+    PERMISSIONS.CHAT_CROSS_TENANT,
   ],
   admin: [PERMISSIONS.WILDCARD],
 };

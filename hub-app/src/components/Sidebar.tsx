@@ -9,7 +9,6 @@ import {
   Settings as SettingsIcon,
   ClipboardList,
   Sparkles,
-  MessageCircle,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
 
@@ -27,13 +26,12 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/territories", labelId: "nav.territories", icon: Map, requiredPermission: "app:territories.view" },
   { to: "/meetings", labelId: "nav.meetings", icon: Calendar, requiredPermission: "app:meetings.view" },
   { to: "/cleaning", labelId: "nav.cleaning", icon: Sparkles, requiredPermission: "app:cleaning.view" },
-  { to: "/chat", labelId: "nav.chat", icon: MessageCircle, requiredPermission: null },
   { to: "/sharing", labelId: "nav.sharing", icon: Handshake, requiredPermission: "app:sharing.view" },
   { to: "/audit", labelId: "nav.audit", icon: ClipboardList, requiredPermission: "app:audit.view" },
   { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, requiredPermission: "app:settings.view" },
 ];
 
-const APP_VERSION = "2026.03.21.14";
+const APP_VERSION = "2026.03.21.15";
 
 interface SidebarProps {
   onNavigate?: () => void;
