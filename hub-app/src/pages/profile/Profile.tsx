@@ -89,84 +89,84 @@ export function Profile() {
     );
   }
 
-  if (!profile) {
-    return <p className="text-[var(--text-muted)]">No profile found</p>;
-  }
-
   return (
     <div className="space-y-6 max-w-xl">
       <h1 className="text-xl font-semibold text-[var(--text)]">
         <FormattedMessage id="profile.title" />
       </h1>
 
-      {/* Profile info */}
-      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[var(--glass-2)] flex items-center justify-center">
-            <User size={20} className="text-[var(--text-muted)]" />
+      {/* Profile info (only if publisher record exists) */}
+      {profile && (
+        <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-[var(--glass-2)] flex items-center justify-center">
+              <User size={20} className="text-[var(--text-muted)]" />
+            </div>
+            <div>
+              <p className="text-[var(--text)] font-medium">
+                {profile.displayName ?? `${profile.firstName} ${profile.lastName}`}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {profile.congregationRole.replace("_", " ")}
+                {profile.congregationFlags.length > 0 && ` · ${profile.congregationFlags.join(", ")}`}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[var(--text)] font-medium">
-              {profile.displayName ?? `${profile.firstName} ${profile.lastName}`}
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">
-              {profile.congregationRole.replace("_", " ")}
-              {profile.congregationFlags.length > 0 && ` · ${profile.congregationFlags.join(", ")}`}
-            </p>
-          </div>
+
+          {profile.appRoles.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {profile.appRoles.map((ar) => (
+                <span
+                  key={ar.role.name}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--amber)] bg-[#d9770614]"
+                >
+                  <Shield size={10} />
+                  {ar.role.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+      )}
 
-        {profile.appRoles.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {profile.appRoles.map((ar) => (
-              <span
-                key={ar.role.name}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--amber)] bg-[#d9770614]"
-              >
-                <Shield size={10} />
-                {ar.role.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Security */}
+      {/* Security — always shown regardless of publisher profile */}
       <SecuritySection />
 
-      {/* Privacy settings */}
-      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
-        <h2 className="text-sm font-medium text-[var(--text)]">
-          <FormattedMessage id="privacy.title" />
-        </h2>
+      {/* Privacy settings (only if publisher record exists) */}
+      {profile && (
+        <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+          <h2 className="text-sm font-medium text-[var(--text)]">
+            <FormattedMessage id="privacy.title" />
+          </h2>
 
-        {(["contactVisibility", "addressVisibility", "notesVisibility"] as const).map((key) => (
-          <div key={key} className="flex items-center justify-between">
-            <label className="text-sm text-[var(--text-muted)]">
-              <FormattedMessage id={`privacy.${key}`} />
-            </label>
-            <select
-              value={privacy[key]}
-              onChange={(e) => setPrivacy((prev) => ({ ...prev, [key]: e.target.value }))}
-              className="px-3 py-1.5 text-sm bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-            >
-              {VISIBILITY_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+          {(["contactVisibility", "addressVisibility", "notesVisibility"] as const).map((key) => (
+            <div key={key} className="flex items-center justify-between">
+              <label className="text-sm text-[var(--text-muted)]">
+                <FormattedMessage id={`privacy.${key}`} />
+              </label>
+              <select
+                value={privacy[key]}
+                onChange={(e) => setPrivacy((prev) => ({ ...prev, [key]: e.target.value }))}
+                className="px-3 py-1.5 text-sm bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
+              >
+                {VISIBILITY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
 
-        <button
-          onClick={savePrivacy}
-          disabled={saving}
-          className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
-        >
-          {saving ? "..." : <FormattedMessage id="common.save" />}
-        </button>
-      </div>
+          <button
+            onClick={savePrivacy}
+            disabled={saving}
+            className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "..." : <FormattedMessage id="common.save" />}
+          </button>
+        </div>
+      )}
 
       {/* Danger zone */}
       <div className="p-4 border border-[var(--red)] border-opacity-30 rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
