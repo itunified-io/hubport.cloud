@@ -143,6 +143,15 @@
   "hub.online": "Connected",
   "hub.offline": "Offline",
 
+  "serviceGroups.title": "Service Groups",
+  "serviceGroups.empty": "No service groups configured yet.",
+  "serviceGroups.seed": "Create Default Groups",
+  "serviceGroups.members": "members",
+  "serviceGroups.noMembers": "No members",
+  "serviceGroups.addMember": "Add member",
+  "serviceGroups.selectPublisher": "Select publisher...",
+  "serviceGroups.unassigned": "Unassigned",
+
   "nav.chat": "Chat",
   "chat.notConfigured": "Chat is not configured for this hub.",
   "chat.openExternal": "Open in new tab",

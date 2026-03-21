@@ -7,6 +7,7 @@ import { LoadingSpinner } from "./components/LoadingSpinner";
 import { Dashboard } from "./pages/Dashboard";
 import { PublisherList } from "./pages/publishers/PublisherList";
 import { PublisherForm } from "./pages/publishers/PublisherForm";
+import { ServiceGroups } from "./pages/publishers/ServiceGroups";
 import { TerritoryList } from "./pages/territories/TerritoryList";
 import { TerritoryMap } from "./pages/territories/TerritoryMap";
 import { MeetingList } from "./pages/meetings/MeetingList";
@@ -86,6 +87,14 @@ export function App() {
           element={
             <PermissionGuard requires="app:publishers.edit">
               <PublisherForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/publishers/service-groups"
+          element={
+            <PermissionGuard requires="app:publishers.view">
+              <ServiceGroups />
             </PermissionGuard>
           }
         />
