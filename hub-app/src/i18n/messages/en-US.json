@@ -143,6 +143,10 @@
   "hub.online": "Connected",
   "hub.offline": "Offline",
 
+  "nav.chat": "Chat",
+  "chat.notConfigured": "Chat is not configured for this hub.",
+  "chat.openExternal": "Open in new tab",
+
   "cleaning.title": "Cleaning Duties",
   "cleaning.empty": "No cleaning or garden duties configured yet.",
   "cleaning.seed": "Set Up Default Duties",
