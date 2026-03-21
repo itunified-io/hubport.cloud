@@ -15,6 +15,10 @@ if [ -d "/app/hub-app/dist" ]; then
   KC_URL="${KEYCLOAK_URL:-}"
   # For browser access, Keycloak URL must be reachable from the client (not internal Docker DNS)
   KC_BROWSER_URL="${KEYCLOAK_BROWSER_URL:-${KC_URL}}"
+  CHAT_URL=""
+  if [ -n "${WEBAUTHN_RP_ID:-}" ]; then
+    CHAT_URL="https://chat-${WEBAUTHN_RP_ID}"
+  fi
   cat > /app/hub-app/dist/runtime-config.js << EOF
 window.__HUBPORT_CONFIG__ = {
   keycloakUrl: "${KC_BROWSER_URL}",
@@ -22,7 +26,7 @@ window.__HUBPORT_CONFIG__ = {
   keycloakClientId: "hub-app",
   apiUrl: "${HUB_API_URL:-http://localhost:3001}",
   rpId: "${WEBAUTHN_RP_ID:-}",
-  chatUrl: "${WEBAUTHN_RP_ID:+https://chat-${WEBAUTHN_RP_ID}}"
+  chatUrl: "${CHAT_URL}"
 };
 EOF
   # Inject runtime-config.js script tag if Vite stripped it during build
