@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -21,6 +22,9 @@ interface Publisher {
   congregationFlags: string[];
   status: string;
   notes: string | null;
+  privacyAccepted: boolean;
+  createdAt: string;
+  approvedAt: string | null;
   appRoles: AppRoleMember[];
 }
 
@@ -171,6 +175,16 @@ export function PublisherForm() {
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
 
+  // ─── Status / lifecycle state ───────────────────────────────────
+  const [publisherStatus, setPublisherStatus] = useState("active");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [_createdAt, setCreatedAt] = useState<string | null>(null);
+  const [_approvedAt, setApprovedAt] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
+  const { can } = usePermissions();
+  const canManageUsers = can("app:roles.edit");
+
   // ─── Role state ─────────────────────────────────────────────────
   const [assignedRoleIds, setAssignedRoleIds] = useState<Set<string>>(new Set());
   const [allRoles, setAllRoles] = useState<AppRole[]>([]);
@@ -205,6 +219,10 @@ export function PublisherForm() {
           setCongregationRole(p.congregationRole);
           setCongregationFlags(p.congregationFlags);
           setStatus(p.status);
+          setPublisherStatus(p.status);
+          setPrivacyAccepted(p.privacyAccepted ?? false);
+          setCreatedAt(p.createdAt ?? null);
+          setApprovedAt(p.approvedAt ?? null);
           setNotes(p.notes ?? "");
           setAssignedRoleIds(new Set(p.appRoles.map((ar) => ar.roleId)));
         }
@@ -264,6 +282,41 @@ export function PublisherForm() {
     );
   };
 
+  // ─── Status actions ─────────────────────────────────────────────
+  const doStatusAction = async (action: string) => {
+    const res = await fetch(`${apiUrl}/users/${id}/${action}`, { method: "POST", headers });
+    if (res.ok) {
+      const updated = await res.json() as Publisher;
+      setPublisherStatus(updated.status);
+    }
+  };
+
+  // ─── Role assignment (full list) ──────────────────────────────
+  const assignRoleById = async (roleId: string) => {
+    if (!id) return;
+    const res = await fetch(`${apiUrl}/roles/${roleId}/members`, {
+      method: "POST", headers,
+      body: JSON.stringify({ publisherId: id }),
+    });
+    if (res.ok) setAssignedRoleIds((prev) => new Set([...prev, roleId]));
+  };
+
+  const removeRoleById = async (roleId: string) => {
+    if (!id) return;
+    const res = await fetch(`${apiUrl}/roles/${roleId}/members/${id}`, { method: "DELETE", headers });
+    if (res.ok) setAssignedRoleIds((prev) => { const n = new Set(prev); n.delete(roleId); return n; });
+  };
+
+  // ─── Send invite email ────────────────────────────────────────
+  const sendInviteEmail = async () => {
+    if (!inviteCode || !email || !id) return;
+    await fetch(`${apiUrl}/users/invite-email`, {
+      method: "POST", headers,
+      body: JSON.stringify({ publisherId: id, inviteCode, email, firstName }),
+    });
+    setEmailSent(true);
+  };
+
   // ─── Save ───────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,14 +337,20 @@ export function PublisherForm() {
       if (address) body.address = address;
       if (notes) body.notes = notes;
 
-      const url = isEdit ? `${apiUrl}/publishers/${id}` : `${apiUrl}/publishers`;
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
-
-      if (res.ok) {
-        const saved = (await res.json()) as Publisher;
-        if (!isEdit) {
-          navigate(`/publishers/${saved.id}`);
+      if (isEdit) {
+        // Update existing publisher
+        await fetch(`${apiUrl}/publishers/${id}`, { method: "PUT", headers, body: JSON.stringify(body) });
+      } else {
+        // Create via invite flow — creates publisher + generates invite code
+        const res = await fetch(`${apiUrl}/users/invite`, {
+          method: "POST", headers, body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const data = await res.json() as { publisher: Publisher; inviteCode: string };
+          setInviteCode(data.inviteCode);
+          // Navigate to the new publisher's edit page
+          navigate(`/publishers/${data.publisher.id}`);
+          return; // Don't fall through — invite code modal will show
         }
       }
     } finally {
@@ -334,6 +393,111 @@ export function PublisherForm() {
           )}
         </h1>
       </div>
+
+      {/* ── Status Management Bar (edit mode only) ────────────────── */}
+      {isEdit && canManageUsers && (
+        <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-[var(--text-muted)]"><FormattedMessage id="publishers.status" />:</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              publisherStatus === "active" ? "text-[var(--green)] bg-[#22c55e14]" :
+              publisherStatus === "invited" || publisherStatus === "pending_approval" ? "text-[var(--amber)] bg-[#d9770614]" :
+              publisherStatus === "rejected" ? "text-[var(--red)] bg-[#ef444414]" :
+              "text-[var(--text-muted)] bg-[var(--glass)]"
+            }`}>
+              {publisherStatus === "active" && <UserCheck size={10} />}
+              {publisherStatus === "inactive" && <UserX size={10} />}
+              {publisherStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {(publisherStatus === "pending_approval" || publisherStatus === "invited") && (
+              <>
+                <button type="button" onClick={() => doStatusAction("approve")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--green)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                  <UserCheck size={14} />
+                  <FormattedMessage id="publishers.approve" />
+                </button>
+                <button type="button" onClick={() => doStatusAction("reject")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                  <UserX size={14} />
+                  <FormattedMessage id="publishers.reject" />
+                </button>
+              </>
+            )}
+            {publisherStatus === "active" && (
+              <button type="button" onClick={() => doStatusAction("deactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--red)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                <UserX size={14} />
+                <FormattedMessage id="publishers.deactivate" />
+              </button>
+            )}
+            {publisherStatus === "inactive" && (
+              <button type="button" onClick={() => doStatusAction("reactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--green)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                <UserCheck size={14} />
+                <FormattedMessage id="publishers.reactivate" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Info Card (edit mode only) ───────────────────────────── */}
+      {isEdit && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
+          <div>
+            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.email" /></p>
+            <p className="text-sm text-[var(--text)]">{email || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.status" /></p>
+            <p className="text-sm text-[var(--text)]">{publisherStatus.replace("_", " ")}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.gender" /></p>
+            <p className="text-sm text-[var(--text)]">{gender || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--text-muted)]">Privacy</p>
+            <p className="text-sm text-[var(--text)]">{privacyAccepted ? "✓" : "—"}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invite Code Modal ────────────────────────────────────── */}
+      {inviteCode && (
+        <div className="p-4 border border-[var(--amber)] border-opacity-30 rounded-[var(--radius)] bg-[#d9770608] space-y-3">
+          <h3 className="text-sm font-medium text-[var(--amber)]">
+            <FormattedMessage id="publishers.invite.success" values={{ code: inviteCode }} />
+          </h3>
+          <p className="text-xs text-[var(--text-muted)]">
+            <FormattedMessage id="publishers.invite.hint" />
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(inviteCode)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+            >
+              <Copy size={14} />
+              Copy
+            </button>
+            {email && !emailSent && (
+              <button
+                type="button"
+                onClick={sendInviteEmail}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--amber)] border border-[var(--amber)] border-opacity-30 rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+              >
+                <Mail size={14} />
+                <FormattedMessage id="publishers.invite.sendEmail" />
+              </button>
+            )}
+            {emailSent && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--green)]">
+                <UserCheck size={14} />
+                <FormattedMessage id="publishers.invite.emailSent" />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* ── Section 1: Personal Information ─────────────────────── */}
@@ -626,6 +790,62 @@ export function PublisherForm() {
             placeholder={intl.formatMessage({ id: "publishers.notes.placeholder" })}
           />
         </div>
+
+        {/* ── Section 7: All Roles (full assignment list) ──────────── */}
+        {isEdit && canManageUsers && (
+          <div className={sectionCls}>
+            <SectionHeader id="publishers.allRoles" />
+            <div className="border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg)] divide-y divide-[var(--border)]">
+              {allRoles.filter((r) => assignedRoleIds.has(r.id)).length === 0 ? (
+                <p className="px-4 py-3 text-sm text-[var(--text-muted)]">
+                  <FormattedMessage id="publishers.allRoles.empty" />
+                </p>
+              ) : (
+                allRoles
+                  .filter((r) => assignedRoleIds.has(r.id))
+                  .map((r) => (
+                    <div key={r.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Shield size={14} className="text-[var(--amber)]" />
+                        <span className="text-sm text-[var(--text)]">{r.name}</span>
+                        {r.scope !== "all" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--glass)] text-[var(--text-muted)]">
+                            {r.scope}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeRoleById(r.id)}
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--red)] cursor-pointer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
+            {/* Add role dropdown */}
+            {allRoles.filter((r) => !assignedRoleIds.has(r.id)).length > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <select
+                  className={`flex-1 ${selectCls}`}
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) assignRoleById(e.target.value);
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="" disabled>{intl.formatMessage({ id: "publishers.allRoles.add" })}</option>
+                  {allRoles.filter((r) => !assignedRoleIds.has(r.id)).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name} ({r.scope})</option>
+                  ))}
+                </select>
+                <Plus size={16} className="text-[var(--text-muted)]" />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Actions ─────────────────────────────────────────────── */}
         <div className="flex items-center gap-3">
