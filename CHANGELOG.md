@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.7
+
+### Fix SecurityGate Not Triggering on First Login (#86)
+- Added `/security` to `API_PREFIXES` in auth middleware
+- `/security/status` was returning 500 because JWT verification was skipped
+- SecurityGate now correctly blocks navigation until password changed + 2FA configured
+
 ## v2026.03.21.6
 
 ### Distinguish TOTP Labels Between Portal and Tenant Hub (#83)
