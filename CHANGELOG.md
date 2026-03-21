@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.4
+
+### Danger Zone Card in Tenant Portal (#81)
+- Red-bordered "Danger Zone" card at bottom of portal dashboard
+- Shows reset commands: `docker compose down -v` + `rm -rf` with tenant slug
+- Collapsed by default, click to expand with warning text
+- Copy buttons on each command
+- Step-by-step: stop containers → remove directory → reinstall
+
 ## v2026.03.21.3
 
 ### Owner First/Last Name in Tenant Registration (#79)
