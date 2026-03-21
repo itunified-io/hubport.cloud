@@ -12,12 +12,16 @@ const TenantRequestBody = Type.Object({
   name: Type.String({ minLength: 2 }),
   email: Type.String({ format: 'email' }),
   subdomain: Type.String({ minLength: 3, maxLength: 63, pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$' }),
+  firstName: Type.Optional(Type.String({ maxLength: 100 })),
+  lastName: Type.Optional(Type.String({ maxLength: 100 })),
 });
 
 export async function tenantRoutes(app: FastifyInstance) {
   // Create a pending tenant request (from CF Worker signup)
   app.post('/request', { schema: { body: TenantRequestBody } }, async (request, reply) => {
-    const { name, email, subdomain } = request.body as { name: string; email: string; subdomain: string };
+    const { name, email, subdomain, firstName, lastName } = request.body as {
+      name: string; email: string; subdomain: string; firstName?: string; lastName?: string;
+    };
 
     const existing = await prisma.tenant.findUnique({ where: { subdomain } });
     if (existing) {
@@ -25,7 +29,11 @@ export async function tenantRoutes(app: FastifyInstance) {
     }
 
     const tenant = await prisma.tenant.create({
-      data: { name, email, subdomain, status: 'PENDING' },
+      data: {
+        name, email, subdomain, status: 'PENDING',
+        ownerFirstName: firstName || null,
+        ownerLastName: lastName || null,
+      },
     });
 
     // Slack notification for new request

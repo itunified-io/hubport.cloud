@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.3
+
+### Owner First/Last Name in Tenant Registration (#79)
+- Added `ownerFirstName` and `ownerLastName` optional fields to Tenant model
+- POST `/tenants/request` accepts `firstName` and `lastName`
+- `/setup/exchange` response includes `firstName` and `lastName`
+- Installer uses these for Keycloak admin user (first + last name)
+
 ## v2026.03.21.2
 
 ### Exchange Response Includes Tenant Email

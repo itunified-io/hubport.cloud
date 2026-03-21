@@ -183,6 +183,8 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       slug: tenant.subdomain,
       name: tenant.name,
       email: tenant.email,
+      firstName: tenant.ownerFirstName || '',
+      lastName: tenant.ownerLastName || '',
       tunnelToken: tenant.tunnelToken,
       centralApiUrl,
       portalUrl,

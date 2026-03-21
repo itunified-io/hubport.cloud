@@ -16,10 +16,12 @@ enum TenantStatus {
 }
 
 model Tenant {
-  id           String       @id @default(uuid())
-  name         String
-  email        String
-  subdomain    String       @unique
+  id             String       @id @default(uuid())
+  name           String
+  email          String
+  ownerFirstName String?
+  ownerLastName  String?
+  subdomain      String       @unique
   status       TenantStatus @default(PENDING)
   role         String       @default("owner") // owner | operator | readonly
   rejectReason String?
