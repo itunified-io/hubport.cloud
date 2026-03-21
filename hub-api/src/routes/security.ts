@@ -32,6 +32,8 @@ import QRCode from "qrcode";
 const RP_NAME = "Hubport";
 const RP_ID = process.env.WEBAUTHN_RP_ID || "localhost";
 const RP_ORIGIN = process.env.WEBAUTHN_ORIGIN || `https://${RP_ID}`;
+const TENANT_DISPLAY_NAME = process.env.HUBPORT_TENANT_NAME || "Hubport";
+const TOTP_ISSUER = `${TENANT_DISPLAY_NAME} Hub`;
 
 // In-memory challenge stores (per-user). Fine for single-instance tenant.
 const pendingWebAuthnChallenges = new Map<string, string>();
@@ -153,7 +155,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
     const user = await getKeycloakUser(userId);
 
     const totp = new TOTP({
-      issuer: "Hubport",
+      issuer: TOTP_ISSUER,
       label: user.email || user.username,
       algorithm: "SHA1",
       digits: 6,
@@ -170,7 +172,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
       secret: totp.secret.base32,
       uri,
       qrCode,
-      issuer: "Hubport",
+      issuer: TOTP_ISSUER,
     };
   });
 
@@ -198,7 +200,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
 
       // Verify the code
       const totp = new TOTP({
-        issuer: "Hubport",
+        issuer: TOTP_ISSUER,
         label: "verify",
         algorithm: "SHA1",
         digits: 6,
