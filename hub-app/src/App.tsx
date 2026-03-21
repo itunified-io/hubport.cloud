@@ -17,6 +17,7 @@ import { RoleList } from "./pages/users/RoleList";
 import { RoleDetail } from "./pages/users/RoleDetail";
 import { AuditLog } from "./pages/audit/AuditLog";
 import { CleaningDashboard } from "./pages/cleaning/CleaningDashboard";
+import { Chat } from "./pages/chat/Chat";
 import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
 
@@ -148,6 +149,9 @@ export function App() {
             </PermissionGuard>
           }
         />
+
+        {/* Chat (Element Web iframe) */}
+        <Route path="/chat" element={<Chat />} />
 
         {/* Role Management (moved from /users/roles to /settings/roles) */}
         <Route

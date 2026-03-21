@@ -143,6 +143,10 @@
   "hub.online": "Verbunden",
   "hub.offline": "Offline",
 
+  "nav.chat": "Chat",
+  "chat.notConfigured": "Chat ist für diesen Hub nicht konfiguriert.",
+  "chat.openExternal": "In neuem Tab öffnen",
+
   "cleaning.title": "Reinigungsdienst",
   "cleaning.empty": "Noch keine Reinigungs- oder Gartenpflege konfiguriert.",
   "cleaning.seed": "Standarddienste einrichten",
