@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FormattedMessage } from "react-intl";
-import { LogOut, Globe, Menu, Wifi, WifiOff, User, ChevronDown, Bell, Shield, Sun, Moon, KeyRound } from "lucide-react";
+import { LogOut, Globe, Menu, Wifi, WifiOff, User, ChevronDown, Bell, MessageCircle, Shield, Sun, Moon, KeyRound } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/auth/useAuth";
 import { useLocale } from "@/i18n/IntlSetup";
@@ -88,6 +88,15 @@ export function Header({ onMenuToggle }: HeaderProps) {
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
+        {/* Messages */}
+        <button
+          onClick={() => navigate("/chat")}
+          className="relative p-2 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--amber)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+          title="Chat"
+        >
+          <MessageCircle size={16} />
         </button>
 
         {/* Notification bell */}
