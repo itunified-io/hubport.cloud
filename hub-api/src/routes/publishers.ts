@@ -43,6 +43,9 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const publishers = await prisma.publisher.findMany({
         orderBy: { lastName: "asc" },
+        include: {
+          appRoles: { include: { role: { select: { name: true, scope: true } } } },
+        },
       });
 
       const ctx = request.policyCtx;

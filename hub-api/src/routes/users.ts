@@ -462,4 +462,69 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.code(204).send();
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // INVITE EMAIL — relay via central API (no Gmail creds in tenant)
+  // ═══════════════════════════════════════════════════════════════════
+
+  const InviteEmailBody = Type.Object({
+    publisherId: Type.String({ format: "uuid" }),
+    inviteCode: Type.String(),
+    email: Type.String({ format: "email" }),
+    firstName: Type.String(),
+  });
+
+  type InviteEmailBodyType = Static<typeof InviteEmailBody>;
+
+  app.post<{ Body: InviteEmailBodyType }>(
+    "/users/invite-email",
+    {
+      schema: { body: InviteEmailBody },
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+    },
+    async (request, reply) => {
+      const { publisherId, inviteCode, email, firstName } = request.body;
+      const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
+      const apiToken = process.env.HUBPORT_API_TOKEN;
+      const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
+
+      if (!centralApiUrl || !apiToken) {
+        return reply.code(503).send({ error: "Email relay not configured (missing CENTRAL_API_URL or HUBPORT_API_TOKEN)" });
+      }
+
+      // Verify publisher exists and email matches
+      const publisher = await prisma.publisher.findUnique({ where: { id: publisherId } });
+      if (!publisher) {
+        return reply.code(404).send({ error: "Publisher not found" });
+      }
+
+      try {
+        const res = await fetch(`${centralApiUrl}/admin/internal/send-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiToken}`,
+          },
+          body: JSON.stringify({
+            to: email,
+            subject: `Einladung zu ${tenantSlug}.hubport.cloud`,
+            templateName: "invite",
+            templateData: { firstName, inviteCode, tenantSlug },
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          app.log.error({ status: res.status, data }, "invite email relay failed");
+          return reply.code(502).send({ error: "Failed to send invite email" });
+        }
+
+        await audit("user.invite_email", request.user.sub, "Publisher", publisherId, { email });
+        return { ok: true };
+      } catch (err) {
+        app.log.error(err, "invite email relay error");
+        return reply.code(502).send({ error: "Email service unreachable" });
+      }
+    },
+  );
 }

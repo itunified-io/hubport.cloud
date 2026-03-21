@@ -104,6 +104,15 @@ export const PERMISSIONS = {
   PRIVILEGE_PUBLIC_TALK_LOCAL: "privilege:publicTalkLocal",
   PRIVILEGE_SERVICE_MEETING_CONDUCTOR: "privilege:serviceMeetingConductor",
 
+  // Cleaning & garden privileges
+  PRIVILEGE_CLEANING_DEEP: "privilege:cleaningDeep",
+  PRIVILEGE_CLEANING_VISUAL: "privilege:cleaningVisual",
+  PRIVILEGE_GARDEN_LAWN: "privilege:gardenLawn",
+  PRIVILEGE_GARDEN_WINTER: "privilege:gardenWinter",
+
+  // Cleaning module
+  CLEANING_VIEW: "app:cleaning.view",
+
   // Management scopes
   MANAGE_ALL: "manage:all",
   MANAGE_TECHNIK: "manage:technik",
@@ -128,6 +137,7 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.PUBLISHERS_VIEW,
     PERMISSIONS.MEETINGS_VIEW,
     PERMISSIONS.TERRITORIES_VIEW,
+    PERMISSIONS.CLEANING_VIEW,
   ],
   elder: [
     PERMISSIONS.PUBLISHERS_VIEW,
@@ -186,7 +196,7 @@ export const PAGE_PERMISSIONS: Record<string, string[]> = {
   "/publishers": [PERMISSIONS.PUBLISHERS_VIEW, PERMISSIONS.PUBLISHERS_VIEW_MINIMAL],
   "/meetings": [PERMISSIONS.MEETINGS_VIEW],
   "/territories": [PERMISSIONS.TERRITORIES_VIEW],
-  "/users": [PERMISSIONS.ROLES_VIEW],
+  "/cleaning": [PERMISSIONS.CLEANING_VIEW],
   "/settings": [PERMISSIONS.SETTINGS_VIEW],
   "/audit": [PERMISSIONS.AUDIT_VIEW],
 };
