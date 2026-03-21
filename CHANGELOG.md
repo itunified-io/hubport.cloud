@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.21.8
+
+### Mandatory Passkey + TOTP, Password Manager Support, Profile Menu (#88)
+- Security wizard now requires ALL THREE steps: Password → Passkey → TOTP (was passkey OR TOTP)
+- `setupComplete` requires `passwordChanged && passkeyRegistered && totpConfigured`
+- Password inputs have `autocomplete="new-password"` — browsers offer auto-generated passwords
+- Added "Security & Account" link in user dropdown → navigates to /profile SecuritySection
+- Passkey step no longer skippable — both passkey and TOTP are mandatory
+- i18n: `nav.profile.security`, `security.wizard.passkey.required` (EN + DE)
+
 ## v2026.03.21.7
 
 ### Fix SecurityGate Not Triggering on First Login (#86)
