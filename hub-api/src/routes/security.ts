@@ -17,6 +17,10 @@ import {
   removeCredential,
   updateRequiredActions,
   verifyPassword,
+  hasPasskey as kcHasPasskey,
+  getPasskeyCount as kcGetPasskeyCount,
+  hasTotp as kcHasTotp,
+  getPasskeys as kcGetPasskeys,
 } from "../lib/keycloak-admin.js";
 import { validatePassword } from "../lib/password-policy.js";
 import prisma from "../lib/prisma.js";
@@ -59,27 +63,32 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
   app.get("/security/status", async (request) => {
     const userId = getUserId(request);
 
-    // Check our DB for password-changed flag
+    // Check local DB for password-changed flag
     const setup = await prisma.securitySetup.findUnique({
       where: { keycloakSub: userId },
     });
-
-    // Check our DB for TOTP
-    const totpConfigured = !!setup?.totpSecret && !!setup?.totpEnabledAt;
-
-    // Check our DB for passkeys
-    const passkeyCount = await prisma.webAuthnCredential.count({
-      where: { keycloakSub: userId },
-    });
-
     const passwordChanged = setup?.passwordChanged ?? false;
-    const passkeyRegistered = passkeyCount > 0;
+
+    // Check Keycloak for passkeys and TOTP (primary source)
+    let passkeyRegistered = false;
+    let totpConfigured = false;
+    try {
+      passkeyRegistered = await kcHasPasskey(userId);
+      totpConfigured = await kcHasTotp(userId);
+    } catch {
+      // Fallback to local DB if Keycloak unreachable
+      totpConfigured = !!setup?.totpSecret && !!setup?.totpEnabledAt;
+      const localCount = await prisma.webAuthnCredential.count({
+        where: { keycloakSub: userId },
+      });
+      passkeyRegistered = localCount > 0;
+    }
 
     return {
       passwordChanged,
       passkeyRegistered,
       totpConfigured,
-      setupComplete: passwordChanged && passkeyRegistered && totpConfigured,
+      setupComplete: passwordChanged && (passkeyRegistered || totpConfigured),
     };
   });
 
@@ -252,10 +261,15 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
   app.delete("/security/totp", async (request, reply) => {
     const userId = getUserId(request);
 
-    // Check if user has a passkey
-    const passkeyCount = await prisma.webAuthnCredential.count({
-      where: { keycloakSub: userId },
-    });
+    // Check if user has a passkey (Keycloak first, fallback local DB)
+    let passkeyCount = 0;
+    try {
+      passkeyCount = await kcGetPasskeyCount(userId);
+    } catch {
+      passkeyCount = await prisma.webAuthnCredential.count({
+        where: { keycloakSub: userId },
+      });
+    }
     if (passkeyCount === 0) {
       return reply.code(400).send({
         error: "Cannot remove TOTP without a registered passkey",
@@ -413,8 +427,24 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    * List registered passkeys for the current user.
    */
   app.get("/security/passkeys", async (request) => {
+    const userId = getUserId(request);
+
+    // Try Keycloak first, fallback to local DB
+    try {
+      const kcPasskeys = await kcGetPasskeys(userId);
+      if (kcPasskeys.length > 0) {
+        return kcPasskeys.map((p) => ({
+          id: p.id,
+          label: p.label,
+          createdAt: new Date(p.createdDate).toISOString(),
+        }));
+      }
+    } catch {
+      // Fallback to local DB
+    }
+
     const credentials = await prisma.webAuthnCredential.findMany({
-      where: { keycloakSub: getUserId(request) },
+      where: { keycloakSub: userId },
       select: {
         id: true,
         label: true,
@@ -438,16 +468,22 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
       const userId = getUserId(request);
       const { id } = request.params;
 
-      // Check if TOTP exists
-      const setup = await prisma.securitySetup.findUnique({
-        where: { keycloakSub: userId },
-      });
-      const hasTOTP = !!setup?.totpSecret && !!setup?.totpEnabledAt;
-
-      // Count remaining passkeys
-      const passkeyCount = await prisma.webAuthnCredential.count({
-        where: { keycloakSub: userId },
-      });
+      // Check Keycloak for TOTP and passkey count
+      let hasTOTP = false;
+      let passkeyCount = 0;
+      try {
+        hasTOTP = await kcHasTotp(userId);
+        passkeyCount = await kcGetPasskeyCount(userId);
+      } catch {
+        // Fallback to local DB
+        const setup = await prisma.securitySetup.findUnique({
+          where: { keycloakSub: userId },
+        });
+        hasTOTP = !!setup?.totpSecret && !!setup?.totpEnabledAt;
+        passkeyCount = await prisma.webAuthnCredential.count({
+          where: { keycloakSub: userId },
+        });
+      }
 
       if (passkeyCount <= 1 && !hasTOTP) {
         return reply.code(400).send({
@@ -456,13 +492,17 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const deleted = await prisma.webAuthnCredential.deleteMany({
-        where: { id, keycloakSub: userId },
-      });
-
-      if (deleted.count === 0) {
-        return reply.code(404).send({ error: "Passkey not found" });
+      // Remove from Keycloak first
+      try {
+        await removeCredential(userId, id);
+      } catch {
+        // Keycloak removal is best-effort
       }
+
+      // Also remove from local DB (if exists)
+      await prisma.webAuthnCredential.deleteMany({
+        where: { id, keycloakSub: userId },
+      }).catch(() => { /* local DB removal is best-effort */ });
 
       return { success: true };
     },

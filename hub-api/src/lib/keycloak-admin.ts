@@ -372,6 +372,76 @@ export async function updateRequiredActions(
     throw new Error(`Keycloak update required actions error: ${res.status}`);
 }
 
+// ─── WebAuthn + TOTP Helpers (Keycloak-Only Storage) ─────────────────
+
+/**
+ * Check if user has a WebAuthn Passwordless credential in Keycloak.
+ */
+export async function hasPasskey(userId: string): Promise<boolean> {
+  const creds = await getUserCredentials(userId);
+  return creds.some((c) => c.type === "webauthn-passwordless");
+}
+
+/**
+ * Count WebAuthn Passwordless credentials.
+ */
+export async function getPasskeyCount(userId: string): Promise<number> {
+  const creds = await getUserCredentials(userId);
+  return creds.filter((c) => c.type === "webauthn-passwordless").length;
+}
+
+/**
+ * Check if user has OTP (TOTP) credential in Keycloak.
+ */
+export async function hasTotp(userId: string): Promise<boolean> {
+  const creds = await getUserCredentials(userId);
+  return creds.some((c) => c.type === "otp");
+}
+
+/**
+ * Add a required action to force credential setup on next login.
+ * Actions: "webauthn-register-passwordless", "CONFIGURE_TOTP"
+ */
+export async function addRequiredAction(
+  userId: string,
+  action: string,
+): Promise<void> {
+  const user = await getKeycloakUser(userId);
+  const actions = user.requiredActions || [];
+  if (!actions.includes(action)) {
+    actions.push(action);
+    await updateRequiredActions(userId, actions);
+  }
+}
+
+/**
+ * Remove a required action from a user.
+ */
+export async function removeRequiredAction(
+  userId: string,
+  action: string,
+): Promise<void> {
+  const user = await getKeycloakUser(userId);
+  const actions = (user.requiredActions || []).filter((a) => a !== action);
+  await updateRequiredActions(userId, actions);
+}
+
+/**
+ * Get all passkey credential details (for profile page display).
+ */
+export async function getPasskeys(
+  userId: string,
+): Promise<Array<{ id: string; label: string; createdDate: number }>> {
+  const creds = await getUserCredentials(userId);
+  return creds
+    .filter((c) => c.type === "webauthn-passwordless")
+    .map((c) => ({
+      id: c.id,
+      label: c.userLabel || "Passkey",
+      createdDate: c.createdDate || 0,
+    }));
+}
+
 /**
  * Verify a password by attempting a resource owner password grant.
  * Returns true if the password is correct.
