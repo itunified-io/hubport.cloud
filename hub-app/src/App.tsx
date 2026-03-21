@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "./auth/useAuth";
+import { SecurityGate } from "./auth/SecurityGate";
 import { PermissionGuard } from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -66,6 +67,7 @@ export function App() {
   }
 
   return (
+    <SecurityGate>
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -204,5 +206,6 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </SecurityGate>
   );
 }

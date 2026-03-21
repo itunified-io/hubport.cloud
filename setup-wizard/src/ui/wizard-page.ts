@@ -136,11 +136,12 @@ export function renderStep(step: WizardStep, num: number, status: StepStatus, to
     <form method="POST" action="/step/${num}">
       ${step.id === 'admin-user' ? `
         <div class="space-y-4 mb-6">
-          <div><label class="block text-sm font-medium mb-1">Username</label><input name="username" class="input" required></div>
+          <p class="text-sm text-zinc-400">Onboard a real person as the first admin. A random temporary password will be generated — share it securely. The user must change it on first login and set up passkey or TOTP.</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div><label class="block text-sm font-medium mb-1">First Name</label><input name="firstName" class="input" required></div>
+            <div><label class="block text-sm font-medium mb-1">Last Name</label><input name="lastName" class="input" required></div>
+          </div>
           <div><label class="block text-sm font-medium mb-1">Email</label><input name="email" type="email" class="input" required></div>
-          <div><label class="block text-sm font-medium mb-1">First Name</label><input name="firstName" class="input"></div>
-          <div><label class="block text-sm font-medium mb-1">Last Name</label><input name="lastName" class="input"></div>
-          <div><label class="block text-sm font-medium mb-1">Password</label><input name="password" type="password" class="input" required></div>
         </div>` : ''}
       ${step.optional ? '<div class="mb-4"><label class="flex items-center gap-2"><input type="checkbox" name="skip" value="true"> Skip this step</label></div>' : ''}
       <div class="flex gap-3">

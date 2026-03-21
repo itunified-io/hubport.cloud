@@ -136,6 +136,7 @@ export function requirePrivacyAccepted(): preHandlerHookHandler {
     if (
       request.url.startsWith("/health") ||
       request.url.startsWith("/onboarding") ||
+      request.url.startsWith("/security") ||
       request.url === "/publishers/me/privacy" ||
       request.url === "/permissions/me"
     ) {

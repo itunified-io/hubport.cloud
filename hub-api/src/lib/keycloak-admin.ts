@@ -248,3 +248,151 @@ export async function logoutKeycloakUser(userId: string): Promise<void> {
     throw new Error(`Keycloak logout error: ${res.status}`);
   }
 }
+
+// ─── Credential Management (ADR-0077) ───────────────────────────────
+
+export interface KeycloakCredential {
+  id: string;
+  type: string; // "password" | "otp" | "webauthn"
+  userLabel?: string;
+  createdDate?: number;
+  credentialData?: string;
+}
+
+export interface KeycloakSession {
+  id: string;
+  ipAddress: string;
+  start: number;
+  lastAccess: number;
+  clients: Record<string, string>;
+}
+
+/**
+ * Get all credentials for a user.
+ */
+export async function getUserCredentials(
+  userId: string,
+): Promise<KeycloakCredential[]> {
+  const token = await getAdminToken();
+  const res = await fetch(`${adminUrl()}/users/${userId}/credentials`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Keycloak get credentials error: ${res.status}`);
+  return res.json() as Promise<KeycloakCredential[]>;
+}
+
+/**
+ * Remove a specific credential by ID.
+ */
+export async function removeCredential(
+  userId: string,
+  credentialId: string,
+): Promise<void> {
+  const token = await getAdminToken();
+  const res = await fetch(
+    `${adminUrl()}/users/${userId}/credentials/${credentialId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (!res.ok) throw new Error(`Keycloak remove credential error: ${res.status}`);
+}
+
+/**
+ * Reset user password via Admin API.
+ */
+export async function resetPassword(
+  userId: string,
+  newPassword: string,
+  temporary: boolean = false,
+): Promise<void> {
+  const token = await getAdminToken();
+  const res = await fetch(`${adminUrl()}/users/${userId}/reset-password`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type: "password", value: newPassword, temporary }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Keycloak reset password error: ${res.status} — ${body}`);
+  }
+}
+
+/**
+ * Get all active sessions for a user.
+ */
+export async function getUserSessions(
+  userId: string,
+): Promise<KeycloakSession[]> {
+  const token = await getAdminToken();
+  const res = await fetch(`${adminUrl()}/users/${userId}/sessions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Keycloak get sessions error: ${res.status}`);
+  return res.json() as Promise<KeycloakSession[]>;
+}
+
+/**
+ * Revoke a specific session by ID.
+ */
+export async function revokeSession(sessionId: string): Promise<void> {
+  const { url, realm } = getConfig();
+  const token = await getAdminToken();
+  const res = await fetch(
+    `${url}/admin/realms/${realm}/sessions/${sessionId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (!res.ok) throw new Error(`Keycloak revoke session error: ${res.status}`);
+}
+
+/**
+ * Update user requiredActions.
+ */
+export async function updateRequiredActions(
+  userId: string,
+  actions: string[],
+): Promise<void> {
+  const token = await getAdminToken();
+  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ requiredActions: actions }),
+  });
+  if (!res.ok)
+    throw new Error(`Keycloak update required actions error: ${res.status}`);
+}
+
+/**
+ * Verify a password by attempting a resource owner password grant.
+ * Returns true if the password is correct.
+ */
+export async function verifyPassword(
+  username: string,
+  password: string,
+): Promise<boolean> {
+  const { url, realm } = getConfig();
+  const res = await fetch(
+    `${url}/realms/${realm}/protocol/openid-connect/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "password",
+        client_id: "hub-app",
+        username,
+        password,
+      }),
+    },
+  );
+  return res.ok;
+}
