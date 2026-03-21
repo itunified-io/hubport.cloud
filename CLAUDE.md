@@ -34,6 +34,15 @@ This repo contains:
 - Auth hook only enforces JWT on API route prefixes — static SPA files are public
 - SPA uses `react-oidc-context` for Keycloak OIDC in the browser
 
+### Security — Passkey-First Authentication (ADR-0077, Plan 013)
+- **Mandatory** for all users: passkey-first + TOTP fallback (see [ADR-0077](https://github.com/itunified-io/infrastructure/blob/main/docs/adr/0077-passkey-first-authentication.md), [Plan 013](https://github.com/itunified-io/infrastructure/blob/main/docs/plans/013-passkey-first-auth-workflow.md))
+- **SecurityGate** (`hub-app/src/auth/SecurityGate.tsx`): Full-screen wizard blocks app until password changed + passkey or TOTP configured
+- **Password policy**: 12+ chars, upper/lower/digit/special, no reuse (5), brute force lockout (5 attempts)
+- **Hub-API proxy routes** (`/security/*`): Password, TOTP, sessions via Keycloak Admin API
+- **WebAuthn passkeys**: Browser `navigator.credentials.create()` with challenge/response through hub-api
+- **Profile security tab**: Self-service password change, passkey/TOTP management, session list + revoke
+- **Setup wizard**: Validates password policy, sets `temporary: true`, adds `requiredActions` for WebAuthn + TOTP
+
 ### Runtime Config
 - `VITE_*` env vars are baked at build time — undefined in generic Docker image
 - `docker-entrypoint.sh` generates `/app/hub-app/dist/config.js` with `window.__HUBPORT_CONFIG__`
