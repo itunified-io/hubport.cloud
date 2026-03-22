@@ -188,6 +188,7 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       tunnelToken: tenant.tunnelToken,
       centralApiUrl,
       portalUrl,
+      mailRelaySecret: process.env.MAIL_RELAY_SECRET || '',
       role: tenant.role,
       deviceCode,
       verifyUrl: `${portalUrl}/portal/devices/verify`,
