@@ -40,8 +40,9 @@ export function SecurityWizard({ status, onComplete }: Props): ReactNode {
 
   const getInitialStep = (): WizardStep => {
     if (!status.passwordChanged) return "password";
-    if (!status.passkeyRegistered && !status.totpConfigured) return "passkey";
-    return "passkey"; // shouldn't happen if setupComplete is false
+    if (!status.passkeyRegistered) return "passkey";
+    if (!status.totpConfigured) return "totp";
+    return "password"; // shouldn't reach here if setupComplete is false
   };
 
   const [step, setStep] = useState<WizardStep>(getInitialStep);
