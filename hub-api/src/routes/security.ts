@@ -17,7 +17,6 @@ import {
   removeCredential,
   updateRequiredActions,
   verifyPassword,
-  hasPasskey as kcHasPasskey,
   getPasskeyCount as kcGetPasskeyCount,
   hasTotp as kcHasTotp,
   getPasskeys as kcGetPasskeys,
@@ -69,20 +68,13 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
     });
     const passwordChanged = setup?.passwordChanged ?? false;
 
-    // Check Keycloak for passkeys and TOTP (primary source)
-    let passkeyRegistered = false;
-    let totpConfigured = false;
-    try {
-      passkeyRegistered = await kcHasPasskey(userId);
-      totpConfigured = await kcHasTotp(userId);
-    } catch {
-      // Fallback to local DB if Keycloak unreachable
-      totpConfigured = !!setup?.totpSecret && !!setup?.totpEnabledAt;
-      const localCount = await prisma.webAuthnCredential.count({
-        where: { keycloakSub: userId },
-      });
-      passkeyRegistered = localCount > 0;
-    }
+    // Check local DB for passkey and TOTP (source of truth — hub-api manages
+    // these credentials directly, not Keycloak)
+    const passkeyCount = await prisma.webAuthnCredential.count({
+      where: { keycloakSub: userId },
+    });
+    const passkeyRegistered = passkeyCount > 0;
+    const totpConfigured = !!setup?.totpSecret && !!setup?.totpEnabledAt;
 
     return {
       passwordChanged,
