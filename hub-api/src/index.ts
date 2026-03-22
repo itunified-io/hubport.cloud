@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { registerAuth } from "./lib/auth.js";
-import { registerPolicyContext, requirePrivacyAccepted } from "./lib/rbac.js";
+import { registerPolicyContext, requirePrivacyAccepted, requireSecurityComplete } from "./lib/rbac.js";
 import { healthRoutes } from "./routes/health.js";
 import { publisherRoutes } from "./routes/publishers.js";
 import { territoryRoutes } from "./routes/territories.js";
@@ -39,6 +39,9 @@ async function start(): Promise<void> {
 
   // Policy context (builds permission context per request)
   registerPolicyContext(app);
+
+  // Security setup enforcement (ADR-0081: server-side credential gate)
+  app.addHook("preHandler", requireSecurityComplete());
 
   // Privacy acceptance gate (blocks API if privacy not accepted)
   app.addHook("preHandler", requirePrivacyAccepted());

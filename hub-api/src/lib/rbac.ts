@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { buildContext, can, type PolicyContext } from "./policy-engine.js";
+import prisma from "./prisma.js";
 
 // ─── Augment FastifyRequest with policyCtx ───────────────────────────
 
@@ -119,6 +120,52 @@ export function requireAnyPermission(...permissions: string[]): preHandlerHookHa
       return reply.code(403).send({
         error: "Forbidden",
         message: `Requires one of: ${permissions.join(", ")}`,
+      });
+    }
+  };
+}
+
+// ─── Security Setup Enforcement (ADR-0081) ──────────────────────────
+
+/** Routes exempt from the security-complete check. */
+const SECURITY_EXEMPT_ROUTES = ["/health", "/onboarding", "/security", "/publishers/me/privacy"];
+
+/**
+ * Server-side enforcement: blocks API access unless the user has
+ * passwordChanged + (passkey OR TOTP).
+ * ADR-0081: backend MUST verify credential setup, not rely on frontend alone.
+ */
+export function requireSecurityComplete(): preHandlerHookHandler {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (SECURITY_EXEMPT_ROUTES.some((r) => request.url.startsWith(r))) {
+      return;
+    }
+
+    const sub = (request.user as { sub?: string } | undefined)?.sub;
+    if (!sub) return; // No user = auth middleware handles it
+
+    const setup = await prisma.securitySetup.findUnique({
+      where: { keycloakSub: sub },
+    });
+
+    if (!setup?.passwordChanged) {
+      return reply.code(403).send({
+        error: "Forbidden",
+        code: "SECURITY_SETUP_INCOMPLETE",
+        message: "Password must be changed before accessing this resource",
+      });
+    }
+
+    const [passkeyCount, hasTOTP] = await Promise.all([
+      prisma.webAuthnCredential.count({ where: { keycloakSub: sub } }),
+      Promise.resolve(!!setup.totpSecret && !!setup.totpEnabledAt),
+    ]);
+
+    if (passkeyCount === 0 && !hasTOTP) {
+      return reply.code(403).send({
+        error: "Forbidden",
+        code: "SECURITY_SETUP_INCOMPLETE",
+        message: "At least one second factor (passkey or TOTP) is required",
       });
     }
   };
