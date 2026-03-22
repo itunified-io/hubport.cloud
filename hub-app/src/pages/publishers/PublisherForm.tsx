@@ -261,9 +261,10 @@ export function PublisherForm() {
         });
         if (res.ok) setAssignedRoleIds((prev) => new Set([...prev, role.id]));
       } else {
+        const { "Content-Type": _, ...deleteHeaders } = headers;
         const res = await fetch(`${apiUrl}/roles/${role.id}/members/${id}`, {
           method: "DELETE",
-          headers,
+          headers: deleteHeaders,
         });
         if (res.ok)
           setAssignedRoleIds((prev) => {

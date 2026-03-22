@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import { randomBytes, createHash } from "node:crypto";
 import prisma from "../lib/prisma.js";
+import { generateInternalEmail } from "./publishers.js";
 import { requirePermission } from "../lib/rbac.js";
 import { audit } from "../lib/policy-engine.js";
 import { PERMISSIONS, FLAG_TO_APP_ROLE, CONGREGATION_FLAGS } from "../lib/permissions.js";
@@ -90,6 +91,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       } = request.body;
 
       const validFlags = validateFlags(congregationRole, congregationFlags);
+      const internalEmail = await generateInternalEmail(firstName, lastName);
 
       // Create publisher record in invited status
       const publisher = await prisma.publisher.create({
@@ -97,6 +99,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           firstName,
           lastName,
           email,
+          internalEmail,
           gender,
           congregationRole,
           congregationFlags: validFlags,
