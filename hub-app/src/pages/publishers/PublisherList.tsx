@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { FormattedMessage, useIntl } from "react-intl";
-import { Users, UserPlus, Shield, ChevronRight, UserCheck, UserX, Clock, Ban } from "lucide-react";
+import { Users, UserPlus, Shield, ChevronRight, UserCheck, UserX, Clock, Ban, Crown, Filter } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
 
@@ -15,6 +15,7 @@ interface Publisher {
   congregationFlags: string[];
   status: string;
   role: string;
+  isOwner: boolean;
   createdAt: string;
   appRoles: { role: { name: string; scope: string } }[];
 }
@@ -57,6 +58,30 @@ function congregationRoleBadge(role: string) {
   );
 }
 
+function systemRoleBadge(role: string, isOwner: boolean) {
+  const colors: Record<string, string> = {
+    admin: "text-[var(--red)] bg-[#ef444414]",
+    elder: "text-[var(--amber)] bg-[#d9770614]",
+    publisher: "text-[var(--text-muted)] bg-[var(--glass)]",
+    viewer: "text-[var(--text-muted)] bg-[var(--glass)]",
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${colors[role] ?? colors.publisher}`}>
+        {role}
+      </span>
+      {isOwner && (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-[var(--amber)] bg-[#d9770614]">
+          <Crown size={9} />
+          owner
+        </span>
+      )}
+    </span>
+  );
+}
+
+const ROLE_FILTER_OPTIONS = ["all", "elder", "ministerial_servant", "publisher"] as const;
+
 export function PublisherList() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -64,6 +89,7 @@ export function PublisherList() {
   const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState<typeof ROLE_FILTER_OPTIONS[number]>("all");
 
   useEffect(() => {
     const fetchPublishers = async () => {
@@ -84,13 +110,13 @@ export function PublisherList() {
     fetchPublishers();
   }, [user?.access_token]);
 
-  const filtered = filter
-    ? publishers.filter((p) => {
-        const name = (p.displayName ?? `${p.firstName} ${p.lastName}`).toLowerCase();
-        const q = filter.toLowerCase();
-        return name.includes(q) || p.email?.toLowerCase().includes(q);
-      })
-    : publishers;
+  const filtered = publishers.filter((p) => {
+    if (roleFilter !== "all" && p.congregationRole !== roleFilter) return false;
+    if (!filter) return true;
+    const name = (p.displayName ?? `${p.firstName} ${p.lastName}`).toLowerCase();
+    const q = filter.toLowerCase();
+    return name.includes(q) || p.email?.toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-6">
@@ -116,15 +142,37 @@ export function PublisherList() {
         </div>
       </div>
 
-      {/* Search filter */}
+      {/* Search + role filter */}
       {publishers.length > 0 && (
-        <input
-          type="text"
-          placeholder={intl.formatMessage({ id: "publishers.search" })}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm text-[var(--text)] placeholder:text-[var(--text-muted)]"
-        />
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder={intl.formatMessage({ id: "publishers.search" })}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm text-[var(--text)] placeholder:text-[var(--text-muted)]"
+          />
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-[var(--text-muted)]" />
+            {ROLE_FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setRoleFilter(opt)}
+                className={`px-2.5 py-1 text-[11px] rounded-full border transition-colors cursor-pointer ${
+                  roleFilter === opt
+                    ? "bg-[var(--amber)] text-black border-[var(--amber)] font-semibold"
+                    : "text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--amber)] hover:text-[var(--text)]"
+                }`}
+              >
+                {opt === "all"
+                  ? intl.formatMessage({ id: "publishers.filter.all" })
+                  : opt === "ministerial_servant"
+                    ? intl.formatMessage({ id: "publishers.role.ministerialServant" })
+                    : intl.formatMessage({ id: `publishers.role.${opt}` })}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {loading ? (
@@ -153,7 +201,7 @@ export function PublisherList() {
                   <FormattedMessage id="publishers.congregationRole" />
                 </th>
                 <th className="px-4 py-3 font-medium hidden lg:table-cell">
-                  {intl.formatMessage({ id: "publishers.appRoles" })}
+                  {intl.formatMessage({ id: "publishers.systemRole" })}
                 </th>
                 <th className="px-4 py-3 font-medium">
                   <FormattedMessage id="publishers.status" />
@@ -178,21 +226,7 @@ export function PublisherList() {
                     {congregationRoleBadge(p.congregationRole)}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {p.appRoles.slice(0, 3).map((ar) => (
-                        <span
-                          key={ar.role.name}
-                          className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium text-[var(--text-muted)] bg-[var(--glass)]"
-                        >
-                          {ar.role.name}
-                        </span>
-                      ))}
-                      {p.appRoles.length > 3 && (
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium text-[var(--text-muted)] bg-[var(--glass)]">
-                          +{p.appRoles.length - 3}
-                        </span>
-                      )}
-                    </div>
+                    {systemRoleBadge(p.role, p.isOwner)}
                   </td>
                   <td className="px-4 py-3">{statusPill(p.status)}</td>
                   <td className="px-4 py-3">
