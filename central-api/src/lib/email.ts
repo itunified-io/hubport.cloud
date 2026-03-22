@@ -249,13 +249,18 @@ export function inviteEmailHtml(data: {
       <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #f59e0b;">${escapeHtml(data.inviteCode)}</p>
     </div>
 
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${sanitizeUrl(tenantPortal)}/invite?code=${encodeURIComponent(data.inviteCode)}" style="display: inline-block; background: #d97706; color: #000; font-weight: 700; font-size: 16px; padding: 14px 40px; border-radius: 8px; text-decoration: none;">Konto erstellen / Create account</a>
+    </div>
+
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #d97706; margin-top: 0; font-size: 15px;">So geht's / How to join</h3>
       <ol style="line-height: 2; padding-left: 20px; margin: 8px 0;">
-        <li>Öffne / Open <a href="${sanitizeUrl(tenantPortal)}" style="color: #d97706; font-weight: 600;">${escapeHtml(data.tenantSlug)}.hubport.cloud</a></li>
-        <li>Erstelle ein Konto / Create an account</li>
-        <li>Gib den Einladungscode ein / Enter the invite code above</li>
+        <li>Klicke den Button oben / Click the button above</li>
+        <li>Gib deinen Namen ein / Enter your name</li>
+        <li>Richte Passwort &amp; 2FA ein / Set up password &amp; 2FA</li>
       </ol>
+      <p style="font-size: 12px; color: #71717a; margin: 8px 0 0;">Oder öffne / Or open: <a href="${sanitizeUrl(tenantPortal)}/invite?code=${encodeURIComponent(data.inviteCode)}" style="color: #d97706;">${escapeHtml(data.tenantSlug)}.hubport.cloud/invite</a></p>
     </div>
 
     <p style="font-size: 13px; color: #a1a1aa;">Dieser Code ist 7 Tage gültig. / This code is valid for 7 days.</p>
