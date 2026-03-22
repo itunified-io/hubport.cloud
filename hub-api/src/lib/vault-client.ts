@@ -1,15 +1,27 @@
 /**
  * HashiCorp Vault client with AppRole authentication.
- * Reads the tenant encryption key from Vault KV v2 and caches it in memory.
+ * ADR-0083: Vault is the sole runtime secret source for all operational secrets.
  *
  * Auth modes (checked in order):
  *   1. VAULT_TOKEN env var — legacy direct token (backwards compat)
  *   2. VAULT_ROLE_ID + VAULT_SECRET_ID — AppRole login (production)
+ *
+ * Secret paths (KV v2 under secret/hubport/):
+ *   encryption-key   — AES-256 field encryption key
+ *   credentials       — KC client secret, Synapse admin/registration secrets
+ *   runtime           — mail relay secret, tunnel token
  */
 
-const VAULT_SECRET_PATH = "secret/data/hubport/encryption-key";
+// ── Secret Path Constants ────────────────────────────────────────────
+
+const VAULT_PATHS = {
+  encryptionKey: "secret/data/hubport/encryption-key",
+  credentials: "secret/data/hubport/credentials",
+  runtime: "secret/data/hubport/runtime",
+} as const;
 
 let cachedKey: Buffer | null = null;
+const secretCache = new Map<string, Record<string, string>>();
 
 // ── AppRole Token Cache ──────────────────────────────────────────────
 
@@ -129,11 +141,97 @@ export async function getEncryptionKey(): Promise<Buffer> {
   return cachedKey;
 }
 
+// ── Generic Secret Reader ────────────────────────────────────────────
+
 /**
- * Clears cached encryption key and AppRole token.
+ * Reads a KV v2 secret from Vault. Results are cached per path.
+ * Falls back to env vars if Vault is not configured (transition period).
+ */
+async function readSecret(path: string): Promise<Record<string, string>> {
+  const cached = secretCache.get(path);
+  if (cached) return cached;
+
+  const vaultAddr = process.env.VAULT_ADDR;
+  if (!vaultAddr) {
+    throw new Error("VAULT_ADDR environment variable is not set");
+  }
+
+  const vaultToken = await getVaultToken();
+  const url = `${vaultAddr.replace(/\/+$/, "")}/v1/${path}`;
+
+  const response = await fetch(url, {
+    headers: { "X-Vault-Token": vaultToken, Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Vault read ${path} failed: ${response.status} ${response.statusText}`);
+  }
+
+  const body = (await response.json()) as { data?: { data?: Record<string, string> } };
+  const data = body?.data?.data;
+  if (!data) {
+    throw new Error(`Vault secret at ${path} has no data`);
+  }
+
+  secretCache.set(path, data);
+  return data;
+}
+
+/**
+ * Read a single field from a Vault secret, with env var fallback.
+ * If Vault read fails and envFallback is provided, returns the env var value.
+ * If neither is available, throws.
+ */
+async function getSecretField(path: string, field: string, envFallback?: string): Promise<string> {
+  try {
+    const data = await readSecret(path);
+    const value = data[field];
+    if (value) return value;
+  } catch {
+    // Vault unavailable — try env fallback
+  }
+
+  if (envFallback) {
+    const envValue = process.env[envFallback];
+    if (envValue) return envValue;
+  }
+
+  throw new Error(`Secret ${field} not found in Vault (${path}) or env (${envFallback ?? "none"})`);
+}
+
+// ── Operational Secret Getters (ADR-0083) ────────────────────────────
+
+/** Keycloak admin client secret for hub-api service account. */
+export async function getKeycloakClientSecret(): Promise<string> {
+  return getSecretField(VAULT_PATHS.credentials, "keycloak_client_secret", "KEYCLOAK_ADMIN_CLIENT_SECRET");
+}
+
+/** Synapse admin password for Matrix operations. */
+export async function getSynapseAdminPassword(): Promise<string> {
+  return getSecretField(VAULT_PATHS.credentials, "synapse_admin_password", "SYNAPSE_ADMIN_PASSWORD");
+}
+
+/** Synapse registration shared secret for admin user creation. */
+export async function getSynapseRegistrationSecret(): Promise<string> {
+  return getSecretField(VAULT_PATHS.credentials, "synapse_registration_secret", "SYNAPSE_REGISTRATION_SECRET");
+}
+
+/** Mail relay HMAC secret for outbound email authentication. */
+export async function getMailRelaySecret(): Promise<string> {
+  return getSecretField(VAULT_PATHS.runtime, "mail_relay_secret", "MAIL_RELAY_SECRET");
+}
+
+/** Cloudflare tunnel token for ingress. */
+export async function getTunnelToken(): Promise<string> {
+  return getSecretField(VAULT_PATHS.runtime, "tunnel_token", "CF_TUNNEL_TOKEN");
+}
+
+/**
+ * Clears all cached secrets and AppRole token.
  * Useful for testing or key rotation.
  */
 export function clearKeyCache(): void {
   cachedKey = null;
   tokenCache = null;
+  secretCache.clear();
 }
