@@ -178,6 +178,8 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
+    // Phase 1: return only non-sensitive data. Secrets are deferred
+    // until device is approved (via POST /setup/secrets).
     const response = {
       tenantId: tenant.id,
       slug: tenant.subdomain,
@@ -185,10 +187,8 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       email: tenant.email,
       firstName: tenant.ownerFirstName || '',
       lastName: tenant.ownerLastName || '',
-      tunnelToken: tenant.tunnelToken,
       centralApiUrl,
       portalUrl,
-      mailRelaySecret: process.env.MAIL_RELAY_SECRET || '',
       role: tenant.role,
       deviceCode,
       verifyUrl: `${portalUrl}/portal/devices/verify`,
@@ -244,5 +244,43 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({ status: device.status });
+  });
+
+  // Retrieve secrets after device approval (public, rate-limited)
+  // Installer calls this only after /setup/device/poll returns "approved".
+  app.post('/setup/secrets', async (req, reply) => {
+    const ip = req.ip;
+    if (!checkRateLimit(ip)) {
+      return reply.status(429).send({ error: 'Too many attempts. Try again in 1 minute.' });
+    }
+
+    const body = req.body as { deviceCode?: string } | null;
+    if (!body?.deviceCode) {
+      return reply.status(400).send({ error: 'deviceCode required.' });
+    }
+
+    const device = await prisma.tenantDevice.findUnique({
+      where: { deviceCode: body.deviceCode.toUpperCase() },
+      include: { tenant: true },
+    });
+
+    if (!device) {
+      return reply.status(404).send({ error: 'Device code not found.' });
+    }
+
+    if (device.status !== 'approved') {
+      return reply.status(403).send({
+        error: 'Device not approved. Secrets are only available after admin approval.',
+      });
+    }
+
+    if (device.expiresAt < new Date()) {
+      return reply.status(410).send({ error: 'Device code expired.' });
+    }
+
+    return reply.send({
+      tunnelToken: device.tenant.tunnelToken,
+      mailRelaySecret: process.env.MAIL_RELAY_SECRET || '',
+    });
   });
 }
