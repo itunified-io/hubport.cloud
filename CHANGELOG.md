@@ -1,6 +1,23 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.1
+
+### Publisher Invite Signup Wizard (#116)
+- Rewrite `/onboarding/redeem` with Keycloak user creation + onboarding token
+- Add `createInvitedKeycloakUser()` function (separate from admin flow)
+- Add onboarding token middleware with dual-auth for `/security/*`
+- Add rate limiting for code redemption (5/IP+code/15min)
+- Add `OnboardingStep` enum + step tracking on Publisher model
+- Add `/onboarding/status`, `/onboarding/user-info`, `/onboarding/complete-security`
+- Rewrite `/onboarding/accept-privacy` with token auth (no IDOR)
+- Add invite wizard UI: InviteWizard, CodeValidation, UserInfoStep, SecurityStep, PrivacyStep, CompletionStep
+- Add `/invite` public route (outside OIDC auth gate)
+- Add DE/EN i18n messages (38 keys)
+- Resume support for interrupted onboarding
+- Keycloak user rollback on DB failure
+- Audit logging on all state-changing endpoints
+
 ## v2026.03.21.12
 
 ### Status Management + Service Groups + Invite Flow (#91, #95)
