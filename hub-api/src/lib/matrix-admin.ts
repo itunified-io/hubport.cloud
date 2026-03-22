@@ -2,14 +2,20 @@
  * Synapse Admin API client for hubport.cloud.
  * Manages Matrix users, rooms, and spaces programmatically.
  *
- * Env: MATRIX_ADMIN_URL (http://synapse:8008), SYNAPSE_REGISTRATION_SECRET
+ * Env: MATRIX_ADMIN_URL, SYNAPSE_REGISTRATION_SECRET,
+ *      SYNAPSE_ADMIN_USER, SYNAPSE_ADMIN_PASSWORD (per-tenant unique)
  */
 
 function getMatrixConfig() {
   const adminUrl = process.env.MATRIX_ADMIN_URL || "http://synapse:8008";
   const serverName = process.env.SYNAPSE_SERVER_NAME || "localhost";
   const registrationSecret = process.env.SYNAPSE_REGISTRATION_SECRET;
-  return { adminUrl, serverName, registrationSecret };
+  const adminUser = process.env.SYNAPSE_ADMIN_USER;
+  const adminPassword = process.env.SYNAPSE_ADMIN_PASSWORD;
+  if (!adminUser || !adminPassword) {
+    throw new Error("SYNAPSE_ADMIN_USER and SYNAPSE_ADMIN_PASSWORD environment variables are required");
+  }
+  return { adminUrl, serverName, registrationSecret, adminUser, adminPassword };
 }
 
 let adminToken: string | null = null;
@@ -20,7 +26,7 @@ let adminToken: string | null = null;
 async function getAdminToken(): Promise<string> {
   if (adminToken) return adminToken;
 
-  const { adminUrl, registrationSecret } = getMatrixConfig();
+  const { adminUrl, registrationSecret, adminUser, adminPassword } = getMatrixConfig();
   if (!registrationSecret) {
     throw new Error("SYNAPSE_REGISTRATION_SECRET not set");
   }
@@ -35,13 +41,13 @@ async function getAdminToken(): Promise<string> {
   // HMAC for admin registration
   const mac = crypto
     .createHmac("sha1", registrationSecret)
-    .update(nonce + "\x00" + "hubport-admin" + "\x00" + "hubport-admin-secret" + "\x00" + "admin")
+    .update(nonce + "\x00" + adminUser + "\x00" + adminPassword + "\x00" + "admin")
     .digest("hex");
 
   const regRes = await fetch(`${adminUrl}/_synapse/admin/v1/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nonce, username: "hubport-admin", password: "hubport-admin-secret", admin: true, mac }),
+    body: JSON.stringify({ nonce, username: adminUser, password: adminPassword, admin: true, mac }),
   });
 
   if (regRes.ok) {
@@ -55,8 +61,8 @@ async function getAdminToken(): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       type: "m.login.password",
-      identifier: { type: "m.id.user", user: "hubport-admin" },
-      password: "hubport-admin-secret",
+      identifier: { type: "m.id.user", user: adminUser },
+      password: adminPassword,
     }),
   });
   if (!loginRes.ok) throw new Error(`Synapse admin login failed: ${loginRes.status}`);
