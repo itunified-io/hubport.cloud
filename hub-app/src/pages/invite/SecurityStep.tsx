@@ -33,7 +33,6 @@ export function SecurityStep({ token, onComplete, onSessionExpired }: Props): Re
   const [loading, setLoading] = useState(false);
 
   // ─── Password State ──────────────────────────────────────────────
-  const [tempPassword, setTempPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -57,7 +56,7 @@ export function SecurityStep({ token, onComplete, onSessionExpired }: Props): Re
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ currentPassword: tempPassword, newPassword }),
+        body: JSON.stringify({ newPassword }),
       });
       if (res.status === 401) { onSessionExpired(); return; }
       if (!res.ok) {
@@ -197,14 +196,6 @@ export function SecurityStep({ token, onComplete, onSessionExpired }: Props): Re
           </h3>
           <input
             type="password"
-            autoComplete="current-password"
-            placeholder={intl.formatMessage({ id: "invite.security.password.temp" })}
-            value={tempPassword}
-            onChange={(e) => setTempPassword(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="password"
             autoComplete="new-password"
             placeholder={intl.formatMessage({ id: "invite.security.password.new" })}
             value={newPassword}
@@ -231,7 +222,7 @@ export function SecurityStep({ token, onComplete, onSessionExpired }: Props): Re
 
           <button
             onClick={handlePasswordSubmit}
-            disabled={!passwordValid || !tempPassword || loading}
+            disabled={!passwordValid || loading}
             className="w-full py-2 bg-[var(--amber)] hover:bg-[var(--amber-light)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)] text-black font-semibold rounded-[var(--radius)] transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             {loading ? "..." : intl.formatMessage({ id: "invite.security.password.submit" })}

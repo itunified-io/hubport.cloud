@@ -89,7 +89,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════
 
   const PasswordBody = Type.Object({
-    currentPassword: Type.String({ minLength: 1 }),
+    currentPassword: Type.Optional(Type.String({ minLength: 1 })),
     newPassword: Type.String({ minLength: 1 }),
   });
 
@@ -103,6 +103,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const userId = getUserId(request);
       const { currentPassword, newPassword } = request.body;
+      const isOnboarding = (request as any).user?.scope === "onboarding";
 
       // Validate new password against policy
       const user = await getKeycloakUser(userId);
@@ -115,10 +116,16 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Verify current password
-      const currentValid = await verifyPassword(user.username, currentPassword);
-      if (!currentValid) {
-        return reply.code(400).send({ error: "Current password is incorrect" });
+      // Skip current password verification during onboarding
+      // (user has a random temp password they never received)
+      if (!isOnboarding) {
+        if (!currentPassword) {
+          return reply.code(400).send({ error: "Current password is required" });
+        }
+        const currentValid = await verifyPassword(user.username, currentPassword);
+        if (!currentValid) {
+          return reply.code(400).send({ error: "Current password is incorrect" });
+        }
       }
 
       // Set new password via Admin API
