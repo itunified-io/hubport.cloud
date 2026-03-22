@@ -15,7 +15,15 @@ const ENCRYPTED_FIELDS = [
   "lastName",
   "email",
   "phone",
+  "address",
+  "notes",
 ] as const;
+
+/**
+ * DateTime fields that must be converted to/from string for encryption.
+ * Prisma sends these as Date objects; we encrypt the ISO string.
+ */
+const ENCRYPTED_DATE_FIELDS = ["dateOfBirth"] as const;
 
 /** Models whose data is subject to field-level encryption. */
 const ENCRYPTED_MODELS = ["Publisher"] as const;
@@ -38,6 +46,16 @@ async function encryptFields(
       data[field] = encrypt(value, key);
     }
   }
+
+  // DateTime fields: convert to ISO string before encryption
+  for (const field of ENCRYPTED_DATE_FIELDS) {
+    const value = data[field];
+    if (value instanceof Date) {
+      data[field] = encrypt(value.toISOString(), key);
+    } else if (typeof value === "string") {
+      data[field] = encrypt(value, key);
+    }
+  }
 }
 
 /**
@@ -56,6 +74,19 @@ async function decryptRecord(
       } catch {
         // If decryption fails the value is likely not encrypted (e.g. legacy
         // data written before encryption was enabled). Leave it as-is.
+      }
+    }
+  }
+
+  // DateTime fields: decrypt string → convert back to Date
+  for (const field of ENCRYPTED_DATE_FIELDS) {
+    const value = record[field];
+    if (typeof value === "string" && value.includes(":")) {
+      try {
+        const decrypted = decrypt(value, key);
+        record[field] = new Date(decrypted);
+      } catch {
+        // Legacy unencrypted value — leave as-is
       }
     }
   }
