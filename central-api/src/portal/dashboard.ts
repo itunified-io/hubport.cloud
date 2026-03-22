@@ -53,7 +53,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /portal/reveal-token — requires password re-entry
-  app.post('/reveal-token', async (req, reply) => {
+  app.post('/reveal-token', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const body = req.body as { password?: string } | null;
 

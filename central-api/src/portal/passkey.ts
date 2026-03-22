@@ -63,7 +63,7 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(options);
   });
 
-  app.post('/passkey/register-verify', { preHandler: portalAuth }, async (req, reply) => {
+  app.post('/passkey/register-verify', { preHandler: portalAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const body = req.body as RegistrationResponseJSON;
     const expectedChallenge = challenges.get(tenantId);
@@ -137,7 +137,7 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ ...options, tenantId: tenant.id });
   });
 
-  app.post('/passkey/auth-verify', async (req, reply) => {
+  app.post('/passkey/auth-verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = req.body as AuthenticationResponseJSON & { tenantId?: string };
     const tenantId = body.tenantId;
     if (!tenantId) return reply.status(400).send({ error: 'tenantId required' });
@@ -213,7 +213,7 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Verify discoverable credential (passkey-first login)
-  app.post('/passkey/auth-verify-discoverable', async (req, reply) => {
+  app.post('/passkey/auth-verify-discoverable', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = req.body as AuthenticationResponseJSON & { sessionId?: string };
 
     if (!body.sessionId) {
@@ -284,7 +284,7 @@ export async function passkeyRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ passkeys: passkeys.map((pk) => ({ ...pk, name: pk.friendlyName })) });
   });
 
-  app.post('/passkey/delete', { preHandler: portalAuth }, async (req, reply) => {
+  app.post('/passkey/delete', { preHandler: portalAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const body = req.body as { credentialId?: string; password?: string } | null;
     if (!body?.credentialId || !body?.password) {

@@ -14,7 +14,7 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /portal/login — authenticate
-  app.post('/login', async (req, reply) => {
+  app.post('/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = req.body as { email?: string; password?: string } | null;
 
     if (!body?.email || !body?.password) {
@@ -81,7 +81,7 @@ export async function loginRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /portal/login/2fa — verify TOTP code
-  app.post('/login/2fa', async (req, reply) => {
+  app.post('/login/2fa', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = req.body as { tempToken?: string; code?: string } | null;
 
     if (!body?.tempToken || !body?.code) {

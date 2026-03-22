@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import formbody from '@fastify/formbody';
 import { tenantRoutes } from './routes/tenants.js';
 import { sharingRoutes } from './routes/sharing.js';
@@ -12,6 +13,7 @@ import { tokenExchangeRoutes } from './routes/token-exchange.js';
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
+await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 await app.register(formbody);
 await app.register(tenantRoutes, { prefix: '/tenants' });
 await app.register(sharingRoutes, { prefix: '/sharing' });
