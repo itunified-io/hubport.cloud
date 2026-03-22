@@ -10,6 +10,14 @@
 
 import { getKeycloakClientSecret, getVerifyClientSecret } from "./vault-client.js";
 
+/** Sanitize a Keycloak path segment: reject path traversal chars, always encode. */
+function safePath(value: string, name: string): string {
+  if (!value || /[\/\\?#]/.test(value)) {
+    throw new Error(`Invalid ${name}: contains path-separator or query characters`);
+  }
+  return encodeURIComponent(value);
+}
+
 interface KeycloakUser {
   id: string;
   username: string;
@@ -100,7 +108,7 @@ export async function listKeycloakUsers(): Promise<KeycloakUser[]> {
  */
 export async function getKeycloakUser(userId: string): Promise<KeycloakUser> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -209,7 +217,7 @@ export async function assignKeycloakRole(
 
   // Assign role to user
   const res = await fetch(
-    `${adminUrl()}/users/${userId}/role-mappings/realm`,
+    `${adminUrl()}/users/${safePath(userId, "userId")}/role-mappings/realm`,
     {
       method: "POST",
       headers: {
@@ -230,7 +238,7 @@ export async function assignKeycloakRole(
  */
 export async function disableKeycloakUser(userId: string): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -249,7 +257,7 @@ export async function disableKeycloakUser(userId: string): Promise<void> {
  */
 export async function enableKeycloakUser(userId: string): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -268,7 +276,7 @@ export async function enableKeycloakUser(userId: string): Promise<void> {
  */
 export async function deleteKeycloakUser(userId: string): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -283,7 +291,7 @@ export async function deleteKeycloakUser(userId: string): Promise<void> {
  */
 export async function logoutKeycloakUser(userId: string): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}/logout`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}/logout`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -318,7 +326,7 @@ export async function getUserCredentials(
   userId: string,
 ): Promise<KeycloakCredential[]> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}/credentials`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}/credentials`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Keycloak get credentials error: ${res.status}`);
@@ -334,7 +342,7 @@ export async function removeCredential(
 ): Promise<void> {
   const token = await getAdminToken();
   const res = await fetch(
-    `${adminUrl()}/users/${userId}/credentials/${credentialId}`,
+    `${adminUrl()}/users/${safePath(userId, "userId")}/credentials/${safePath(credentialId, "credentialId")}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -352,7 +360,7 @@ export async function resetPassword(
   temporary: boolean = false,
 ): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}/reset-password`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}/reset-password`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -373,7 +381,7 @@ export async function getUserSessions(
   userId: string,
 ): Promise<KeycloakSession[]> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}/sessions`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Keycloak get sessions error: ${res.status}`);
@@ -387,7 +395,7 @@ export async function revokeSession(sessionId: string): Promise<void> {
   const { url, realm } = getConfig();
   const token = await getAdminToken();
   const res = await fetch(
-    `${url}/admin/realms/${realm}/sessions/${sessionId}`,
+    `${url}/admin/realms/${realm}/sessions/${safePath(sessionId, "sessionId")}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -404,7 +412,7 @@ export async function updateRequiredActions(
   actions: string[],
 ): Promise<void> {
   const token = await getAdminToken();
-  const res = await fetch(`${adminUrl()}/users/${userId}`, {
+  const res = await fetch(`${adminUrl()}/users/${safePath(userId, "userId")}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
