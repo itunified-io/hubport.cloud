@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.4
+
+### SEC-004 Phase 3 Residual — Verify Client + TOTP Encryption
+- fix: dedicated hub-verify Keycloak client for password verification (F3) (#172)
+- fix: verifyPassword() migrated from hub-app to hub-verify (ADR-0081) (#172)
+- fix: directAccessGrantsEnabled=false on hub-app public client (#172)
+- fix: getAdminToken() reads client secret from Vault via getKeycloakClientSecret() (#172)
+- feat: SecuritySetup.totpSecret encrypted via prisma-encryption.ts (F4, ADR-0082) (#172)
+
 ## v2026.03.22.3
 
 ### SEC-004 Phase 3 — Tenant Security Hardening
