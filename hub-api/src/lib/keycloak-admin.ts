@@ -4,8 +4,11 @@
  * Uses client credentials grant to obtain admin token,
  * then manages users via Keycloak Admin REST API.
  *
- * Env: KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID, KEYCLOAK_ADMIN_CLIENT_SECRET
+ * Env: KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID
+ * Secrets: admin client secret via Vault (getKeycloakClientSecret), verify client secret via Vault (getVerifyClientSecret)
  */
+
+import { getKeycloakClientSecret, getVerifyClientSecret } from "./vault-client.js";
 
 interface KeycloakUser {
   id: string;
@@ -23,15 +26,14 @@ function getConfig() {
   const url = process.env.KEYCLOAK_URL;
   const realm = process.env.KEYCLOAK_REALM;
   const clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID;
-  const clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
 
-  if (!url || !realm || !clientId || !clientSecret) {
+  if (!url || !realm || !clientId) {
     throw new Error(
-      "Missing Keycloak admin env: KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID, KEYCLOAK_ADMIN_CLIENT_SECRET",
+      "Missing Keycloak admin env: KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID",
     );
   }
 
-  return { url, realm, clientId, clientSecret };
+  return { url, realm, clientId };
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
@@ -45,7 +47,8 @@ export async function getAdminToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const { url, realm, clientId, clientSecret } = getConfig();
+  const { url, realm, clientId } = getConfig();
+  const clientSecret = await getKeycloakClientSecret();
   const tokenUrl = `${url}/realms/${realm}/protocol/openid-connect/token`;
 
   const res = await fetch(tokenUrl, {
@@ -484,7 +487,8 @@ export async function getPasskeys(
 }
 
 /**
- * Verify a password by attempting a resource owner password grant.
+ * Verify a password by attempting a resource owner password grant
+ * via the dedicated hub-verify confidential client (SEC-004 F3).
  * Returns true if the password is correct.
  */
 export async function verifyPassword(
@@ -492,6 +496,7 @@ export async function verifyPassword(
   password: string,
 ): Promise<boolean> {
   const { url, realm } = getConfig();
+  const verifySecret = await getVerifyClientSecret();
   const res = await fetch(
     `${url}/realms/${realm}/protocol/openid-connect/token`,
     {
@@ -499,7 +504,8 @@ export async function verifyPassword(
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "password",
-        client_id: "hub-app",
+        client_id: "hub-verify",
+        client_secret: verifySecret,
         username,
         password,
       }),

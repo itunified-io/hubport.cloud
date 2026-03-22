@@ -78,21 +78,21 @@ export const keycloakStep: WizardStep = {
         return { success: false, message: `Failed to create realm: ${realmRes.statusText}` };
       }
 
-      // Create OIDC public client for hub-app (SPA)
+      // Create OIDC public client for hub-app (SPA — no direct access grants per ADR-0081)
       await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: 'hub-app',
           publicClient: true,
-          directAccessGrantsEnabled: true,
+          directAccessGrantsEnabled: false,
           redirectUris: ['*'],
           webOrigins: ['*'],
           protocol: 'openid-connect',
         }),
       });
 
-      // Create OIDC confidential client for hub-api (password verification via direct grant)
+      // Create OIDC confidential client for hub-api (admin API + service account)
       const apiClientSecret = process.env.KC_API_CLIENT_SECRET || crypto.randomUUID();
       await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
         method: 'POST',
@@ -102,6 +102,23 @@ export const keycloakStep: WizardStep = {
           publicClient: false,
           secret: apiClientSecret,
           serviceAccountsEnabled: true,
+          directAccessGrantsEnabled: true,
+          redirectUris: [],
+          webOrigins: [],
+          protocol: 'openid-connect',
+        }),
+      });
+
+      // Create dedicated verification client (ROPC only — no admin access, SEC-004 F3)
+      const verifyClientSecret = process.env.KC_VERIFY_CLIENT_SECRET || crypto.randomUUID();
+      await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'hub-verify',
+          publicClient: false,
+          secret: verifyClientSecret,
+          serviceAccountsEnabled: false,
           directAccessGrantsEnabled: true,
           redirectUris: [],
           webOrigins: [],
@@ -125,10 +142,13 @@ export const keycloakStep: WizardStep = {
         credentials: {
           realm: REALM,
           app_client_id: 'hub-app',
-          app_client_type: 'public',
+          app_client_type: 'public (directAccessGrants disabled)',
           api_client_id: 'hub-api',
-          api_client_type: 'confidential',
+          api_client_type: 'confidential (admin + service account)',
           api_client_secret: apiClientSecret,
+          verify_client_id: 'hub-verify',
+          verify_client_type: 'confidential (ROPC password verification only)',
+          verify_client_secret: verifyClientSecret,
           password_policy: '12+ chars, upper, lower, digit, special, not-username, history 5',
           brute_force: '5 failures → 60s lockout (max 15min)',
           roles: roles.join(', '),

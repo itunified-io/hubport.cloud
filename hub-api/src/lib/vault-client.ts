@@ -206,6 +206,11 @@ export async function getKeycloakClientSecret(): Promise<string> {
   return getSecretField(VAULT_PATHS.credentials, "keycloak_client_secret", "KEYCLOAK_ADMIN_CLIENT_SECRET");
 }
 
+/** Keycloak hub-verify client secret for password verification (SEC-004 F3). */
+export async function getVerifyClientSecret(): Promise<string> {
+  return getSecretField(VAULT_PATHS.credentials, "verify_client_secret", "KEYCLOAK_VERIFY_SECRET");
+}
+
 /** Synapse admin password for Matrix operations. */
 export async function getSynapseAdminPassword(): Promise<string> {
   return getSecretField(VAULT_PATHS.credentials, "synapse_admin_password", "SYNAPSE_ADMIN_PASSWORD");

@@ -17,6 +17,7 @@ const ENCRYPTED_FIELDS = [
   "phone",
   "address",
   "notes",
+  "totpSecret",
 ] as const;
 
 /**
@@ -26,7 +27,7 @@ const ENCRYPTED_FIELDS = [
 const ENCRYPTED_DATE_FIELDS = ["dateOfBirth"] as const;
 
 /** Models whose data is subject to field-level encryption. */
-const ENCRYPTED_MODELS = ["Publisher"] as const;
+const ENCRYPTED_MODELS = ["Publisher", "SecuritySetup"] as const;
 
 function isEncryptedModel(model: string | undefined): boolean {
   return ENCRYPTED_MODELS.includes(model as (typeof ENCRYPTED_MODELS)[number]);
