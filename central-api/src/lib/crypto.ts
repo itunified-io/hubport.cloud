@@ -3,7 +3,10 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
 
 const JWT_SECRET_KEY = () => {
-  const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required — refusing to start with default');
+  }
   return new TextEncoder().encode(secret);
 };
 
@@ -58,13 +61,14 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const ENCRYPTION_KEY = () => {
   const key = process.env.ENCRYPTION_KEY;
-  if (!key) return null;
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY environment variable is required — refusing to run without encryption');
+  }
   return Buffer.from(key, 'base64');
 };
 
 export function encryptToken(plaintext: string): string {
   const key = ENCRYPTION_KEY();
-  if (!key) return plaintext; // fallback: no encryption in dev
 
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
@@ -77,7 +81,6 @@ export function encryptToken(plaintext: string): string {
 
 export function decryptToken(ciphertext: string): string {
   const key = ENCRYPTION_KEY();
-  if (!key) return ciphertext; // fallback: no encryption in dev
 
   try {
     const data = Buffer.from(ciphertext, 'base64');
