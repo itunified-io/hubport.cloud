@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import fjwt from "@fastify/jwt";
 import buildGetJwks from "get-jwks";
+import { requireOnboardingToken } from "./onboarding-token.js";
 
 export interface UserPayload {
   sub: string;
@@ -84,6 +85,10 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
     const path = request.url.split("?")[0];
     if (!API_PREFIXES.some((p) => path.startsWith(p))) return;
 
+    // /onboarding/redeem is public (rate-limited, no auth)
+    if (path === "/onboarding/redeem") return;
+
+    // Try OIDC JWT first
     try {
       const decoded = await request.jwtVerify<Record<string, unknown>>();
       (request as unknown as { user: UserPayload }).user = {
@@ -92,7 +97,15 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
         preferred_username: (decoded.preferred_username as string) ?? "",
         roles: extractRoles(decoded),
       };
+      return; // OIDC succeeded
     } catch {
+      // OIDC failed — try onboarding token for /security/* and /onboarding/*
+      if (path.startsWith("/security/") || path.startsWith("/onboarding/")) {
+        const ok = await requireOnboardingToken(app, request, reply);
+        if (ok) return; // onboarding token accepted
+        return; // reply already sent with error by requireOnboardingToken
+      }
+      // Other routes: OIDC required
       reply.code(401).send({ error: "Unauthorized" });
     }
   });

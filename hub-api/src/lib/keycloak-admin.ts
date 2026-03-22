@@ -146,6 +146,47 @@ export async function createKeycloakUser(
 }
 
 /**
+ * Create a Keycloak user for an invited publisher.
+ * Unlike createKeycloakUser(), this sets emailVerified=true (invite code = proof)
+ * and uses a random temporary password.
+ */
+export async function createInvitedKeycloakUser(email: string): Promise<string> {
+  const token = await getAdminToken();
+  const { randomUUID } = await import("node:crypto");
+  const tempPassword = randomUUID();
+
+  const res = await fetch(`${adminUrl()}/users`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username: email,
+      email,
+      enabled: true,
+      emailVerified: true,
+      credentials: [
+        {
+          type: "password",
+          value: tempPassword,
+          temporary: true,
+        },
+      ],
+      requiredActions: ["UPDATE_PASSWORD"],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Keycloak createInvitedUser error: ${res.status} ${await res.text()}`);
+  }
+
+  const location = res.headers.get("Location");
+  if (!location) throw new Error("No Location header in Keycloak create response");
+  return location.split("/").pop()!;
+}
+
+/**
  * Assign a realm role to a Keycloak user.
  */
 export async function assignKeycloakRole(

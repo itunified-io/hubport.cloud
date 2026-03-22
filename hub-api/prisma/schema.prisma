@@ -47,6 +47,15 @@ enum RoleScope {
   weekend
 }
 
+enum OnboardingStep {
+  invited
+  code_redeemed
+  user_info
+  security
+  privacy
+  complete
+}
+
 // ─── Publisher ────────────────────────────────────────────────────────
 
 model Publisher {
@@ -79,6 +88,9 @@ model Publisher {
   invitedAt  DateTime?
   approvedBy String?
   approvedAt DateTime?
+  onboardingStep    OnboardingStep  @default(invited)
+  onboardingToken   String?         /// Hashed JWT — cleared on completion
+  termsVersion      String?         /// Version of accepted terms
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

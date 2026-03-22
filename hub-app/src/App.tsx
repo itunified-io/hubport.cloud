@@ -21,6 +21,7 @@ import { CleaningDashboard } from "./pages/cleaning/CleaningDashboard";
 // Chat is now a global widget in Layout.tsx (ChatWidget), not a page route
 import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
+import { InviteWizard } from "./pages/invite/InviteWizard";
 
 function LoginPage() {
   const { signIn } = useAuth();
@@ -61,6 +62,11 @@ export function App() {
         </div>
       </div>
     );
+  }
+
+  // Public route: invite signup wizard (no auth required)
+  if (window.location.pathname.startsWith("/invite")) {
+    return <InviteWizard />;
   }
 
   if (!isAuthenticated) {
