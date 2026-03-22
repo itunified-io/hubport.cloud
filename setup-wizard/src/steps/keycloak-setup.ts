@@ -92,7 +92,7 @@ export const keycloakStep: WizardStep = {
         }),
       });
 
-      // Create OIDC confidential client for hub-api (admin API + service account)
+      // Create OIDC confidential client for hub-api (admin API + service account — no ROPC, SEC-004-2)
       const apiClientSecret = process.env.KC_API_CLIENT_SECRET || crypto.randomUUID();
       await fetch(`${KC_URL}/admin/realms/${REALM}/clients`, {
         method: 'POST',
@@ -102,7 +102,7 @@ export const keycloakStep: WizardStep = {
           publicClient: false,
           secret: apiClientSecret,
           serviceAccountsEnabled: true,
-          directAccessGrantsEnabled: true,
+          directAccessGrantsEnabled: false,
           redirectUris: [],
           webOrigins: [],
           protocol: 'openid-connect',
@@ -144,7 +144,7 @@ export const keycloakStep: WizardStep = {
           app_client_id: 'hub-app',
           app_client_type: 'public (directAccessGrants disabled)',
           api_client_id: 'hub-api',
-          api_client_type: 'confidential (admin + service account)',
+          api_client_type: 'confidential (admin service account, no ROPC)',
           api_client_secret: apiClientSecret,
           verify_client_id: 'hub-verify',
           verify_client_type: 'confidential (ROPC password verification only)',
