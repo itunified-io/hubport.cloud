@@ -20,6 +20,12 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Sanitize URLs for href attributes — blocks javascript: and data: schemes (SEC-003 F3). */
+function sanitizeUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return '#';
+}
+
 function saEmail(): string { return process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || ''; }
 function privateKeyB64(): string { return process.env.GMAIL_PRIVATE_KEY || ''; }
 function senderEmail(): string { return process.env.GMAIL_SENDER_EMAIL || ''; }
@@ -140,7 +146,7 @@ export function onboardingEmailHtml(tenant: {
     ${tenant.setupUrl ? `
     <div style="background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.4); border-radius: 10px; padding: 20px; margin: 20px 0; text-align: center;">
       <p style="margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #d97706;">Set Up Your Account</p>
-      <a href="${tenant.setupUrl}" style="display: inline-block; background: #d97706; color: #fff; padding: 12px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px;">Create Password &amp; Enable MFA</a>
+      <a href="${sanitizeUrl(tenant.setupUrl || '')}" style="display: inline-block; background: #d97706; color: #fff; padding: 12px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px;">Create Password &amp; Enable MFA</a>
       <p style="margin: 12px 0 0; font-size: 12px; color: #a1a1aa;">This link expires in 7 days. After setup, you can access your credentials in the Tenant Portal.</p>
     </div>
     ` : `
@@ -236,7 +242,7 @@ export function inviteEmailHtml(data: {
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #d97706; margin-top: 0; font-size: 15px;">So geht's / How to join</h3>
       <ol style="line-height: 2; padding-left: 20px; margin: 8px 0;">
-        <li>Öffne / Open <a href="${tenantPortal}" style="color: #d97706; font-weight: 600;">${escapeHtml(data.tenantSlug)}.hubport.cloud</a></li>
+        <li>Öffne / Open <a href="${sanitizeUrl(tenantPortal)}" style="color: #d97706; font-weight: 600;">${escapeHtml(data.tenantSlug)}.hubport.cloud</a></li>
         <li>Erstelle ein Konto / Create an account</li>
         <li>Gib den Einladungscode ein / Enter the invite code above</li>
       </ol>

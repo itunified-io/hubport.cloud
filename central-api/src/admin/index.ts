@@ -120,7 +120,12 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Internal-only endpoint for MCP skill to provision auth (setup token)
   // Called during tenant approval — creates or resets TenantAuth with a fresh setup token.
+  // Auth: MAIL_RELAY_SECRET (ADR-0079 / SEC-003 F2)
   app.post('/internal/provision-auth', async (req, reply) => {
+    if (!validateMailRelayAuth(req.headers.authorization)) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing mail relay secret' });
+    }
+
     const body = req.body as { tenantId: string } | null;
     if (!body?.tenantId) {
       return reply.status(400).send({ error: 'Missing tenantId' });
