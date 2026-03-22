@@ -14,6 +14,7 @@ import { auditRoutes } from "./routes/audit.js";
 import { securityRoutes } from "./routes/security.js";
 import { serviceGroupRoutes } from "./routes/service-groups.js";
 import { cleaningRoutes } from "./routes/cleaning.js";
+import { jitsiRoutes } from "./routes/jitsi.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
@@ -58,6 +59,7 @@ async function start(): Promise<void> {
   await app.register(securityRoutes);
   await app.register(serviceGroupRoutes);
   await app.register(cleaningRoutes);
+  await app.register(jitsiRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {

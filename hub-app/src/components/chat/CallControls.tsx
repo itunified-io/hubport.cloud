@@ -1,23 +1,16 @@
 /**
  * CallControls — voice/video call overlay using self-hosted Jitsi Meet.
- * Opens a full-screen modal with Jitsi iframe when a call is initiated.
+ * SEC-004 F-18: JWT auth + HMAC room names (no guest access, no predictable rooms).
  */
 import { useState, useCallback } from "react";
 import { Phone, Video, PhoneOff } from "lucide-react";
+import { useAuth } from "@/auth/useAuth";
+import { getApiUrl } from "@/lib/config";
 
 interface Props {
   roomId: string;
   roomName: string;
   isDirect: boolean;
-}
-
-/** Simple hash of room ID to create a valid Jitsi room name */
-function roomIdToConference(roomId: string): string {
-  let hash = 0;
-  for (let i = 0; i < roomId.length; i++) {
-    hash = ((hash << 5) - hash + roomId.charCodeAt(i)) | 0;
-  }
-  return `hubport-${Math.abs(hash).toString(36)}`;
 }
 
 function getJitsiUrl(): string {
@@ -28,26 +21,48 @@ function getJitsiUrl(): string {
 }
 
 export function CallControls({ roomId, roomName }: Props) {
+  const { user } = useAuth();
   const [activeCall, setActiveCall] = useState<"voice" | "video" | null>(null);
+  const [jitsiToken, setJitsiToken] = useState<string | null>(null);
+  const [conference, setConference] = useState<string | null>(null);
 
-  const startCall = useCallback((type: "voice" | "video") => {
-    if (!getJitsiUrl()) return;
-    setActiveCall(type);
-  }, []);
+  const startCall = useCallback(async (type: "voice" | "video") => {
+    if (!getJitsiUrl() || !user?.access_token) return;
+    try {
+      const res = await fetch(`${getApiUrl()}/meetings/jitsi-token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${user.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ roomId }),
+      });
+      if (!res.ok) return;
+      const { token, room } = (await res.json()) as { token: string; room: string };
+      setJitsiToken(token);
+      setConference(room);
+      setActiveCall(type);
+    } catch {
+      // Silently fail — button stays inactive
+    }
+  }, [user?.access_token, roomId]);
 
   const endCall = useCallback(() => {
     setActiveCall(null);
+    setJitsiToken(null);
+    setConference(null);
   }, []);
 
-  const conference = roomIdToConference(roomId);
   const jitsiUrl = getJitsiUrl();
-  const jitsiParams = [
-    `#config.startWithAudioOnly=${activeCall === "voice"}`,
-    `&config.prejoinConfig.enabled=false`,
-    `&config.disableDeepLinking=true`,
-    `&config.toolbarButtons=["microphone","camera","hangup","chat","tileview"]`,
-    `&userInfo.displayName=${encodeURIComponent(roomName)}`,
-  ].join("");
+  const jitsiParams = activeCall && jitsiToken
+    ? [
+        `?jwt=${jitsiToken}`,
+        `#config.startWithAudioOnly=${activeCall === "voice"}`,
+        `&config.prejoinConfig.enabled=false`,
+        `&config.disableDeepLinking=true`,
+        `&config.toolbarButtons=["microphone","camera","hangup","chat","tileview"]`,
+      ].join("")
+    : "";
 
   return (
     <>
@@ -72,7 +87,7 @@ export function CallControls({ roomId, roomName }: Props) {
       </div>
 
       {/* Call modal overlay */}
-      {activeCall && jitsiUrl && (
+      {activeCall && jitsiUrl && conference && (
         <div
           className="fixed inset-0 z-[9999] flex flex-col"
           style={{ background: "#050507" }}
