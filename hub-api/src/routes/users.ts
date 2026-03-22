@@ -509,6 +509,21 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // ── Invite Email Rate Limiter (ADR-0079) ─────────────────────────
+  const INVITE_RATE_LIMIT = 3; // max invite emails per publisher per hour
+  const INVITE_RATE_WINDOW_MS = 60 * 60 * 1000;
+  const inviteSendTimestamps = new Map<string, number[]>();
+
+  function checkInviteRateLimit(publisherId: string): boolean {
+    const now = Date.now();
+    const timestamps = inviteSendTimestamps.get(publisherId) || [];
+    const recent = timestamps.filter(t => now - t < INVITE_RATE_WINDOW_MS);
+    inviteSendTimestamps.set(publisherId, recent);
+    if (recent.length >= INVITE_RATE_LIMIT) return false;
+    recent.push(now);
+    return true;
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // INVITE EMAIL — relay via central API (no Gmail creds in tenant)
   // ═══════════════════════════════════════════════════════════════════
@@ -531,17 +546,23 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { publisherId, inviteCode, email, firstName } = request.body;
       const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
-      const apiToken = process.env.HUBPORT_API_TOKEN;
+      const relaySecret = process.env.MAIL_RELAY_SECRET;
       const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
 
-      if (!centralApiUrl || !apiToken) {
-        return reply.code(503).send({ error: "Email relay not configured (missing CENTRAL_API_URL or HUBPORT_API_TOKEN)" });
+      if (!centralApiUrl || !relaySecret) {
+        return reply.code(503).send({ error: "Email relay not configured (missing CENTRAL_API_URL or MAIL_RELAY_SECRET)" });
       }
 
-      // Verify publisher exists and email matches
+      // Verify publisher exists and has email — use DB email, NOT request body (ADR-0079)
       const publisher = await prisma.publisher.findUnique({ where: { id: publisherId } });
       if (!publisher) {
         return reply.code(404).send({ error: "Publisher not found" });
+      }
+      if (!publisher.email) {
+        return reply.code(400).send({ error: "Publisher has no email address" });
+      }
+      if (!checkInviteRateLimit(publisherId)) {
+        return reply.code(429).send({ error: "Rate limit exceeded — max 3 invite emails per publisher per hour" });
       }
 
       try {
@@ -549,10 +570,10 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiToken}`,
+            Authorization: `Bearer ${relaySecret}`,
           },
           body: JSON.stringify({
-            to: email,
+            to: publisher.email,
             subject: `Einladung zu ${tenantSlug}.hubport.cloud`,
             templateName: "invite",
             templateData: { firstName, inviteCode, tenantSlug },
@@ -592,6 +613,9 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       if (!publisher.email) {
         return reply.code(400).send({ error: "Publisher has no email address" });
       }
+      if (!checkInviteRateLimit(publisher.id)) {
+        return reply.code(429).send({ error: "Rate limit exceeded — max 3 invite emails per publisher per hour" });
+      }
 
       // Generate new invite code (invalidates old one)
       const newCode = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
@@ -604,18 +628,18 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         data: { codeHash: hash, publisherId: publisher.id, expiresAt },
       });
 
-      // Send invite email via central API relay
+      // Send invite email via central API relay (dedicated relay secret — ADR-0079)
       const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
-      const apiToken = process.env.HUBPORT_API_TOKEN;
+      const relaySecret = process.env.MAIL_RELAY_SECRET;
       const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
 
-      if (centralApiUrl && apiToken) {
+      if (centralApiUrl && relaySecret) {
         try {
           await fetch(`${centralApiUrl}/admin/internal/send-email`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${apiToken}`,
+              Authorization: `Bearer ${relaySecret}`,
             },
             body: JSON.stringify({
               to: publisher.email,

@@ -196,6 +196,52 @@ export function onboardingEmailHtml(tenant: {
 </html>`;
 }
 
+export function inviteEmailHtml(data: {
+  firstName: string;
+  inviteCode: string;
+  tenantSlug: string;
+}): string {
+  const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
+  // Derive the tenant-specific portal URL
+  const tenantPortal = `https://${data.tenantSlug}.hubport.cloud`;
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #050507; color: #e4e4e7;">
+  <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.08);">
+    <h1 style="color: #d97706;">hubport.cloud</h1>
+  </div>
+
+  <div style="padding: 30px 0;">
+    <h2 style="color: #e4e4e7;">Einladung / Invitation</h2>
+    <p>Hallo ${data.firstName},</p>
+    <p>Du wurdest eingeladen, der Versammlung <strong style="color: #f59e0b;">${data.tenantSlug}</strong> auf hubport.cloud beizutreten.</p>
+
+    <div style="background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.4); border-radius: 10px; padding: 24px; margin: 24px 0; text-align: center;">
+      <p style="margin: 0 0 8px; font-size: 13px; color: #a1a1aa;">Dein Einladungscode / Your invite code:</p>
+      <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #f59e0b;">${data.inviteCode}</p>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
+      <h3 style="color: #d97706; margin-top: 0; font-size: 15px;">So geht's / How to join</h3>
+      <ol style="line-height: 2; padding-left: 20px; margin: 8px 0;">
+        <li>Öffne / Open <a href="${tenantPortal}" style="color: #d97706; font-weight: 600;">${data.tenantSlug}.hubport.cloud</a></li>
+        <li>Erstelle ein Konto / Create an account</li>
+        <li>Gib den Einladungscode ein / Enter the invite code above</li>
+      </ol>
+    </div>
+
+    <p style="font-size: 13px; color: #a1a1aa;">Dieser Code ist 7 Tage gültig. / This code is valid for 7 days.</p>
+  </div>
+
+  <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px; text-align: center; color: #71717a; font-size: 12px;">
+    <p>hubport.cloud — Congregation management</p>
+  </div>
+</body>
+</html>`;
+}
+
 export function rejectionEmailHtml(tenant: { name: string }, reason?: string): string {
   return `
 <!DOCTYPE html>
