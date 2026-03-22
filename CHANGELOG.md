@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.7
+
+### CodeQL + Dependabot Remediation
+- fix: biased cryptographic random → rejection sampling in admin-user.ts (#178)
+- fix: validate + encode Keycloak admin path segments via safePath() (#180)
+- feat: @fastify/rate-limit in hub-api + central-api — global 100/min + per-route 5-10/min on auth endpoints (#182)
+- dismiss: 2 js/insufficient-password-hash alerts (matrix HMAC-SHA1 protocol, SHA-256 token hash)
+- chore: lockfile refresh for effect, serialize-javascript, esbuild Dependabot alerts
+
 ## v2026.03.22.6
 
 ### SEC-004-2: hub-api directAccessGrants disabled in setup-wizard
