@@ -5,6 +5,7 @@
  * Read-only: provisioning is managed via the hubport-admin MCP skill.
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../lib/email.js';
@@ -27,6 +28,37 @@ export function recordSentEmail(email: SentEmail): void {
 
 export function getLastSentEmail(): SentEmail | null {
   return sentEmails.length > 0 ? sentEmails[sentEmails.length - 1]! : null;
+}
+
+// ── Mail Relay Auth (ADR-0079) ─────────────────────────────────────
+// Dedicated shared secret for /internal/send-email — NOT tenant API tokens.
+// Only callers with MAIL_RELAY_SECRET can use this endpoint:
+//   - hub-api (tenant containers) for invite emails
+//   - hubport-admin MCP skill for onboarding/rejection emails
+const MAIL_RELAY_SECRET = process.env.MAIL_RELAY_SECRET || '';
+
+function validateMailRelayAuth(authHeader: string | undefined): boolean {
+  if (!MAIL_RELAY_SECRET) return false; // unconfigured = closed
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7).trim();
+  // Constant-time comparison to prevent timing attacks
+  if (token.length !== MAIL_RELAY_SECRET.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(MAIL_RELAY_SECRET));
+}
+
+// ── Rate Limiter (defense-in-depth per ADR-0079) ──────────────────
+const EMAIL_RATE_LIMIT = 20; // max sends per source per hour
+const EMAIL_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const emailSendTimestamps = new Map<string, number[]>();
+
+function checkRateLimit(source: string): boolean {
+  const now = Date.now();
+  const timestamps = emailSendTimestamps.get(source) || [];
+  const recent = timestamps.filter(t => now - t < EMAIL_RATE_WINDOW_MS);
+  emailSendTimestamps.set(source, recent);
+  if (recent.length >= EMAIL_RATE_LIMIT) return false;
+  recent.push(now);
+  return true;
 }
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -127,8 +159,15 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true, setupToken, setupUrl });
   });
 
-  // Internal-only endpoint for MCP skill to send emails
+  // Internal-only endpoint for sending emails via pre-defined templates.
+  // Auth: dedicated MAIL_RELAY_SECRET (not tenant API tokens) — ADR-0079.
+  // Callers: hub-api (invite emails), hubport-admin skill (onboarding/rejection).
   app.post('/internal/send-email', async (req, reply) => {
+    // Dedicated relay secret auth — NOT tenant tokens
+    if (!validateMailRelayAuth(req.headers.authorization)) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing mail relay secret' });
+    }
+
     const body = req.body as {
       to: string;
       subject: string;
@@ -140,9 +179,15 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Missing required fields: to, subject, templateName' });
     }
 
+    // Rate limiting keyed by caller IP (defense-in-depth — ADR-0079)
+    const source = req.ip || 'unknown';
+    if (!checkRateLimit(source)) {
+      return reply.status(429).send({ error: 'Rate limit exceeded', message: `Maximum ${EMAIL_RATE_LIMIT} emails per hour` });
+    }
+
     try {
       // Import email templates dynamically based on templateName
-      const { onboardingEmailHtml, rejectionEmailHtml } = await import('../lib/email.js');
+      const { onboardingEmailHtml, rejectionEmailHtml, inviteEmailHtml } = await import('../lib/email.js');
 
       let html: string;
       if (body.templateName === 'onboarding') {
@@ -157,6 +202,12 @@ export async function adminRoutes(app: FastifyInstance) {
           body.templateData as { name: string },
           (body.templateData as { reason?: string }).reason,
         );
+      } else if (body.templateName === 'invite') {
+        html = inviteEmailHtml(body.templateData as {
+          firstName: string;
+          inviteCode: string;
+          tenantSlug: string;
+        });
       } else {
         return reply.status(400).send({ error: `Unknown template: ${body.templateName}` });
       }
