@@ -25,7 +25,27 @@ const PublisherBody = Type.Object({
     Type.Literal("inactive"),
   ])),
   notes: Type.Optional(Type.String()),
+  role: Type.Optional(Type.Union([
+    Type.Literal("admin"),
+    Type.Literal("elder"),
+    Type.Literal("publisher"),
+    Type.Literal("viewer"),
+  ])),
+  isOwner: Type.Optional(Type.Boolean()),
 });
+
+/** Generate internal email: firstname.lastname@slug.hubport.cloud */
+export async function generateInternalEmail(firstName: string, lastName: string): Promise<string> {
+  const domain = process.env.WEBAUTHN_RP_ID || "hubport.cloud";
+  const base = `${firstName.toLowerCase().replace(/[^a-z]/g, "")}.${lastName.toLowerCase().replace(/[^a-z]/g, "")}`;
+  let candidate = `${base}@${domain}`;
+  let suffix = 1;
+  while (await prisma.publisher.findFirst({ where: { internalEmail: candidate } })) {
+    suffix++;
+    candidate = `${base}${suffix}@${domain}`;
+  }
+  return candidate;
+}
 
 type PublisherBodyType = Static<typeof PublisherBody>;
 
@@ -93,9 +113,11 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { dateOfBirth, ...rest } = request.body;
+      const internalEmail = await generateInternalEmail(rest.firstName, rest.lastName);
       const publisher = await prisma.publisher.create({
         data: {
           ...rest,
+          internalEmail,
           ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
         },
       });

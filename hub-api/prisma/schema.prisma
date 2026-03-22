@@ -55,7 +55,8 @@ model Publisher {
   firstName        String            /// @encrypted — AES-256-GCM
   lastName         String            /// @encrypted — AES-256-GCM
   displayName      String?           /// Optional display name override
-  email            String?           /// @encrypted — AES-256-GCM
+  email            String?           /// @encrypted — AES-256-GCM (private/contact email)
+  internalEmail    String?           /// Auto-generated username@slug.hubport.cloud (Matrix/Keycloak login)
   phone            String?           /// @encrypted — AES-256-GCM
   gender           Gender?
   address          String?           /// @encrypted — AES-256-GCM
@@ -64,6 +65,7 @@ model Publisher {
   congregationFlags String[]         /// Additional flags: pioneer types, elder/MS sub-roles
   role             String            @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)
   status           MemberStatus      @default(active)
+  isOwner          Boolean           @default(false) /// Tenant owner (installer-created admin)
   notes            String?           /// @encrypted — AES-256-GCM
   avatarUrl        String?           /// Profile picture URL
 
