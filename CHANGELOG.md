@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.2
+
+### Invite Flow Fixes (#116, #118, #119)
+- fix: invite email links to `/invite?code=XXX` with CTA button (#118)
+- fix: defer Keycloak user creation from `/users/invite` to `/onboarding/redeem` (#119)
+- fix: skip temp password verification during onboarding in `/security/password` (#119)
+- fix: make email required in invite body schema (#119)
+
 ## v2026.03.22.1
 
 ### Publisher Invite Signup Wizard (#116)
