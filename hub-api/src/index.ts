@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import { registerAuth } from "./lib/auth.js";
 import { registerPolicyContext, requirePrivacyAccepted, requireSecurityComplete } from "./lib/rbac.js";
@@ -30,6 +31,12 @@ async function start(): Promise<void> {
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? true,
     credentials: true,
+  });
+
+  // Rate limiting (CodeQL js/missing-rate-limiting)
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
   });
 
   // Multipart (file uploads, max 2MB)
