@@ -1,6 +1,11 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.6
+
+### SEC-004-2: hub-api directAccessGrants disabled in setup-wizard
+- fix: keycloak-setup.ts hub-api directAccessGrantsEnabled=false (#176)
+
 ## v2026.03.22.5
 
 ### SEC-004 Residual — MAIL_RELAY_SECRET Vault Migration
