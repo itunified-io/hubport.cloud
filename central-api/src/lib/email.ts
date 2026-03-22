@@ -20,10 +20,20 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Sanitize URLs for href attributes — blocks javascript: and data: schemes (SEC-003 F3). */
+/**
+ * Sanitize URLs for safe interpolation into href="..." attributes.
+ * 1. Block non-http(s) schemes (javascript:, data:, etc.)
+ * 2. Escape HTML attribute-special chars to prevent quote breakout
+ */
 function sanitizeUrl(url: string): string {
-  if (/^https?:\/\//i.test(url)) return url;
-  return '#';
+  if (!/^https?:\/\//i.test(url)) return '#';
+  // Escape chars that could break out of href="..." context
+  return url
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function saEmail(): string { return process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || ''; }
