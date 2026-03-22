@@ -10,6 +10,16 @@
 
 import { SignJWT, importPKCS8 } from 'jose';
 
+/** Escape user-influenced values before interpolating into HTML email templates (ADR-0079 / SEC-002 F3). */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function saEmail(): string { return process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || ''; }
 function privateKeyB64(): string { return process.env.GMAIL_PRIVATE_KEY || ''; }
 function senderEmail(): string { return process.env.GMAIL_SENDER_EMAIL || ''; }
@@ -116,13 +126,13 @@ export function onboardingEmailHtml(tenant: {
   </div>
 
   <div style="padding: 30px 0;">
-    <h2 style="color: #e4e4e7;">Welcome, ${tenant.name}!</h2>
+    <h2 style="color: #e4e4e7;">Welcome, ${escapeHtml(tenant.name)}!</h2>
     <p>Your congregation has been approved on hubport.cloud. You can now set up your self-hosted instance.</p>
 
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #d97706; margin-top: 0;">Your Registration</h3>
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 8px 0; color: #a1a1aa;">Subdomain</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;"> ${tenant.subdomain}.hubport.cloud</td></tr>
+        <tr><td style="padding: 8px 0; color: #a1a1aa;">Subdomain</td><td style="padding: 8px 0; font-family: monospace; color: #f59e0b;"> ${escapeHtml(tenant.subdomain)}.hubport.cloud</td></tr>
         <tr><td style="padding: 8px 0; color: #a1a1aa;">Status</td><td style="padding: 8px 0; color: #22c55e; font-weight: 600;">Approved</td></tr>
       </table>
     </div>
@@ -215,18 +225,18 @@ export function inviteEmailHtml(data: {
 
   <div style="padding: 30px 0;">
     <h2 style="color: #e4e4e7;">Einladung / Invitation</h2>
-    <p>Hallo ${data.firstName},</p>
-    <p>Du wurdest eingeladen, der Versammlung <strong style="color: #f59e0b;">${data.tenantSlug}</strong> auf hubport.cloud beizutreten.</p>
+    <p>Hallo ${escapeHtml(data.firstName)},</p>
+    <p>Du wurdest eingeladen, der Versammlung <strong style="color: #f59e0b;">${escapeHtml(data.tenantSlug)}</strong> auf hubport.cloud beizutreten.</p>
 
     <div style="background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.4); border-radius: 10px; padding: 24px; margin: 24px 0; text-align: center;">
       <p style="margin: 0 0 8px; font-size: 13px; color: #a1a1aa;">Dein Einladungscode / Your invite code:</p>
-      <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #f59e0b;">${data.inviteCode}</p>
+      <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #f59e0b;">${escapeHtml(data.inviteCode)}</p>
     </div>
 
     <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 20px; margin: 20px 0;">
       <h3 style="color: #d97706; margin-top: 0; font-size: 15px;">So geht's / How to join</h3>
       <ol style="line-height: 2; padding-left: 20px; margin: 8px 0;">
-        <li>Öffne / Open <a href="${tenantPortal}" style="color: #d97706; font-weight: 600;">${data.tenantSlug}.hubport.cloud</a></li>
+        <li>Öffne / Open <a href="${tenantPortal}" style="color: #d97706; font-weight: 600;">${escapeHtml(data.tenantSlug)}.hubport.cloud</a></li>
         <li>Erstelle ein Konto / Create an account</li>
         <li>Gib den Einladungscode ein / Enter the invite code above</li>
       </ol>
@@ -253,9 +263,9 @@ export function rejectionEmailHtml(tenant: { name: string }, reason?: string): s
   </div>
   <div style="padding: 30px 0;">
     <h2 style="color: #e4e4e7;">Registration Update</h2>
-    <p>Dear ${tenant.name},</p>
+    <p>Dear ${escapeHtml(tenant.name)},</p>
     <p>Unfortunately, your registration request for hubport.cloud could not be approved at this time.</p>
-    ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+    ${reason ? `<p><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ''}
     <p>If you believe this is an error, please <a href="https://hubport.cloud/contact" style="color: #d97706;">contact us</a>.</p>
   </div>
 </body>
