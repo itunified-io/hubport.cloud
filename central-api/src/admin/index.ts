@@ -30,20 +30,29 @@ export function getLastSentEmail(): SentEmail | null {
   return sentEmails.length > 0 ? sentEmails[sentEmails.length - 1]! : null;
 }
 
-// ── Mail Relay Auth (ADR-0079) ─────────────────────────────────────
-// Dedicated shared secret for /internal/send-email — NOT tenant API tokens.
-// Only callers with MAIL_RELAY_SECRET can use this endpoint:
-//   - hub-api (tenant containers) for invite emails
-//   - hubport-admin MCP skill for onboarding/rejection emails
+// ── Auth Secrets (ADR-0079) ─────────────────────────────────────────
+// Two separate secrets with distinct privilege boundaries:
+//   MAIL_RELAY_SECRET — shared with tenants for email relay only
+//   ADMIN_SECRET      — operator-only, NOT distributed to tenants
 const MAIL_RELAY_SECRET = process.env.MAIL_RELAY_SECRET || '';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 
-function validateMailRelayAuth(authHeader: string | undefined): boolean {
-  if (!MAIL_RELAY_SECRET) return false; // unconfigured = closed
+function validateSecret(authHeader: string | undefined, secret: string): boolean {
+  if (!secret) return false; // unconfigured = closed
   if (!authHeader?.startsWith('Bearer ')) return false;
   const token = authHeader.slice(7).trim();
-  // Constant-time comparison to prevent timing attacks
-  if (token.length !== MAIL_RELAY_SECRET.length) return false;
-  return timingSafeEqual(Buffer.from(token), Buffer.from(MAIL_RELAY_SECRET));
+  if (token.length !== secret.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+}
+
+/** Validate MAIL_RELAY_SECRET — for /internal/send-email (tenant-accessible) */
+function validateMailRelayAuth(authHeader: string | undefined): boolean {
+  return validateSecret(authHeader, MAIL_RELAY_SECRET);
+}
+
+/** Validate ADMIN_SECRET — for /internal/provision-auth (operator-only, NOT tenant-accessible) */
+function validateAdminAuth(authHeader: string | undefined): boolean {
+  return validateSecret(authHeader, ADMIN_SECRET);
 }
 
 // ── Rate Limiter (defense-in-depth per ADR-0079) ──────────────────
@@ -120,10 +129,10 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Internal-only endpoint for MCP skill to provision auth (setup token)
   // Called during tenant approval — creates or resets TenantAuth with a fresh setup token.
-  // Auth: MAIL_RELAY_SECRET (ADR-0079 / SEC-003 F2)
+  // Auth: ADMIN_SECRET — operator-only, NOT shared with tenants (SEC-003 privilege boundary fix)
   app.post('/internal/provision-auth', async (req, reply) => {
-    if (!validateMailRelayAuth(req.headers.authorization)) {
-      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing mail relay secret' });
+    if (!validateAdminAuth(req.headers.authorization)) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing admin secret' });
     }
 
     const body = req.body as { tenantId: string } | null;
