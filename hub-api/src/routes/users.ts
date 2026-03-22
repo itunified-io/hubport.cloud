@@ -13,6 +13,7 @@ import {
   deleteKeycloakUser,
   logoutKeycloakUser,
 } from "../lib/keycloak-admin.js";
+import { getMailRelaySecret } from "../lib/vault-client.js";
 import { ensureMatrixUser, uploadMatrixMedia } from "../lib/matrix-admin.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
@@ -534,11 +535,15 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { publisherId, inviteCode, email, firstName } = request.body;
       const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
-      const relaySecret = process.env.MAIL_RELAY_SECRET;
       const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
-
-      if (!centralApiUrl || !relaySecret) {
-        return reply.code(503).send({ error: "Email relay not configured (missing CENTRAL_API_URL or MAIL_RELAY_SECRET)" });
+      let relaySecret: string;
+      try {
+        relaySecret = await getMailRelaySecret();
+      } catch {
+        return reply.code(503).send({ error: "Email relay not configured (MAIL_RELAY_SECRET not available)" });
+      }
+      if (!centralApiUrl) {
+        return reply.code(503).send({ error: "Email relay not configured (missing CENTRAL_API_URL)" });
       }
 
       // Verify publisher exists and has email — use DB email, NOT request body (ADR-0079)
@@ -617,23 +622,28 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       });
 
       // Send invite email via central API relay (dedicated relay secret — ADR-0079)
-      const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
-      const relaySecret = process.env.MAIL_RELAY_SECRET;
-      const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
+      const centralApiUrl2 = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
+      const tenantSlug2 = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
+      let relaySecret2: string | undefined;
+      try {
+        relaySecret2 = await getMailRelaySecret();
+      } catch {
+        // Vault unavailable + no env fallback — skip email
+      }
 
-      if (centralApiUrl && relaySecret) {
+      if (centralApiUrl2 && relaySecret2) {
         try {
-          await fetch(`${centralApiUrl}/admin/internal/send-email`, {
+          await fetch(`${centralApiUrl2}/admin/internal/send-email`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${relaySecret}`,
+              Authorization: `Bearer ${relaySecret2}`,
             },
             body: JSON.stringify({
               to: publisher.email,
-              subject: `Einladung zu ${tenantSlug}.hubport.cloud`,
+              subject: `Einladung zu ${tenantSlug2}.hubport.cloud`,
               templateName: "invite",
-              templateData: { firstName: publisher.firstName, inviteCode: newCode, tenantSlug },
+              templateData: { firstName: publisher.firstName, inviteCode: newCode, tenantSlug: tenantSlug2 },
             }),
           });
         } catch (err) {
