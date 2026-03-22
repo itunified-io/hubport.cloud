@@ -601,7 +601,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       // Delete old invite codes for this publisher and create new one
       await prisma.inviteCode.deleteMany({ where: { publisherId: publisher.id } });
       await prisma.inviteCode.create({
-        data: { hash, publisherId: publisher.id, expiresAt },
+        data: { codeHash: hash, publisherId: publisher.id, expiresAt },
       });
 
       // Send invite email via central API relay
