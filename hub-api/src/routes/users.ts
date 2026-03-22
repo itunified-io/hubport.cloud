@@ -21,7 +21,7 @@ type IdParamsType = Static<typeof IdParams>;
 const InviteBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
   lastName: Type.String({ minLength: 1 }),
-  email: Type.Optional(Type.String({ format: "email" })),
+  email: Type.String({ format: "email" }),
   gender: Type.Optional(Type.Union([Type.Literal("male"), Type.Literal("female")])),
   congregationRole: Type.Optional(Type.Union([
     Type.Literal("publisher"),
@@ -121,19 +121,8 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
-      // Optionally create Keycloak user if email provided
-      let keycloakUserId: string | undefined;
-      if (email) {
-        try {
-          keycloakUserId = await createKeycloakUser(email, firstName, lastName);
-          await prisma.publisher.update({
-            where: { id: publisher.id },
-            data: { keycloakSub: keycloakUserId },
-          });
-        } catch {
-          // Non-critical — user can register manually via invite code
-        }
-      }
+      // Keycloak user creation deferred to POST /onboarding/redeem
+      // (createInvitedKeycloakUser sets emailVerified=true, temp password)
 
       // Auto-assign AppRoles based on congregation flags
       for (const flag of validFlags) {
@@ -162,7 +151,6 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(201).send({
         publisher,
         inviteCode: code,
-        keycloakUserId,
       });
     },
   );
