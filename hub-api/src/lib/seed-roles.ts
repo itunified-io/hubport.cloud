@@ -96,10 +96,98 @@ const SYSTEM_ROLES: SeedRole[] = [
       P.PRIVILEGE_WT_READER, P.PRIVILEGE_PUBLIC_TALK,
       P.PRIVILEGE_WT_CONDUCTOR,
       P.PRIVILEGE_PUBLIC_TALK_LOCAL, P.PRIVILEGE_SERVICE_MEETING_CONDUCTOR,
+      P.PRIVILEGE_INITIAL_CALL_ASSISTANT, P.PRIVILEGE_RETURN_VISIT_ASSISTANT,
+      P.PRIVILEGE_BIBLE_STUDY_ASSISTANT,
       P.PRIVILEGE_TECHNICAL_SOUND, P.PRIVILEGE_TECHNICAL_VIDEO,
       P.PRIVILEGE_TECHNICAL_MICROPHONE, P.PRIVILEGE_TECHNICAL_STAGE,
       P.PRIVILEGE_ATTENDANT_MIDWEEK, P.PRIVILEGE_ATTENDANT_WEEKEND,
     ],
+  },
+  // ─── Individual midweek meeting parts ────────────────────────────
+  {
+    name: "Vorsitzender Woche",
+    description: "Midweek meeting chairman",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_CHAIRMAN_MIDWEEK, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Eingangsgebet",
+    description: "Opening prayer",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_OPENING_PRAYER, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Schlussgebet",
+    description: "Closing prayer",
+    scope: "all",
+    permissions: [P.PRIVILEGE_CLOSING_PRAYER, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Schätze",
+    description: "Spiritual gems presentation",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_GEMS, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Bibellesung",
+    description: "Bible reading",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_BIBLE_READING, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Erstes Gespräch",
+    description: "Initial call demonstration",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_INITIAL_CALL, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Rückbesuch",
+    description: "Return visit demonstration",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_RETURN_VISIT, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Bibelstudium",
+    description: "Bible study demonstration",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_BIBLE_STUDY, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Vortrag Woche",
+    description: "Midweek meeting talk",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_TALK, P.MEETINGS_VIEW],
+  },
+  {
+    name: "VBS Leiter",
+    description: "Congregation Bible Study conductor",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_CBS_CONDUCTOR, P.MEETINGS_VIEW],
+  },
+  {
+    name: "VBS Leser",
+    description: "Congregation Bible Study reader",
+    scope: "midweek",
+    permissions: [P.PRIVILEGE_CBS_READER, P.MEETINGS_VIEW],
+  },
+  // ─── Individual weekend meeting parts ──────────────────────────
+  {
+    name: "Vorsitzender Wochenende",
+    description: "Weekend meeting chairman",
+    scope: "weekend",
+    permissions: [P.PRIVILEGE_CHAIRMAN_WEEKEND, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Öffentlicher Vortrag",
+    description: "Public talk speaker",
+    scope: "weekend",
+    permissions: [P.PRIVILEGE_PUBLIC_TALK, P.MEETINGS_VIEW],
+  },
+  {
+    name: "WT Leser",
+    description: "Watchtower study reader",
+    scope: "weekend",
+    permissions: [P.PRIVILEGE_WT_READER, P.MEETINGS_VIEW],
   },
   {
     name: "Technik Responsible",
@@ -130,6 +218,21 @@ const SYSTEM_ROLES: SeedRole[] = [
       P.TERRITORIES_VIEW, P.TERRITORIES_EDIT, P.TERRITORIES_ASSIGN,
       P.MEETINGS_VIEW,
     ],
+  },
+  {
+    name: "Assistent Midweek",
+    description: "Midweek meeting assistant / householder for student parts",
+    scope: "midweek",
+    permissions: [
+      P.PRIVILEGE_INITIAL_CALL_ASSISTANT, P.PRIVILEGE_RETURN_VISIT_ASSISTANT,
+      P.PRIVILEGE_BIBLE_STUDY_ASSISTANT, P.MEETINGS_VIEW,
+    ],
+  },
+  {
+    name: "Assistent Weekend",
+    description: "Weekend meeting assistant",
+    scope: "weekend",
+    permissions: [P.MEETINGS_VIEW, P.PUBLISHERS_VIEW_MINIMAL],
   },
   {
     name: "Cleaning Responsible",
@@ -214,7 +317,7 @@ const SYSTEM_ROLES: SeedRole[] = [
 ];
 
 /**
- * Upsert all 22 system roles. Safe to call multiple times.
+ * Upsert all system roles. Safe to call multiple times.
  */
 export async function seedSystemRoles(): Promise<void> {
   for (const role of SYSTEM_ROLES) {

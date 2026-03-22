@@ -104,6 +104,11 @@ export const PERMISSIONS = {
   PRIVILEGE_PUBLIC_TALK_LOCAL: "privilege:publicTalkLocal",
   PRIVILEGE_SERVICE_MEETING_CONDUCTOR: "privilege:serviceMeetingConductor",
 
+  // Student part assistant privileges (householder role)
+  PRIVILEGE_INITIAL_CALL_ASSISTANT: "privilege:initialCallAssistant",
+  PRIVILEGE_RETURN_VISIT_ASSISTANT: "privilege:returnVisitAssistant",
+  PRIVILEGE_BIBLE_STUDY_ASSISTANT: "privilege:bibleStudyAssistant",
+
   // Cleaning & garden privileges
   PRIVILEGE_CLEANING_DEEP: "privilege:cleaningDeep",
   PRIVILEGE_CLEANING_VISUAL: "privilege:cleaningVisual",

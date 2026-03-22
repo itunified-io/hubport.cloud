@@ -67,7 +67,7 @@ const MS_FLAGS = [
   "territory_servant",
 ];
 
-/** Duty roles shown in Duties section (toggle switches) */
+/** Duty roles shown in Duties tab (toggle switches) */
 const DUTY_ROLE_NAMES = [
   // Technical
   "Mikrofon",
@@ -84,11 +84,36 @@ const DUTY_ROLE_NAMES = [
   "Sichtreinigung",
   "Rasen",
   "Winterdienst",
-  // Planning
-  "Vortragsplaner",
 ];
 
-const TABS = ["personal", "congregation", "duties", "roles"] as const;
+/** Midweek meeting roles — each individually toggleable */
+const MIDWEEK_ROLES = [
+  { name: "LM Overseer", labelKey: "program.role.lmOverseer" },
+  { name: "Vorsitzender Woche", labelKey: "program.role.chairman" },
+  { name: "Eingangsgebet", labelKey: "program.role.openingPrayer" },
+  { name: "Schlussgebet", labelKey: "program.role.closingPrayer" },
+  { name: "Schätze", labelKey: "program.role.gems" },
+  { name: "Bibellesung", labelKey: "program.role.bibleReading" },
+  { name: "Erstes Gespräch", labelKey: "program.role.initialCall" },
+  { name: "Assistent Midweek", labelKey: "program.role.initialCallAssistant" },
+  { name: "Rückbesuch", labelKey: "program.role.returnVisit" },
+  { name: "Bibelstudium", labelKey: "program.role.bibleStudy" },
+  { name: "Vortrag Woche", labelKey: "program.role.talk" },
+  { name: "VBS Leiter", labelKey: "program.role.cbsConductor" },
+  { name: "VBS Leser", labelKey: "program.role.cbsReader" },
+];
+
+/** Weekend meeting roles — each individually toggleable */
+const WEEKEND_ROLES = [
+  { name: "WT Conductor", labelKey: "program.role.wtConductor" },
+  { name: "Vorsitzender Wochenende", labelKey: "program.role.chairmanWeekend" },
+  { name: "Öffentlicher Vortrag", labelKey: "program.role.publicTalk" },
+  { name: "WT Leser", labelKey: "program.role.wtReader" },
+  { name: "Vortragsplaner", labelKey: "program.role.vortragsplaner" },
+  { name: "Assistent Weekend", labelKey: "program.role.assistentWeekend" },
+];
+
+const TABS = ["personal", "congregation", "duties", "program", "roles"] as const;
 type Tab = typeof TABS[number];
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -778,20 +803,42 @@ export function PublisherForm() {
           </div>
         )}
 
-        {/* ── Tab: Duties ───────────────────────────────────────── */}
+        {/* ── Tab: Duties (technical + cleaning only) ──────────── */}
         {isEdit && activeTab === "duties" && (
+          <div className={sectionCls}>
+            <SectionHeader id="publishers.duties" />
+            <div className="divide-y divide-[var(--border)]">
+              {DUTY_ROLE_NAMES.map((name) => {
+                const role = roleByName(name);
+                if (!role) return null;
+                return (
+                  <Toggle
+                    key={name}
+                    label={name}
+                    scope={role.scope}
+                    checked={isRoleAssigned(name)}
+                    onChange={(v) => toggleRole(name, v)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Program (dedicated meeting roles) ─────────── */}
+        {isEdit && activeTab === "program" && (
           <>
-            {/* Duty Roles */}
+            {/* Midweek Meeting */}
             <div className={sectionCls}>
-              <SectionHeader id="publishers.duties" />
+              <SectionHeader id="program.midweek.title" />
               <div className="divide-y divide-[var(--border)]">
-                {DUTY_ROLE_NAMES.map((name) => {
+                {MIDWEEK_ROLES.map(({ name, labelKey }) => {
                   const role = roleByName(name);
                   if (!role) return null;
                   return (
                     <Toggle
                       key={name}
-                      label={name}
+                      label={intl.formatMessage({ id: labelKey })}
                       scope={role.scope}
                       checked={isRoleAssigned(name)}
                       onChange={(v) => toggleRole(name, v)}
@@ -801,78 +848,23 @@ export function PublisherForm() {
               </div>
             </div>
 
-            {/* Program (Midweek / Weekend) */}
+            {/* Weekend Meeting */}
             <div className={sectionCls}>
-              <SectionHeader id="publishers.program" />
-
-              {/* Midweek */}
-              <div className="space-y-1">
-                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
-                  <FormattedMessage id="publishers.program.midweek" />
-                </h3>
-                <div className="divide-y divide-[var(--border)]">
-                  {(["Program", "LM Overseer"] as const).map((name) => {
-                    const role = roleByName(name);
-                    if (!role) return null;
-                    return (
-                      <Toggle
-                        key={name}
-                        label={name}
-                        scope={role.scope}
-                        checked={isRoleAssigned(name)}
-                        onChange={(v) => toggleRole(name, v)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Weekend */}
-              <div className="space-y-1 pt-4">
-                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
-                  <FormattedMessage id="publishers.program.weekend" />
-                </h3>
-                <div className="divide-y divide-[var(--border)]">
-                  {(["Program", "WT Conductor", "Vortragsplaner"] as const).map((name) => {
-                    const role = roleByName(name);
-                    if (!role) return null;
-                    if (name === "Program" && isRoleAssigned("Program")) {
-                      return (
-                        <div key={`${name}-weekend`} className="flex items-center justify-between py-2">
-                          <span className="flex items-center gap-2 text-sm text-[var(--text)]">
-                            {name}
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--glass)] text-[var(--text-muted)]">
-                              <FormattedMessage id="publishers.program.assignedAbove" />
-                            </span>
-                          </span>
-                          <span className="h-5 w-9 inline-flex items-center justify-center">
-                            <span className="text-[10px] text-[var(--amber)]">✓</span>
-                          </span>
-                        </div>
-                      );
-                    }
-                    if (name === "Program") {
-                      return (
-                        <Toggle
-                          key={`${name}-weekend`}
-                          label={name}
-                          scope={role.scope}
-                          checked={isRoleAssigned(name)}
-                          onChange={(v) => toggleRole(name, v)}
-                        />
-                      );
-                    }
-                    return (
-                      <Toggle
-                        key={name}
-                        label={name}
-                        scope={role.scope}
-                        checked={isRoleAssigned(name)}
-                        onChange={(v) => toggleRole(name, v)}
-                      />
-                    );
-                  })}
-                </div>
+              <SectionHeader id="program.weekend.title" />
+              <div className="divide-y divide-[var(--border)]">
+                {WEEKEND_ROLES.map(({ name, labelKey }) => {
+                  const role = roleByName(name);
+                  if (!role) return null;
+                  return (
+                    <Toggle
+                      key={name}
+                      label={intl.formatMessage({ id: labelKey })}
+                      scope={role.scope}
+                      checked={isRoleAssigned(name)}
+                      onChange={(v) => toggleRole(name, v)}
+                    />
+                  );
+                })}
               </div>
             </div>
           </>
