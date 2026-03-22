@@ -130,7 +130,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // Internal-only endpoint for MCP skill to provision auth (setup token)
   // Called during tenant approval — creates or resets TenantAuth with a fresh setup token.
   // Auth: ADMIN_SECRET — operator-only, NOT shared with tenants (SEC-003 privilege boundary fix)
-  app.post('/internal/provision-auth', async (req, reply) => {
+  app.post('/internal/provision-auth', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!validateAdminAuth(req.headers.authorization)) {
       return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing admin secret' });
     }

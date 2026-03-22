@@ -99,7 +99,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: typeof PasswordBody.static }>(
     "/security/password",
-    { schema: { body: PasswordBody } },
+    { schema: { body: PasswordBody }, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const userId = getUserId(request);
       const { currentPassword, newPassword } = request.body;
@@ -194,7 +194,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: typeof TotpVerifyBody.static }>(
     "/security/totp/verify",
-    { schema: { body: TotpVerifyBody } },
+    { schema: { body: TotpVerifyBody }, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const userId = getUserId(request);
       const { code } = request.body;
@@ -257,7 +257,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    * DELETE /security/totp
    * Remove TOTP. Blocked if no passkey exists.
    */
-  app.delete("/security/totp", async (request, reply) => {
+  app.delete("/security/totp", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const userId = getUserId(request);
 
     // Check if user has a passkey (Keycloak first, fallback local DB)
@@ -353,7 +353,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post<{ Body: typeof PasskeyRegisterBody.static }>(
     "/security/passkeys/register",
-    { schema: { body: PasskeyRegisterBody } },
+    { schema: { body: PasskeyRegisterBody }, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const userId = getUserId(request);
       const { credential, label } = request.body;
@@ -463,6 +463,7 @@ export async function securityRoutes(app: FastifyInstance): Promise<void> {
    */
   app.delete<{ Params: { id: string } }>(
     "/security/passkeys/:id",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const userId = getUserId(request);
       const { id } = request.params;

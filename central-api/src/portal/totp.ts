@@ -85,7 +85,7 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /portal/totp/verify — verify code and enable 2FA
-  app.post('/totp/verify', async (req, reply) => {
+  app.post('/totp/verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const body = req.body as { code?: string } | null;
 
@@ -135,7 +135,7 @@ export async function totpRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /portal/totp/disable — disable 2FA (requires password)
-  app.post('/totp/disable', async (req, reply) => {
+  app.post('/totp/disable', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
     const body = req.body as { password?: string } | null;
 
