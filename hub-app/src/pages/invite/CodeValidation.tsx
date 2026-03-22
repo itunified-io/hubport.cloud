@@ -56,7 +56,7 @@ export function CodeValidation({ onSubmit, loading, error }: Props): ReactNode {
     const text = e.clipboardData.getData("text").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
     if (!text) return;
     const next = ["", "", "", "", "", ""];
-    for (let i = 0; i < text.length; i++) next[i] = text[i];
+    for (let i = 0; i < text.length; i++) next[i] = text[i] ?? "";
     setDigits(next);
     const focusIdx = Math.min(text.length, 5);
     inputs.current[focusIdx]?.focus();
