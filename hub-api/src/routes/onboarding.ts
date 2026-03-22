@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { createHash } from "node:crypto";
 import prisma from "../lib/prisma.js";
 import { audit } from "../lib/policy-engine.js";
-import { createInvitedKeycloakUser } from "../lib/keycloak-admin.js";
+import { createInvitedKeycloakUser, deleteKeycloakUser } from "../lib/keycloak-admin.js";
 import {
   generateOnboardingToken,
   hashToken,
@@ -112,7 +112,8 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
         }),
       ]);
     } catch (err) {
-      app.log.error({ err, keycloakSub }, "DB update failed after KC user creation — orphaned KC user");
+      app.log.error({ err, keycloakSub }, "DB update failed — deleting orphaned KC user");
+      try { await deleteKeycloakUser(keycloakSub); } catch (e) { app.log.error(e, "Failed to delete orphaned KC user"); }
       return reply.code(500).send({ error: "Kontoerstellung fehlgeschlagen", code: "DB_ERROR" });
     }
 
