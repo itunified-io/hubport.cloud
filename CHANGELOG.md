@@ -1,6 +1,11 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.5
+
+### SEC-004 Residual — MAIL_RELAY_SECRET Vault Migration
+- fix: users.ts invite flows read MAIL_RELAY_SECRET from Vault via getMailRelaySecret() (#174)
+
 ## v2026.03.22.4
 
 ### SEC-004 Phase 3 Residual — Verify Client + TOTP Encryption
