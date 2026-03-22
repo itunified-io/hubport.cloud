@@ -80,6 +80,8 @@ async function createPublisherRecord(
         firstName,
         lastName,
         email,
+        role: 'admin',
+        isOwner: true,
         congregationRole: 'elder',
         status: 'active',
         congregationFlags: [],

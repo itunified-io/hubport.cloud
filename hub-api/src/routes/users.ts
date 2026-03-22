@@ -573,4 +573,64 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // ─── Resend Invite ──────────────────────────────────────────────
+  // Generates a new invite code and sends the invite email again.
+
+  app.post<{ Params: IdParamsType }>(
+    "/users/:id/resend-invite",
+    {
+      preHandler: requirePermission(PERMISSIONS.ROLES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({ where: { id: request.params.id } });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+      if (publisher.status !== "invited" && publisher.status !== "pending_approval") {
+        return reply.code(400).send({ error: "Publisher is not in invited/pending state" });
+      }
+      if (!publisher.email) {
+        return reply.code(400).send({ error: "Publisher has no email address" });
+      }
+
+      // Generate new invite code (invalidates old one)
+      const newCode = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+      const hash = createHash("sha256").update(newCode).digest("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      // Delete old invite codes for this publisher and create new one
+      await prisma.inviteCode.deleteMany({ where: { publisherId: publisher.id } });
+      await prisma.inviteCode.create({
+        data: { hash, publisherId: publisher.id, expiresAt },
+      });
+
+      // Send invite email via central API relay
+      const centralApiUrl = process.env.CENTRAL_API_URL || process.env.HUB_API_URL;
+      const apiToken = process.env.HUBPORT_API_TOKEN;
+      const tenantSlug = process.env.WEBAUTHN_RP_ID?.replace(".hubport.cloud", "") || "tenant";
+
+      if (centralApiUrl && apiToken) {
+        try {
+          await fetch(`${centralApiUrl}/admin/internal/send-email`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiToken}`,
+            },
+            body: JSON.stringify({
+              to: publisher.email,
+              subject: `Einladung zu ${tenantSlug}.hubport.cloud`,
+              templateName: "invite",
+              templateData: { firstName: publisher.firstName, inviteCode: newCode, tenantSlug },
+            }),
+          });
+        } catch (err) {
+          app.log.error(err, "resend invite email relay error");
+        }
+      }
+
+      await audit("user.resend_invite", request.user.sub, "Publisher", publisher.id, null, { inviteCode: newCode });
+      return { ok: true, inviteCode: newCode };
+    },
+  );
 }

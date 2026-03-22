@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
@@ -88,6 +88,9 @@ const DUTY_ROLE_NAMES = [
   "Vortragsplaner",
 ];
 
+const TABS = ["personal", "congregation", "duties", "roles"] as const;
+type Tab = typeof TABS[number];
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 const inputCls =
@@ -161,6 +164,9 @@ export function PublisherForm() {
     "Content-Type": "application/json",
   };
 
+  // ─── Tab state ──────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<Tab>("personal");
+
   // ─── Form state ─────────────────────────────────────────────────
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -191,6 +197,10 @@ export function PublisherForm() {
   const [allRoles, setAllRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+
+  // ─── Resend invite state ────────────────────────────────────────
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   // ─── Load data ──────────────────────────────────────────────────
   useEffect(() => {
@@ -319,6 +329,21 @@ export function PublisherForm() {
     setEmailSent(true);
   };
 
+  // ─── Resend invite ────────────────────────────────────────────
+  const resendInvite = async () => {
+    if (!id || !email) return;
+    setResending(true);
+    setResendSuccess(false);
+    try {
+      const res = await fetch(`${apiUrl}/users/${id}/resend-invite`, {
+        method: "POST", headers,
+      });
+      if (res.ok) setResendSuccess(true);
+    } finally {
+      setResending(false);
+    }
+  };
+
   // ─── Save ───────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,6 +452,20 @@ export function PublisherForm() {
                   <UserX size={14} />
                   <FormattedMessage id="publishers.reject" />
                 </button>
+                {email && (
+                  <button
+                    type="button"
+                    onClick={resendInvite}
+                    disabled={resending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--amber)] border border-[var(--amber)] border-opacity-30 rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer disabled:opacity-50"
+                  >
+                    <RotateCw size={14} className={resending ? "animate-spin" : ""} />
+                    {resendSuccess
+                      ? <FormattedMessage id="publishers.resendInvite.success" />
+                      : <FormattedMessage id="publishers.resendInvite" />
+                    }
+                  </button>
+                )}
               </>
             )}
             {publisherStatus === "active" && (
@@ -513,220 +552,240 @@ export function PublisherForm() {
         </div>
       )}
 
+      {/* ── Tab Bar (edit mode: 4 tabs, create mode: form inline) ── */}
+      {isEdit && (
+        <div className="flex border-b border-[var(--border)]">
+          {TABS.map((tab) => {
+            // Only show duties/roles tabs in edit mode
+            if ((tab === "duties" || tab === "roles") && !isEdit) return null;
+            // Only show roles tab if user can manage users
+            if (tab === "roles" && !canManageUsers) return null;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                  activeTab === tab
+                    ? "text-[var(--amber)] border-b-2 border-[var(--amber)] -mb-px"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                <FormattedMessage id={`publishers.tab.${tab}`} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-6">
-        {/* ── Section 1: Personal Information ─────────────────────── */}
-        <div className={sectionCls}>
-          <SectionHeader id="publishers.personalInfo" />
+        {/* ── Tab: Personal (or create mode: all inline) ────────────── */}
+        {(!isEdit || activeTab === "personal") && (
+          <>
+            {/* Personal Information */}
+            <div className={sectionCls}>
+              <SectionHeader id="publishers.personalInfo" />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.firstName" /> *
-              </label>
-              <input
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.lastName" /> *
-              </label>
-              <input
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-[var(--text-muted)]">
-              <FormattedMessage id="publishers.displayName" />
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder={intl.formatMessage({ id: "publishers.displayName.hint" })}
-              className={inputCls}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.gender" />
-              </label>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">—</option>
-                <option value="male">{intl.formatMessage({ id: "publishers.gender.male" })}</option>
-                <option value="female">{intl.formatMessage({ id: "publishers.gender.female" })}</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.dateOfBirth" />
-              </label>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Section 2: Contact ──────────────────────────────────── */}
-        <div className={sectionCls}>
-          <SectionHeader id="publishers.contact" />
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.email" />
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.phone" />
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-[var(--text-muted)]">
-              <FormattedMessage id="publishers.address" />
-            </label>
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={2}
-              className={inputCls + " resize-none"}
-            />
-          </div>
-        </div>
-
-        {/* ── Section 3: Congregation ─────────────────────────────── */}
-        <div className={sectionCls}>
-          <SectionHeader id="publishers.congregation" />
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.congregationRole" />
-              </label>
-              <select
-                value={congregationRole}
-                onChange={(e) => {
-                  setCongregationRole(e.target.value);
-                  // Clear role-specific flags when role changes
-                  setCongregationFlags((prev) =>
-                    prev.filter((f) => COMMON_FLAGS.includes(f)),
-                  );
-                }}
-                className={selectCls}
-              >
-                <option value="publisher">{intl.formatMessage({ id: "publishers.role.publisher" })}</option>
-                <option value="ministerial_servant">{intl.formatMessage({ id: "publishers.role.ministerialServant" })}</option>
-                <option value="elder">{intl.formatMessage({ id: "publishers.role.elder" })}</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.status" />
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className={selectCls}
-              >
-                <option value="active">{intl.formatMessage({ id: "publishers.status.active" })}</option>
-                <option value="inactive">{intl.formatMessage({ id: "publishers.status.inactive" })}</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Congregation Flags */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-[var(--text-muted)]">
-              <FormattedMessage id="publishers.congregationFlags" />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {availableFlags.map((flag) => (
-                <button
-                  key={flag}
-                  type="button"
-                  onClick={() => toggleFlag(flag)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
-                    congregationFlags.includes(flag)
-                      ? "bg-[var(--amber)] text-black border-[var(--amber)] font-semibold"
-                      : "bg-transparent text-[var(--text-muted)] border-[var(--border-2)] hover:border-[var(--amber)] hover:text-[var(--text)]"
-                  }`}
-                >
-                  {intl.formatMessage({ id: `publishers.flag.${flag}` })}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Section 4: Duties ───────────────────────────────────── */}
-        {isEdit && (
-          <div className={sectionCls}>
-            <SectionHeader id="publishers.duties" />
-            <div className="divide-y divide-[var(--border)]">
-              {DUTY_ROLE_NAMES.map((name) => {
-                const role = roleByName(name);
-                if (!role) return null;
-                return (
-                  <Toggle
-                    key={name}
-                    label={name}
-                    scope={role.scope}
-                    checked={isRoleAssigned(name)}
-                    onChange={(v) => toggleRole(name, v)}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.firstName" /> *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className={inputCls}
                   />
-                );
-              })}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.lastName" /> *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-[var(--text-muted)]">
+                  <FormattedMessage id="publishers.displayName" />
+                </label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={intl.formatMessage({ id: "publishers.displayName.hint" })}
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.gender" />
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="">—</option>
+                    <option value="male">{intl.formatMessage({ id: "publishers.gender.male" })}</option>
+                    <option value="female">{intl.formatMessage({ id: "publishers.gender.female" })}</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.dateOfBirth" />
+                  </label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div className={sectionCls}>
+              <SectionHeader id="publishers.contact" />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.email" />
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.phone" />
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-[var(--text-muted)]">
+                  <FormattedMessage id="publishers.address" />
+                </label>
+                <textarea
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  rows={2}
+                  className={inputCls + " resize-none"}
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className={sectionCls}>
+              <SectionHeader id="publishers.notes" />
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className={inputCls + " resize-none"}
+                placeholder={intl.formatMessage({ id: "publishers.notes.placeholder" })}
+              />
+            </div>
+          </>
+        )}
+
+        {/* ── Tab: Congregation ──────────────────────────────────── */}
+        {(!isEdit || activeTab === "congregation") && (
+          <div className={sectionCls}>
+            <SectionHeader id="publishers.congregation" />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-[var(--text-muted)]">
+                  <FormattedMessage id="publishers.congregationRole" />
+                </label>
+                <select
+                  value={congregationRole}
+                  onChange={(e) => {
+                    setCongregationRole(e.target.value);
+                    setCongregationFlags((prev) =>
+                      prev.filter((f) => COMMON_FLAGS.includes(f)),
+                    );
+                  }}
+                  className={selectCls}
+                >
+                  <option value="publisher">{intl.formatMessage({ id: "publishers.role.publisher" })}</option>
+                  <option value="ministerial_servant">{intl.formatMessage({ id: "publishers.role.ministerialServant" })}</option>
+                  <option value="elder">{intl.formatMessage({ id: "publishers.role.elder" })}</option>
+                </select>
+              </div>
+              {isEdit && (
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.status" />
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="active">{intl.formatMessage({ id: "publishers.status.active" })}</option>
+                    <option value="inactive">{intl.formatMessage({ id: "publishers.status.inactive" })}</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Congregation Flags */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[var(--text-muted)]">
+                <FormattedMessage id="publishers.congregationFlags" />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableFlags.map((flag) => (
+                  <button
+                    key={flag}
+                    type="button"
+                    onClick={() => toggleFlag(flag)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-colors cursor-pointer ${
+                      congregationFlags.includes(flag)
+                        ? "bg-[var(--amber)] text-black border-[var(--amber)] font-semibold"
+                        : "bg-transparent text-[var(--text-muted)] border-[var(--border-2)] hover:border-[var(--amber)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {intl.formatMessage({ id: `publishers.flag.${flag}` })}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── Section 5: Program (Midweek / Weekend) ──────────────── */}
-        {isEdit && (
-          <div className={sectionCls}>
-            <SectionHeader id="publishers.program" />
-
-            {/* Midweek */}
-            <div className="space-y-1">
-              <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
-                <FormattedMessage id="publishers.program.midweek" />
-              </h3>
+        {/* ── Tab: Duties ───────────────────────────────────────── */}
+        {isEdit && activeTab === "duties" && (
+          <>
+            {/* Duty Roles */}
+            <div className={sectionCls}>
+              <SectionHeader id="publishers.duties" />
               <div className="divide-y divide-[var(--border)]">
-                {(["Program", "LM Overseer"] as const).map((name) => {
+                {DUTY_ROLE_NAMES.map((name) => {
                   const role = roleByName(name);
                   if (!role) return null;
                   return (
@@ -742,71 +801,85 @@ export function PublisherForm() {
               </div>
             </div>
 
-            {/* Weekend */}
-            <div className="space-y-1 pt-4">
-              <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
-                <FormattedMessage id="publishers.program.weekend" />
-              </h3>
-              <div className="divide-y divide-[var(--border)]">
-                {(["Program", "WT Conductor", "Vortragsplaner"] as const).map((name) => {
-                  const role = roleByName(name);
-                  if (!role) return null;
-                  // Don't duplicate Program if already shown
-                  if (name === "Program" && isRoleAssigned("Program")) {
-                    return (
-                      <div key={`${name}-weekend`} className="flex items-center justify-between py-2">
-                        <span className="flex items-center gap-2 text-sm text-[var(--text)]">
-                          {name}
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--glass)] text-[var(--text-muted)]">
-                            <FormattedMessage id="publishers.program.assignedAbove" />
-                          </span>
-                        </span>
-                        <span className="h-5 w-9 inline-flex items-center justify-center">
-                          <span className="text-[10px] text-[var(--amber)]">✓</span>
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (name === "Program") {
+            {/* Program (Midweek / Weekend) */}
+            <div className={sectionCls}>
+              <SectionHeader id="publishers.program" />
+
+              {/* Midweek */}
+              <div className="space-y-1">
+                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
+                  <FormattedMessage id="publishers.program.midweek" />
+                </h3>
+                <div className="divide-y divide-[var(--border)]">
+                  {(["Program", "LM Overseer"] as const).map((name) => {
+                    const role = roleByName(name);
+                    if (!role) return null;
                     return (
                       <Toggle
-                        key={`${name}-weekend`}
+                        key={name}
                         label={name}
                         scope={role.scope}
                         checked={isRoleAssigned(name)}
                         onChange={(v) => toggleRole(name, v)}
                       />
                     );
-                  }
-                  return (
-                    <Toggle
-                      key={name}
-                      label={name}
-                      scope={role.scope}
-                      checked={isRoleAssigned(name)}
-                      onChange={(v) => toggleRole(name, v)}
-                    />
-                  );
-                })}
+                  })}
+                </div>
+              </div>
+
+              {/* Weekend */}
+              <div className="space-y-1 pt-4">
+                <h3 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">
+                  <FormattedMessage id="publishers.program.weekend" />
+                </h3>
+                <div className="divide-y divide-[var(--border)]">
+                  {(["Program", "WT Conductor", "Vortragsplaner"] as const).map((name) => {
+                    const role = roleByName(name);
+                    if (!role) return null;
+                    if (name === "Program" && isRoleAssigned("Program")) {
+                      return (
+                        <div key={`${name}-weekend`} className="flex items-center justify-between py-2">
+                          <span className="flex items-center gap-2 text-sm text-[var(--text)]">
+                            {name}
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--glass)] text-[var(--text-muted)]">
+                              <FormattedMessage id="publishers.program.assignedAbove" />
+                            </span>
+                          </span>
+                          <span className="h-5 w-9 inline-flex items-center justify-center">
+                            <span className="text-[10px] text-[var(--amber)]">✓</span>
+                          </span>
+                        </div>
+                      );
+                    }
+                    if (name === "Program") {
+                      return (
+                        <Toggle
+                          key={`${name}-weekend`}
+                          label={name}
+                          scope={role.scope}
+                          checked={isRoleAssigned(name)}
+                          onChange={(v) => toggleRole(name, v)}
+                        />
+                      );
+                    }
+                    return (
+                      <Toggle
+                        key={name}
+                        label={name}
+                        scope={role.scope}
+                        checked={isRoleAssigned(name)}
+                        onChange={(v) => toggleRole(name, v)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* ── Section 6: Notes ────────────────────────────────────── */}
-        <div className={sectionCls}>
-          <SectionHeader id="publishers.notes" />
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            className={inputCls + " resize-none"}
-            placeholder={intl.formatMessage({ id: "publishers.notes.placeholder" })}
-          />
-        </div>
-
-        {/* ── Section 7: All Roles (full assignment list) ──────────── */}
-        {isEdit && canManageUsers && (
+        {/* ── Tab: Roles ─────────────────────────────────────────── */}
+        {isEdit && activeTab === "roles" && canManageUsers && (
           <div className={sectionCls}>
             <SectionHeader id="publishers.allRoles" />
             <div className="border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg)] divide-y divide-[var(--border)]">
