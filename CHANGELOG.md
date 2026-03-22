@@ -1,6 +1,19 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.3
+
+### SEC-004 Phase 3 — Tenant Security Hardening
+- fix: SecurityGate fail-closed + server-side `requireSecurityComplete()` middleware (#120)
+- fix: remove JWT_SECRET and ENCRYPTION_KEY dev fallbacks — fail hard (#121, #149)
+- fix: read Matrix admin credentials from env vars, not hardcoded (#153)
+- fix: defer tunnelToken/mailRelaySecret until device approved (#152, #154)
+- feat: extend hub-api field encryption to address, dateOfBirth, notes (#155, #157)
+- feat: central-api field encryption for email, names, tunnelToken, totpSecret (#156)
+- feat: vault-client extended for all operational secrets with env fallback (#150)
+- fix: token rotation reads/writes via Vault instead of file (#157)
+- feat: Jitsi JWT auth + HMAC-SHA256 room names (#151)
+
 ## v2026.03.22.2
 
 ### Invite Flow Fixes (#116, #118, #119)
