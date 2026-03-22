@@ -14,6 +14,19 @@ const KC_ADMIN_PASSWORD = process.env.KC_ADMIN_PASSWORD || '';
 const REALM = 'hubport';
 const DB_URL = process.env.DATABASE_URL || '';
 
+/**
+ * Bias-free random index: rejection sampling eliminates modulo bias.
+ * Rejects values >= (256 - 256 % max) so every index is equally likely.
+ */
+function secureRandomIndex(max: number): number {
+  const limit = 256 - (256 % max);
+  let byte: number;
+  do {
+    byte = randomBytes(1)[0]!;
+  } while (byte >= limit);
+  return byte % max;
+}
+
 /** Generate a random password meeting ADR-0077 policy (12+ chars, upper, lower, digit, special). */
 function generateTempPassword(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz';
@@ -24,20 +37,20 @@ function generateTempPassword(): string {
 
   // Guarantee at least one of each category
   const result = [
-    upper[randomBytes(1)[0]! % upper.length],
-    chars[randomBytes(1)[0]! % chars.length],
-    digits[randomBytes(1)[0]! % digits.length],
-    special[randomBytes(1)[0]! % special.length],
+    upper[secureRandomIndex(upper.length)]!,
+    chars[secureRandomIndex(chars.length)]!,
+    digits[secureRandomIndex(digits.length)]!,
+    special[secureRandomIndex(special.length)]!,
   ];
 
   // Fill remaining 12 chars
   for (let i = 0; i < 12; i++) {
-    result.push(all[randomBytes(1)[0]! % all.length]);
+    result.push(all[secureRandomIndex(all.length)]!);
   }
 
-  // Shuffle (Fisher-Yates)
+  // Shuffle (Fisher-Yates with unbiased random)
   for (let i = result.length - 1; i > 0; i--) {
-    const j = randomBytes(1)[0]! % (i + 1);
+    const j = secureRandomIndex(i + 1);
     [result[i], result[j]] = [result[j]!, result[i]!];
   }
 
