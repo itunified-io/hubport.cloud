@@ -13,18 +13,18 @@ export interface OnboardingTokenPayload {
   scope: "onboarding";
 }
 
-export function generateOnboardingToken(
+export async function generateOnboardingToken(
   app: FastifyInstance,
   publisherId: string,
   keycloakSub: string,
-): string {
-  // @fastify/jwt payload type is fixed to OIDC shape; onboarding tokens
-  // carry extra fields (kc, scope). Use `any` cast to bypass the constraint.
+): Promise<string> {
+  // @fastify/jwt sign may be sync or async depending on version
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (app.jwt.sign as any)(
+  const token = await (app.jwt.sign as any)(
     { sub: publisherId, kc: keycloakSub, scope: "onboarding" },
     { expiresIn: "30m" },
-  ) as string;
+  );
+  return token as string;
 }
 
 export function hashToken(token: string): string {

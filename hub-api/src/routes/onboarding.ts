@@ -59,7 +59,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 
     // Resume: already redeemed but not complete
     if (invite.redeemedAt && publisher.onboardingStep !== "complete") {
-      const token = generateOnboardingToken(app, publisher.id, publisher.keycloakSub!);
+      const token = await generateOnboardingToken(app, publisher.id, publisher.keycloakSub!);
       await prisma.publisher.update({
         where: { id: publisher.id },
         data: { onboardingToken: hashToken(token) },
@@ -120,7 +120,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(500).send({ error: "Kontoerstellung fehlgeschlagen", code: "DB_ERROR" });
     }
 
-    const token = generateOnboardingToken(app, publisher.id, keycloakSub);
+    const token = await generateOnboardingToken(app, publisher.id, keycloakSub);
     await prisma.publisher.update({
       where: { id: publisher.id },
       data: { onboardingToken: hashToken(token) },
@@ -192,7 +192,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
-    const token = generateOnboardingToken(app, publisherId, publisher.keycloakSub!);
+    const token = await generateOnboardingToken(app, publisherId, publisher.keycloakSub!);
     await prisma.publisher.update({
       where: { id: publisherId },
       data: { onboardingToken: hashToken(token) },
@@ -241,7 +241,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       data: { onboardingStep: "security" },
     });
 
-    const token = generateOnboardingToken(app, publisherId, publisher.keycloakSub!);
+    const token = await generateOnboardingToken(app, publisherId, publisher.keycloakSub!);
     await prisma.publisher.update({
       where: { id: publisherId },
       data: { onboardingToken: hashToken(token) },
