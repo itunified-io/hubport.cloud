@@ -287,7 +287,7 @@ function WeekCard({ meeting, apiUrl, headers, onRefresh, locked }: {
   const sectionGroups: Record<string, { parts: WorkbookPart[]; assignments: Assignment[] }> = {};
   for (const part of parts) {
     if (!sectionGroups[part.section]) sectionGroups[part.section] = { parts: [], assignments: [] };
-    sectionGroups[part.section].parts.push(part);
+    sectionGroups[part.section]!.parts.push(part);
   }
   for (const a of programAssignments) {
     const sec = a.workbookPart?.section ?? "treasures";
@@ -323,7 +323,7 @@ function WeekCard({ meeting, apiUrl, headers, onRefresh, locked }: {
           {(["treasures", "ministry", "living"] as const).map((sec) => {
             const group = sectionGroups[sec];
             if (!group || (group.parts.length === 0 && group.assignments.length === 0)) return null;
-            const colors = SECTION_COLORS[sec];
+            const colors = SECTION_COLORS[sec]!;
             return (
               <div key={sec}>
                 <div className={`${colors.header} px-4 py-1.5`}>
