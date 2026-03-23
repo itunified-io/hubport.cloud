@@ -17,9 +17,17 @@ import { serviceGroupRoutes } from "./routes/service-groups.js";
 import { cleaningRoutes } from "./routes/cleaning.js";
 import { jitsiRoutes } from "./routes/jitsi.js";
 import { internalRoutes } from "./routes/internal.js";
+import { workbookRoutes } from "./routes/workbooks.js";
+import { meetingPeriodRoutes } from "./routes/meeting-periods.js";
+import { meetingAssignmentRoutes } from "./routes/meeting-assignments.js";
+import { weekendStudyRoutes } from "./routes/weekend-study.js";
+import { speakerRoutes } from "./routes/speakers.js";
+import { publicTalkRoutes } from "./routes/public-talks.js";
+import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
+import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
 
 const app = Fastify({
   logger: {
@@ -69,6 +77,13 @@ async function start(): Promise<void> {
   await app.register(cleaningRoutes);
   await app.register(jitsiRoutes);
   await app.register(internalRoutes);
+  await app.register(workbookRoutes);
+  await app.register(meetingPeriodRoutes);
+  await app.register(meetingAssignmentRoutes);
+  await app.register(weekendStudyRoutes);
+  await app.register(speakerRoutes);
+  await app.register(publicTalkRoutes);
+  await app.register(congregationSettingsRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
@@ -94,6 +109,10 @@ async function start(): Promise<void> {
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
     app.log.info("System roles up to date");
+
+    app.log.info("Upserting meeting slot templates...");
+    await seedSlotTemplates();
+    app.log.info("Slot templates up to date");
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }
