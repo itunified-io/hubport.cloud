@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.23.4
+
+### Fix: Password verification bypasses 2FA required actions (#188)
+- fix: verifyPassword() temporarily clears Keycloak requiredActions before password grant
+- Restores requiredActions in finally block (always, even on error)
+- Fixes SecurityGate deadlock: password change blocked by CONFIGURE_TOTP
+
 ## v2026.03.23.1
 
 ### Publisher Bootstrap Endpoint (#116)
