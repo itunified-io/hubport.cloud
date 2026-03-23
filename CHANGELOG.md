@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.23.5
+
+### Installer E2E Fixes — Invite, RBAC, Encryption, JWT
+- fix: bootstrap assigns Admin AppRole (WILDCARD) to hub owner (#188, #190)
+- fix: invite redeem passes decrypted email to Keycloak (#191, #192)
+- fix: add findUniqueOrThrow/findFirstOrThrow to encryption READ_ACTIONS (#191)
+- fix: await async generateOnboardingToken — fastify/jwt sign returns Promise (#191)
+- fix: use standalone fast-jwt signer for onboarding tokens (JWKS can't sign) (#191)
+
 ## v2026.03.23.4
 
 ### Fix: Password verification bypasses 2FA required actions (#188)
