@@ -38,7 +38,6 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 
     const invite = await prisma.inviteCode.findUnique({
       where: { codeHash },
-      include: { publisher: true },
     });
 
     if (!invite) {
@@ -52,7 +51,11 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const publisher = invite.publisher;
+    // Fetch publisher separately so encryption extension decrypts fields
+    // (include:{publisher:true} on InviteCode skips Publisher decryption)
+    const publisher = await prisma.publisher.findUniqueOrThrow({
+      where: { id: invite.publisherId },
+    });
 
     // Resume: already redeemed but not complete
     if (invite.redeemedAt && publisher.onboardingStep !== "complete") {
