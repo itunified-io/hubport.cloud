@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.23.1
+
+### Publisher Bootstrap Endpoint (#116)
+- feat: POST /internal/bootstrap — one-shot admin publisher creation
+- Guarded by X-Bootstrap-Secret + zero-publisher count
+- Added /internal to security + privacy exempt routes
+
 ## v2026.03.22.8
 
 ### Node.js 22 Upgrade + Build Fixes
