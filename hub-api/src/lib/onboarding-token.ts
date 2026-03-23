@@ -1,10 +1,11 @@
 /**
  * Onboarding token — short-lived JWT for invite signup wizard.
- * Uses @fastify/jwt (already registered on Fastify instance).
+ * Uses fast-jwt with a local HMAC secret (NOT app.jwt which uses JWKS for verification only).
  * Single-tenant-per-database — no tenant ID needed.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { createSigner, createVerifier } from "fast-jwt";
 import prisma from "./prisma.js";
 
 export interface OnboardingTokenPayload {
@@ -13,18 +14,28 @@ export interface OnboardingTokenPayload {
   scope: "onboarding";
 }
 
+/** Get or generate the onboarding token signing secret */
+function getOnboardingSecret(): string {
+  // Use KEYCLOAK_ADMIN_CLIENT_SECRET as HMAC key (available in every tenant stack)
+  // Falls back to JWT_SECRET or a per-process random (dev only)
+  return (
+    process.env.KEYCLOAK_ADMIN_CLIENT_SECRET ??
+    process.env.JWT_SECRET ??
+    randomBytes(32).toString("hex")
+  );
+}
+
 export async function generateOnboardingToken(
-  app: FastifyInstance,
+  _app: FastifyInstance,
   publisherId: string,
   keycloakSub: string,
 ): Promise<string> {
-  // @fastify/jwt sign may be sync or async depending on version
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const token = await (app.jwt.sign as any)(
-    { sub: publisherId, kc: keycloakSub, scope: "onboarding" },
-    { expiresIn: "30m" },
-  );
-  return token as string;
+  const signer = createSigner({
+    key: getOnboardingSecret(),
+    algorithm: "HS256",
+    expiresIn: 1800000, // 30 minutes in ms
+  });
+  return signer({ sub: publisherId, kc: keycloakSub, scope: "onboarding" });
 }
 
 export function hashToken(token: string): string {
@@ -51,7 +62,8 @@ export async function requireOnboardingToken(
   let payload: OnboardingTokenPayload;
 
   try {
-    payload = app.jwt.verify<OnboardingTokenPayload>(token);
+    const verifier = createVerifier({ key: getOnboardingSecret(), algorithms: ["HS256"] });
+    payload = verifier(token) as OnboardingTokenPayload;
   } catch {
     reply.code(401).send({ error: "Sitzung abgelaufen", code: "TOKEN_EXPIRED" });
     return false;
