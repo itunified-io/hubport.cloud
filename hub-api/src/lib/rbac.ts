@@ -128,7 +128,7 @@ export function requireAnyPermission(...permissions: string[]): preHandlerHookHa
 // ─── Security Setup Enforcement (ADR-0081) ──────────────────────────
 
 /** Routes exempt from the security-complete check. */
-const SECURITY_EXEMPT_ROUTES = ["/health", "/onboarding", "/security", "/publishers/me/privacy"];
+const SECURITY_EXEMPT_ROUTES = ["/health", "/onboarding", "/security", "/publishers/me/privacy", "/internal"];
 
 /**
  * Server-side enforcement: blocks API access unless the user has
@@ -184,6 +184,7 @@ export function requirePrivacyAccepted(): preHandlerHookHandler {
       request.url.startsWith("/health") ||
       request.url.startsWith("/onboarding") ||
       request.url.startsWith("/security") ||
+      request.url.startsWith("/internal") ||
       request.url === "/publishers/me/privacy" ||
       request.url === "/permissions/me"
     ) {
