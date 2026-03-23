@@ -54,8 +54,7 @@ export async function checkWorkbookAvailability(
 
     const month = BIMONTHLY_STARTS[biIdx];
     const endMonth = month + 1;
-    const yearStr = String(year).slice(-2);
-    const issueCode = `${yearStr}${String(month).padStart(2, "0")}`;
+    const issueCode = `${year}${String(month).padStart(2, "0")}`;
     const yearMonth = `${year}-${String(month).padStart(2, "0")}`;
 
     // Month names for label
@@ -103,9 +102,9 @@ export async function checkWorkbookAvailability(
           }
         }
 
-        // Try dedicated thumbnail endpoint
+        // Cover thumbnail from JW CDN — pattern: /img/p/mwb/{YYYYMM}/{LOCALE}/pt/mwb_{LOCALE}_{YYYYMM}_lg.jpg
         if (hasFiles && !thumbnailUrl) {
-          thumbnailUrl = `https://cms-imgp.jw-cdn.org/img/p/mwb/${issueCode}/univ/art/mwb${issueCode}_xl.jpg`;
+          thumbnailUrl = `https://cms-imgp.jw-cdn.org/img/p/mwb/${issueCode}/${wtLocale}/pt/mwb_${wtLocale}_${issueCode}_lg.jpg`;
         }
 
         results.push({
@@ -156,8 +155,7 @@ export async function checkStudyAvailability(
 
     const month = BIMONTHLY_STARTS[biIdx];
     const endMonth = month + 1;
-    const yearStr = String(year).slice(-2);
-    const issueCode = `${yearStr}${String(month).padStart(2, "0")}`;
+    const issueCode = `${year}${String(month).padStart(2, "0")}`;
     const yearMonth = `${year}-${String(month).padStart(2, "0")}`;
     const startLabel = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long" });
     const endLabel = new Date(year, endMonth - 1, 1).toLocaleDateString("en-US", { month: "long" });
@@ -177,7 +175,7 @@ export async function checkStudyAvailability(
           yearMonth, label, available: !!hasFiles, publicationCode: "w",
           issueCode,
           url: hasFiles ? `https://www.jw.org/finder?wtlocale=${wtLocale}&pub=w&issue=${issueCode}` : null,
-          thumbnailUrl: hasFiles ? `https://cms-imgp.jw-cdn.org/img/p/w/${issueCode}/univ/art/w${issueCode}_xl.jpg` : null,
+          thumbnailUrl: hasFiles ? `https://cms-imgp.jw-cdn.org/img/p/w/${issueCode}/${wtLocale}/pt/w_${wtLocale}_${issueCode}_lg.jpg` : null,
         });
       } else {
         results.push({ yearMonth, label, available: false, publicationCode: "w", issueCode, url: null, thumbnailUrl: null });
