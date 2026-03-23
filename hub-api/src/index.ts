@@ -26,6 +26,7 @@ import { publicTalkRoutes } from "./routes/public-talks.js";
 import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
+import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
 
@@ -135,6 +136,8 @@ async function start(): Promise<void> {
   await app.listen({ port, host });
   // Start API token auto-rotation
   startTokenRotationJob(app.log);
+  // Start workbook auto-fetch (checks for new editions every 12h)
+  startWorkbookAutoFetch(app.log);
   app.log.info(`hub-api listening on ${host}:${port}`);
 }
 

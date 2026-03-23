@@ -58,7 +58,6 @@ export function MidweekPlanner() {
   const [periods, setPeriods] = useState<MeetingPeriod[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<MeetingPeriod | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showTimeline, setShowTimeline] = useState(false);
   const [availableEditions, setAvailableEditions] = useState<AvailableEdition[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [importLanguage, setImportLanguage] = useState("de");
@@ -107,12 +106,7 @@ export function MidweekPlanner() {
     }
   }, [apiUrl, user?.access_token, importLanguage]);
 
-  useEffect(() => { loadPeriods(); }, [loadPeriods]);
-
-  const openTimeline = () => {
-    setShowTimeline(true);
-    loadTimeline();
-  };
+  useEffect(() => { loadPeriods(); loadTimeline(); }, [loadPeriods, loadTimeline]);
 
   const handleImport = async (yearMonth: string) => {
     setImportingMonth(yearMonth);
@@ -157,44 +151,26 @@ export function MidweekPlanner() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--text)]">Midweek Meeting Planner</h1>
-        <button
-          onClick={openTimeline}
-          className="px-4 py-2 bg-[var(--amber)] text-black font-semibold rounded-[var(--radius)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
+        <select
+          value={importLanguage}
+          onChange={(e) => {
+            setImportLanguage(e.target.value);
+            setTimeout(() => loadTimeline(), 0);
+          }}
+          className="px-3 py-1.5 bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm text-[var(--text)]"
         >
-          Import Workbook
-        </button>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="ru">Русский</option>
+        </select>
       </div>
 
-      {/* Timeline / Import Panel */}
-      {showTimeline && (
-        <div className="bg-[var(--bg-1)] rounded-[var(--radius)] border border-[var(--border)] p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--text)]">Available Workbook Editions</h2>
-            <div className="flex items-center gap-3">
-              <select
-                value={importLanguage}
-                onChange={(e) => {
-                  setImportLanguage(e.target.value);
-                  setTimeout(() => loadTimeline(), 0);
-                }}
-                className="px-3 py-1.5 bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm text-[var(--text)]"
-              >
-                <option value="de">Deutsch</option>
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="it">Italiano</option>
-                <option value="pt">Português</option>
-                <option value="ru">Русский</option>
-              </select>
-              <button
-                onClick={() => setShowTimeline(false)}
-                className="text-sm text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+      {/* Workbook Editions */}
+      <div>
 
           {importError && (
             <p className="text-red-400 text-sm">{importError}</p>
@@ -301,11 +277,10 @@ export function MidweekPlanner() {
               })}
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {/* Period List */}
-      {!selectedPeriod && !showTimeline && (
+      {!selectedPeriod && (
         <div className="space-y-3">
           {periods.length === 0 ? (
             <div className="text-center py-12 text-[var(--text-muted)]">
