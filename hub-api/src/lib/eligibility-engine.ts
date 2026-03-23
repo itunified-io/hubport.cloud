@@ -136,7 +136,7 @@ export async function checkEligibility(
 export async function getEligiblePublishers(
   slotKey: string,
   meetingType: "midweek" | "weekend",
-): Promise<{ publisherId: string; firstName: string; lastName: string; displayName: string | null }[]> {
+): Promise<{ id: string; firstName: string; lastName: string; displayName: string | null }[]> {
   const publishers = await prisma.publisher.findMany({
     where: { status: "active" },
     select: { id: true, firstName: true, lastName: true, displayName: true },
