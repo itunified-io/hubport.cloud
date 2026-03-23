@@ -194,4 +194,73 @@ export async function meetingPeriodRoutes(app: FastifyInstance): Promise<void> {
       return { success: true, status: "open" };
     },
   );
+
+  // Delete a period (admin only — for cleanup of orphans/duplicates)
+  app.delete<{ Params: IdParamsType }>(
+    "/meeting-periods/:id",
+    {
+      preHandler: requirePermission(PERMISSIONS.WILDCARD),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const period = await prisma.meetingPeriod.findUnique({
+        where: { id: request.params.id },
+        include: { meetings: { select: { id: true } } },
+      });
+      if (!period) {
+        return reply.code(404).send({ error: "Period not found" });
+      }
+
+      const actorId = request.user?.sub ?? "unknown";
+
+      // Unlink meetings from this period (don't delete the meetings themselves)
+      await prisma.meeting.updateMany({
+        where: { meetingPeriodId: period.id },
+        data: { meetingPeriodId: null },
+      });
+
+      await prisma.meetingPeriod.delete({ where: { id: period.id } });
+      await audit("meeting_period.delete", actorId, "MeetingPeriod", period.id);
+      return reply.code(204).send();
+    },
+  );
+
+  // Cleanup: remove duplicate/empty periods
+  app.post(
+    "/meeting-periods/cleanup",
+    { preHandler: requirePermission(PERMISSIONS.WILDCARD) },
+    async (request) => {
+      const actorId = request.user?.sub ?? "unknown";
+
+      // Find periods with 0 meetings that have a duplicate (same sourceEditionId with meetings)
+      const allPeriods = await prisma.meetingPeriod.findMany({
+        include: { _count: { select: { meetings: true } } },
+      });
+
+      let removed = 0;
+      const editionGroups = new Map<string, typeof allPeriods>();
+      for (const p of allPeriods) {
+        const key = p.sourceEditionId ?? p.id;
+        if (!editionGroups.has(key)) editionGroups.set(key, []);
+        editionGroups.get(key)!.push(p);
+      }
+
+      for (const [, group] of editionGroups) {
+        if (group.length <= 1) continue;
+        // Keep the one with the most meetings, delete the rest
+        group.sort((a, b) => b._count.meetings - a._count.meetings);
+        for (let i = 1; i < group.length; i++) {
+          await prisma.meeting.updateMany({
+            where: { meetingPeriodId: group[i].id },
+            data: { meetingPeriodId: group[0].id },
+          });
+          await prisma.meetingPeriod.delete({ where: { id: group[i].id } });
+          await audit("meeting_period.cleanup", actorId, "MeetingPeriod", group[i].id);
+          removed++;
+        }
+      }
+
+      return { cleaned: removed };
+    },
+  );
 }

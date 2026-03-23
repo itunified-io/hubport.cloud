@@ -13,7 +13,7 @@ import {
   commitWorkbookImport,
 } from "../lib/importers/jw/midweek-workbook-importer.js";
 
-const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export function startWorkbookAutoFetch(log: FastifyBaseLogger): void {
   // Run on startup (after a short delay to let DB settle)
@@ -22,7 +22,7 @@ export function startWorkbookAutoFetch(log: FastifyBaseLogger): void {
   // Then every 12 hours
   setInterval(() => autoFetchCurrentEdition(log), CHECK_INTERVAL_MS);
 
-  log.info("[workbook-auto-fetch] Job started (interval: 12h)");
+  log.info("[workbook-auto-fetch] Job started (interval: 7d)");
 }
 
 async function autoFetchCurrentEdition(log: FastifyBaseLogger): Promise<void> {

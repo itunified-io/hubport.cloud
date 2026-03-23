@@ -120,25 +120,38 @@ export async function commitWorkbookImport(
       }
     }
 
-    // 4. Create or update MeetingPeriod
+    // 4. Find existing or create MeetingPeriod (prevent duplicates)
     const weekDates = edition.weeks.map((w) => new Date(w.weekOf));
     const startDate = new Date(Math.min(...weekDates.map((d) => d.getTime())));
     const endDate = new Date(Math.max(...weekDates.map((d) => d.getTime())));
     // End date is the Sunday of the last week
     endDate.setDate(endDate.getDate() + 6);
 
-    const period = await tx.meetingPeriod.create({
-      data: {
-        type: "midweek_workbook",
-        status: "open",
-        language: edition.language,
-        startDate,
-        endDate,
-        sourceEditionId: dbEdition.id,
-        openedBy: actorId,
-        openedAt: new Date(),
-      },
+    // Check for existing period linked to this edition
+    let period = await tx.meetingPeriod.findFirst({
+      where: { sourceEditionId: dbEdition.id },
     });
+
+    if (period) {
+      // Update existing period dates (reimport may shift them)
+      period = await tx.meetingPeriod.update({
+        where: { id: period.id },
+        data: { startDate, endDate },
+      });
+    } else {
+      period = await tx.meetingPeriod.create({
+        data: {
+          type: "midweek_workbook",
+          status: "open",
+          language: edition.language,
+          startDate,
+          endDate,
+          sourceEditionId: dbEdition.id,
+          openedBy: actorId,
+          openedAt: new Date(),
+        },
+      });
+    }
 
     // 5. Create meetings for each week + seed assignment slots
     let meetingsCreated = 0;
