@@ -1,7 +1,7 @@
 # hubport.cloud — Multi-stage Docker build
 # Bundles: hub-app (React SPA) + hub-api (Fastify) + setup-wizard
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Copy all package files for workspace install
@@ -10,7 +10,11 @@ COPY hub-app/package*.json ./hub-app/
 COPY hub-api/package*.json ./hub-api/
 COPY setup-wizard/package*.json ./setup-wizard/
 COPY central-api/package*.json ./central-api/
-RUN npm ci
+# npm ci uses lockfile for exact versions, then force-install the platform-specific
+# rollup binary (npm bug #4828: macOS lockfile omits Linux optional deps)
+RUN npm ci --legacy-peer-deps && \
+    node -e "try{require('@rollup/rollup-linux-x64-musl')}catch(e){process.exit(1)}" 2>/dev/null || \
+    npm install @rollup/rollup-linux-x64-musl --no-save --legacy-peer-deps
 
 # Copy source and build hub-api (Prisma + TypeScript)
 COPY hub-api/ ./hub-api/
@@ -25,7 +29,7 @@ COPY setup-wizard/ ./setup-wizard/
 RUN npm run build --workspace=setup-wizard
 
 # --- Runtime ---
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 
 RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
