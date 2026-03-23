@@ -114,7 +114,7 @@ async function decryptResult(result: unknown): Promise<void> {
 const WRITE_ACTIONS = ["create", "update", "upsert", "createMany", "updateMany"];
 
 /** Actions that read data and therefore need decryption after the DB call. */
-const READ_ACTIONS = ["findUnique", "findFirst", "findMany"];
+const READ_ACTIONS = ["findUnique", "findUniqueOrThrow", "findFirst", "findFirstOrThrow", "findMany"];
 
 /**
  * Returns a Prisma client extension that handles transparent
