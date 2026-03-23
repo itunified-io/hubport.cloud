@@ -17,6 +17,12 @@ interface SeedRole {
 
 const SYSTEM_ROLES: SeedRole[] = [
   {
+    name: "Admin",
+    description: "Hub administrator — full access, any congregation role",
+    scope: "all",
+    permissions: [P.WILDCARD],
+  },
+  {
     name: "Coordinator",
     description: "Body of elders coordinator — full access",
     scope: "all",
