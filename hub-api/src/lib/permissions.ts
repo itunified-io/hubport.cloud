@@ -58,6 +58,30 @@ export const PERMISSIONS = {
   MEETINGS_EDIT: "app:meetings.edit",
   MEETINGS_PUBLISH: "app:meetings.publish",
 
+  // Workbook import
+  WORKBOOKS_VIEW: "app:workbooks.view",
+  WORKBOOKS_IMPORT: "app:workbooks.import",
+
+  // Meeting periods
+  MEETING_PERIODS_VIEW: "app:meeting_periods.view",
+  MEETING_PERIODS_MANAGE: "app:meeting_periods.manage",
+
+  // Meeting assignments
+  MEETING_ASSIGNMENTS_VIEW: "app:meeting_assignments.view",
+  MEETING_ASSIGNMENTS_EDIT: "app:meeting_assignments.edit",
+
+  // Weekend study
+  WEEKEND_STUDY_VIEW: "app:weekend_study.view",
+  WEEKEND_STUDY_IMPORT: "app:weekend_study.import",
+
+  // Public talks
+  PUBLIC_TALKS_VIEW: "app:public_talks.view",
+  PUBLIC_TALKS_EDIT: "app:public_talks.edit",
+
+  // Speakers
+  SPEAKERS_VIEW: "app:speakers.view",
+  SPEAKERS_EDIT: "app:speakers.edit",
+
   // Territories
   TERRITORIES_VIEW: "app:territories.view",
   TERRITORIES_EDIT: "app:territories.edit",
@@ -134,6 +158,10 @@ export const PERMISSIONS = {
   MANAGE_ORDNUNGSDIENST: "manage:ordnungsdienst",
   MANAGE_PROGRAM: "manage:program",
   MANAGE_CLEANING: "manage:cleaning",
+  MANAGE_MIDWEEK_PROGRAM: "manage:midweek_program",
+  MANAGE_WEEKEND_PROGRAM: "manage:weekend_program",
+  MANAGE_MEETING_DUTIES: "manage:meeting_duties",
+  MANAGE_PUBLIC_TALKS: "manage:public_talks",
 
   // Wildcard
   WILDCARD: "*",
@@ -216,6 +244,11 @@ export const CONGREGATION_ROLE_PERMISSIONS: Record<string, string[]> = {
 export const PAGE_PERMISSIONS: Record<string, string[]> = {
   "/publishers": [PERMISSIONS.PUBLISHERS_VIEW, PERMISSIONS.PUBLISHERS_VIEW_MINIMAL],
   "/meetings": [PERMISSIONS.MEETINGS_VIEW],
+  "/meetings/planner": [PERMISSIONS.MEETING_ASSIGNMENTS_VIEW, PERMISSIONS.MANAGE_MIDWEEK_PROGRAM],
+  "/meetings/weekend": [PERMISSIONS.MEETING_ASSIGNMENTS_VIEW, PERMISSIONS.MANAGE_WEEKEND_PROGRAM],
+  "/meetings/public-talks": [PERMISSIONS.PUBLIC_TALKS_VIEW, PERMISSIONS.MANAGE_PUBLIC_TALKS],
+  "/meetings/speakers": [PERMISSIONS.SPEAKERS_VIEW],
+  "/meetings/workbooks": [PERMISSIONS.WORKBOOKS_VIEW],
   "/territories": [PERMISSIONS.TERRITORIES_VIEW],
   "/cleaning": [PERMISSIONS.CLEANING_VIEW],
   "/settings": [PERMISSIONS.SETTINGS_VIEW],
