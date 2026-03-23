@@ -1,6 +1,19 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.23.7
+
+### JW Meeting Planning — Midweek, Weekend, Public Talks (#201)
+- feat: 15 new Prisma models for meeting planning domain (periods, workbook editions/weeks/parts, weekend study, slot templates, assignments, speakers, public talks, congregation settings)
+- feat: server-side JW.org workbook + study importer with preview/commit workflow
+- feat: eligibility engine with privilege/gender/scope checks
+- feat: 7 new API route modules (workbooks, meeting-periods, assignments, weekend-study, speakers, public-talks, congregation-settings)
+- feat: 3 planner UI pages (MidweekPlanner, WeekendPlanner, PublicTalkPlanner)
+- feat: 16 new permissions + 4 management scopes + Public Talk Coordinator role
+- feat: canonical slot template seeder (24 program + duty slots)
+- feat: immutable assignment history audit trail
+- refactor: migrated meetings.ts from legacy requireRole() to requirePermission()
+
 ## v2026.03.23.5
 
 ### Installer E2E Fixes — Invite, RBAC, Encryption, JWT
