@@ -12,6 +12,7 @@ import {
   previewWorkbookImport,
   commitWorkbookImport,
 } from "../lib/importers/jw/midweek-workbook-importer.js";
+import { checkWorkbookAvailability } from "../lib/importers/jw/jw-availability.js";
 import prisma from "../lib/prisma.js";
 
 const ImportPreviewBody = Type.Object({
@@ -28,6 +29,31 @@ const IdParams = Type.Object({
 type IdParamsType = Static<typeof IdParams>;
 
 export async function workbookRoutes(app: FastifyInstance): Promise<void> {
+  // Check which workbook editions are available on JW.org
+  app.get(
+    "/workbooks/available",
+    { preHandler: requirePermission(PERMISSIONS.WORKBOOKS_VIEW) },
+    async (request) => {
+      const { language } = request.query as { language?: string };
+      const lang = language ?? "de";
+
+      // Get already-imported editions for comparison
+      const imported = await prisma.workbookEdition.findMany({
+        where: { language: lang },
+        select: { yearMonth: true, id: true },
+      });
+      const importedMap = new Map(imported.map((e) => [e.yearMonth, e.id]));
+
+      const available = await checkWorkbookAvailability(lang);
+
+      return available.map((edition) => ({
+        ...edition,
+        imported: importedMap.has(edition.yearMonth),
+        importedEditionId: importedMap.get(edition.yearMonth) ?? null,
+      }));
+    },
+  );
+
   // List imported workbook editions
   app.get(
     "/workbooks/editions",

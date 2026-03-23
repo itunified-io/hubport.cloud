@@ -2,16 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../../auth/useAuth";
 import { getApiUrl } from "../../../lib/config";
 
-interface WorkbookWeek {
-  id: string;
-  weekOf: string;
-  dateRange: string;
-  theme: string;
-  bibleReading: string;
-  songNumbers: number[];
-  parts: WorkbookPart[];
-}
-
 interface WorkbookPart {
   id: string;
   section: string;
@@ -35,7 +25,11 @@ interface PeriodMeeting {
   title: string;
   date: string;
   status: string;
-  workbookWeek?: WorkbookWeek;
+  workbookWeek?: {
+    theme: string;
+    dateRange: string;
+    parts: WorkbookPart[];
+  };
   assignments: Assignment[];
 }
 
@@ -48,17 +42,25 @@ interface Assignment {
   assistant?: { id: string; firstName: string; lastName: string; displayName?: string };
 }
 
+interface AvailableEdition {
+  yearMonth: string;
+  label: string;
+  available: boolean;
+  imported: boolean;
+  importedEditionId: string | null;
+  url: string | null;
+}
+
 export function MidweekPlanner() {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<MeetingPeriod[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<MeetingPeriod | null>(null);
   const [loading, setLoading] = useState(true);
-  const [importModal, setImportModal] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [availableEditions, setAvailableEditions] = useState<AvailableEdition[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const [importLanguage, setImportLanguage] = useState("de");
-  const [importYearMonth, setImportYearMonth] = useState(
-    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
-  );
-  const [importLoading, setImportLoading] = useState(false);
+  const [importingMonth, setImportingMonth] = useState<string | null>(null);
   const [importError, setImportError] = useState("");
 
   const apiUrl = getApiUrl();
@@ -82,46 +84,66 @@ export function MidweekPlanner() {
     if (res.ok) setSelectedPeriod(await res.json());
   }, [apiUrl, user?.access_token]);
 
+  const loadTimeline = useCallback(async () => {
+    setTimelineLoading(true);
+    setImportError("");
+    try {
+      const res = await fetch(
+        `${apiUrl}/workbooks/available?language=${importLanguage}`,
+        { headers },
+      );
+      if (res.ok) {
+        setAvailableEditions(await res.json());
+      } else {
+        const err = await res.json().catch(() => ({ error: "Failed to load" }));
+        setImportError(err.error || "Failed to check availability");
+      }
+    } catch {
+      setImportError("Network error — could not reach server");
+    } finally {
+      setTimelineLoading(false);
+    }
+  }, [apiUrl, user?.access_token, importLanguage]);
+
   useEffect(() => { loadPeriods(); }, [loadPeriods]);
 
-  const handleImport = async () => {
-    setImportLoading(true);
+  const openTimeline = () => {
+    setShowTimeline(true);
+    loadTimeline();
+  };
+
+  const handleImport = async (yearMonth: string) => {
+    setImportingMonth(yearMonth);
     setImportError("");
     try {
       const res = await fetch(`${apiUrl}/workbooks/import/commit`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ language: importLanguage, yearMonth: importYearMonth }),
+        body: JSON.stringify({ language: importLanguage, yearMonth }),
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({ error: "Import failed" }));
         setImportError(err.error || "Import failed");
         return;
       }
       const result = await res.json();
-      setImportModal(false);
+      setShowTimeline(false);
       await loadPeriods();
       await loadPeriodDetail(result.periodId);
     } catch {
-      setImportError("Network error");
+      setImportError("Network error during import");
     } finally {
-      setImportLoading(false);
+      setImportingMonth(null);
     }
   };
 
   const handlePublish = async (periodId: string) => {
-    await fetch(`${apiUrl}/meeting-periods/${periodId}/publish`, {
-      method: "POST",
-      headers,
-    });
+    await fetch(`${apiUrl}/meeting-periods/${periodId}/publish`, { method: "POST", headers });
     await loadPeriodDetail(periodId);
   };
 
   const handleLock = async (periodId: string) => {
-    await fetch(`${apiUrl}/meeting-periods/${periodId}/lock`, {
-      method: "POST",
-      headers,
-    });
+    await fetch(`${apiUrl}/meeting-periods/${periodId}/lock`, { method: "POST", headers });
     await loadPeriodDetail(periodId);
   };
 
@@ -134,15 +156,128 @@ export function MidweekPlanner() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--text)]">Midweek Meeting Planner</h1>
         <button
-          onClick={() => setImportModal(true)}
+          onClick={openTimeline}
           className="px-4 py-2 bg-[var(--amber)] text-black font-semibold rounded-[var(--radius)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
         >
           Import Workbook
         </button>
       </div>
 
+      {/* Timeline / Import Panel */}
+      {showTimeline && (
+        <div className="bg-[var(--bg-1)] rounded-[var(--radius)] border border-[var(--border)] p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--text)]">Available Workbook Editions</h2>
+            <div className="flex items-center gap-3">
+              <select
+                value={importLanguage}
+                onChange={(e) => {
+                  setImportLanguage(e.target.value);
+                  setTimeout(() => loadTimeline(), 0);
+                }}
+                className="px-3 py-1.5 bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm text-[var(--text)]"
+              >
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português</option>
+                <option value="ru">Русский</option>
+              </select>
+              <button
+                onClick={() => setShowTimeline(false)}
+                className="text-sm text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {importError && (
+            <p className="text-red-400 text-sm">{importError}</p>
+          )}
+
+          {timelineLoading ? (
+            <div className="text-center py-8 text-[var(--text-muted)]">
+              Checking JW.org for available editions...
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {availableEditions.map((edition) => {
+                const isCurrent = edition.yearMonth === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                return (
+                  <div
+                    key={edition.yearMonth}
+                    className={`flex items-center justify-between p-3 rounded-[var(--radius-sm)] border transition-colors ${
+                      isCurrent
+                        ? "border-[var(--amber)] bg-[var(--amber)]/5"
+                        : "border-[var(--border)] bg-[var(--bg)]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full ${
+                        edition.available ? "bg-green-500" : "bg-gray-500"
+                      }`} />
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isCurrent ? "text-[var(--amber)]" : "text-[var(--text)]"
+                        }`}>
+                          {edition.label}
+                        </span>
+                        {isCurrent && (
+                          <span className="ml-2 text-xs text-[var(--amber)]">current</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {edition.imported && (
+                        <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">
+                          Imported
+                        </span>
+                      )}
+                      {edition.available && !edition.imported && (
+                        <button
+                          onClick={() => handleImport(edition.yearMonth)}
+                          disabled={importingMonth !== null}
+                          className="px-3 py-1.5 text-xs bg-[var(--amber)] text-black font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer"
+                        >
+                          {importingMonth === edition.yearMonth ? "Importing..." : "Import"}
+                        </button>
+                      )}
+                      {edition.available && edition.imported && (
+                        <button
+                          onClick={() => handleImport(edition.yearMonth)}
+                          disabled={importingMonth !== null}
+                          className="px-3 py-1.5 text-xs border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--bg-2)] disabled:opacity-50 cursor-pointer"
+                        >
+                          {importingMonth === edition.yearMonth ? "Reimporting..." : "Reimport"}
+                        </button>
+                      )}
+                      {!edition.available && (
+                        <span className="text-xs text-[var(--text-muted)]">Not available</span>
+                      )}
+                      {edition.url && (
+                        <a
+                          href={edition.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[var(--amber)] hover:underline"
+                        >
+                          JW.org →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Period List */}
-      {!selectedPeriod && (
+      {!selectedPeriod && !showTimeline && (
         <div className="space-y-3">
           {periods.length === 0 ? (
             <div className="text-center py-12 text-[var(--text-muted)]">
@@ -214,59 +349,6 @@ export function MidweekPlanner() {
           ))}
         </div>
       )}
-
-      {/* Import Modal */}
-      {importModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-[var(--bg-1)] rounded-[var(--radius)] p-6 w-full max-w-md border border-[var(--border)]">
-            <h2 className="text-lg font-bold text-[var(--text)] mb-4">Import Workbook</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Language</label>
-                <select
-                  value={importLanguage}
-                  onChange={(e) => setImportLanguage(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-                >
-                  <option value="de">Deutsch</option>
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
-                  <option value="fr">Français</option>
-                  <option value="it">Italiano</option>
-                  <option value="pt">Português</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-1">Month</label>
-                <input
-                  type="month"
-                  value={importYearMonth}
-                  onChange={(e) => setImportYearMonth(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-                />
-              </div>
-              {importError && (
-                <p className="text-red-400 text-sm">{importError}</p>
-              )}
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setImportModal(false)}
-                  className="px-4 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-2)] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImport}
-                  disabled={importLoading}
-                  className="px-4 py-2 bg-[var(--amber)] text-black font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer"
-                >
-                  {importLoading ? "Importing..." : "Import & Create Period"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -330,7 +412,6 @@ function MeetingCard({
 
       {expanded && (
         <div className="border-t border-[var(--border)] p-4 space-y-4">
-          {/* Program Parts */}
           {programAssignments.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-[var(--amber)] mb-2">Program</h4>
@@ -350,7 +431,6 @@ function MeetingCard({
             </div>
           )}
 
-          {/* Duties */}
           {dutyAssignments.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-[var(--text-muted)] mb-2">Duties</h4>
