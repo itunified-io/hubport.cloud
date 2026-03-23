@@ -104,7 +104,7 @@ export async function getEncryptionKey(): Promise<Buffer> {
   }
 
   const vaultToken = await getVaultToken();
-  const url = `${vaultAddr.replace(/\/+$/, "")}/v1/${VAULT_SECRET_PATH}`;
+  const url = `${vaultAddr.replace(/\/+$/, "")}/v1/${VAULT_PATHS.encryptionKey}`;
 
   const response = await fetch(url, {
     headers: {
@@ -126,7 +126,7 @@ export async function getEncryptionKey(): Promise<Buffer> {
   const keyHex = body?.data?.data?.key;
   if (!keyHex) {
     throw new Error(
-      `Vault secret at ${VAULT_SECRET_PATH} is missing the "key" field`,
+      `Vault secret at ${VAULT_PATHS.encryptionKey} is missing the "key" field`,
     );
   }
 
