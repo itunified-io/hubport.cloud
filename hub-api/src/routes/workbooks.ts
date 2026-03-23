@@ -32,7 +32,7 @@ export async function workbookRoutes(app: FastifyInstance): Promise<void> {
   // Check which workbook editions are available on JW.org
   app.get(
     "/workbooks/available",
-    { preHandler: requirePermission(PERMISSIONS.WORKBOOKS_VIEW) },
+    { preHandler: requirePermission(PERMISSIONS.MEETINGS_VIEW) },
     async (request) => {
       const { language } = request.query as { language?: string };
       const lang = language ?? "de";

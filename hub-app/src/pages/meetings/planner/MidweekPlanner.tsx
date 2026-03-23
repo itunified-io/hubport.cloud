@@ -49,6 +49,8 @@ interface AvailableEdition {
   imported: boolean;
   importedEditionId: string | null;
   url: string | null;
+  thumbnailUrl: string | null;
+  issueCode: string;
 }
 
 export function MidweekPlanner() {
@@ -203,70 +205,100 @@ export function MidweekPlanner() {
               Checking JW.org for available editions...
             </div>
           ) : (
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {availableEditions.map((edition) => {
-                const isCurrent = edition.yearMonth === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                const now = new Date();
+                const [y, m] = edition.yearMonth.split("-").map(Number);
+                const isCurrent = y === now.getFullYear() && (m === now.getMonth() + 1 || m === now.getMonth());
                 return (
                   <div
                     key={edition.yearMonth}
-                    className={`flex items-center justify-between p-3 rounded-[var(--radius-sm)] border transition-colors ${
+                    className={`rounded-[var(--radius)] border overflow-hidden transition-colors ${
                       isCurrent
-                        ? "border-[var(--amber)] bg-[var(--amber)]/5"
-                        : "border-[var(--border)] bg-[var(--bg)]"
-                    }`}
+                        ? "border-[var(--amber)] ring-1 ring-[var(--amber)]/30"
+                        : edition.available
+                          ? "border-[var(--border)] hover:border-[var(--amber)]/50"
+                          : "border-[var(--border)] opacity-50"
+                    } bg-[var(--bg)]`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full ${
-                        edition.available ? "bg-green-500" : "bg-gray-500"
-                      }`} />
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isCurrent ? "text-[var(--amber)]" : "text-[var(--text)]"
-                        }`}>
-                          {edition.label}
-                        </span>
-                        {isCurrent && (
-                          <span className="ml-2 text-xs text-[var(--amber)]">current</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
+                    {/* Thumbnail */}
+                    <div className="relative aspect-[3/4] bg-[var(--bg-2)] overflow-hidden">
+                      {edition.thumbnailUrl ? (
+                        <img
+                          src={edition.thumbnailUrl}
+                          alt={edition.label}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      {isCurrent && (
+                        <div className="absolute top-2 right-2 px-2 py-0.5 text-xs font-semibold bg-[var(--amber)] text-black rounded-full">
+                          Current
+                        </div>
+                      )}
                       {edition.imported && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">
+                        <div className="absolute top-2 left-2 px-2 py-0.5 text-xs font-medium bg-blue-600 text-white rounded-full">
                           Imported
-                        </span>
-                      )}
-                      {edition.available && !edition.imported && (
-                        <button
-                          onClick={() => handleImport(edition.yearMonth)}
-                          disabled={importingMonth !== null}
-                          className="px-3 py-1.5 text-xs bg-[var(--amber)] text-black font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer"
-                        >
-                          {importingMonth === edition.yearMonth ? "Importing..." : "Import"}
-                        </button>
-                      )}
-                      {edition.available && edition.imported && (
-                        <button
-                          onClick={() => handleImport(edition.yearMonth)}
-                          disabled={importingMonth !== null}
-                          className="px-3 py-1.5 text-xs border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--bg-2)] disabled:opacity-50 cursor-pointer"
-                        >
-                          {importingMonth === edition.yearMonth ? "Reimporting..." : "Reimport"}
-                        </button>
+                        </div>
                       )}
                       {!edition.available && (
-                        <span className="text-xs text-[var(--text-muted)]">Not available</span>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <span className="text-xs text-white/70">Not yet available</span>
+                        </div>
                       )}
-                      {edition.url && (
-                        <a
-                          href={edition.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[var(--amber)] hover:underline"
-                        >
-                          JW.org →
-                        </a>
-                      )}
+                    </div>
+
+                    {/* Info + Actions */}
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          edition.available ? "bg-green-500" : "bg-gray-500"
+                        }`} />
+                        <span className="text-sm font-medium text-[var(--text)] truncate">
+                          {edition.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {edition.available && !edition.imported && (
+                          <button
+                            onClick={() => handleImport(edition.yearMonth)}
+                            disabled={importingMonth !== null}
+                            className="flex-1 px-3 py-1.5 text-xs bg-[var(--amber)] text-black font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer text-center"
+                          >
+                            {importingMonth === edition.yearMonth ? "Importing..." : "Import"}
+                          </button>
+                        )}
+                        {edition.available && edition.imported && (
+                          <button
+                            onClick={() => handleImport(edition.yearMonth)}
+                            disabled={importingMonth !== null}
+                            className="flex-1 px-3 py-1.5 text-xs border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--bg-2)] disabled:opacity-50 cursor-pointer text-center"
+                          >
+                            {importingMonth === edition.yearMonth ? "Reimporting..." : "Reimport"}
+                          </button>
+                        )}
+                        {edition.url && (
+                          <a
+                            href={edition.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1.5 text-xs border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--bg-2)]"
+                            title="View on JW.org"
+                          >
+                            ↗
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
