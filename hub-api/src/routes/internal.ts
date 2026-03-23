@@ -70,6 +70,19 @@ export async function internalRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
+      // Auto-assign Coordinator AppRole (WILDCARD permissions) to admin owner
+      const coordinatorRole = await prisma.appRole.findFirst({
+        where: { name: "Coordinator" },
+      });
+      if (coordinatorRole) {
+        await prisma.appRoleMember.create({
+          data: {
+            publisherId: publisher.id,
+            roleId: coordinatorRole.id,
+          },
+        });
+      }
+
       await audit(
         "publisher.bootstrap",
         "installer",
