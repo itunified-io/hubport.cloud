@@ -36,7 +36,7 @@ export async function checkWorkbookAvailability(
   const now = new Date();
   const results: EditionAvailability[] = [];
 
-  // Determine range: 2 bimonthly periods back, 4 forward
+  // Determine range: current + future only
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
@@ -44,8 +44,8 @@ export async function checkWorkbookAvailability(
   const currentBiStart = BIMONTHLY_STARTS.filter((m) => m <= currentMonth).pop() ?? 1;
   const currentBiIdx = BIMONTHLY_STARTS.indexOf(currentBiStart);
 
-  // Generate list: 2 back + current + 4 forward = 7 editions
-  for (let offset = -2; offset <= 4; offset++) {
+  // Generate list: current + 4 forward = 5 editions
+  for (let offset = 0; offset <= 4; offset++) {
     let biIdx = currentBiIdx + offset;
     let year = currentYear;
 
