@@ -123,8 +123,8 @@ export function MidweekPlanner() {
         return;
       }
       const result = await res.json();
-      setShowTimeline(false);
       await loadPeriods();
+      await loadTimeline();
       await loadPeriodDetail(result.periodId);
     } catch {
       setImportError("Network error during import");
