@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.22.8
+
+### Node.js 22 Upgrade + Build Fixes
+- chore: upgrade Dockerfiles from Node.js 20 → 22 (builder + runtime)
+- chore: central-api distroless runtime → nodejs22-debian12
+- fix: vault-client.ts `VAULT_SECRET_PATH` → `VAULT_PATHS.encryptionKey` (TS build error)
+- chore: add `.dockerignore` to exclude node_modules, .git, dist from build context
+- chore: multi-arch Docker build support (linux/amd64 + linux/arm64) via buildx TARGETARCH
+
 ## v2026.03.22.7
 
 ### CodeQL + Dependabot Remediation
