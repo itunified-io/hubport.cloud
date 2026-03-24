@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.4
+
+### Feat: EPUB-based workbook parser (#208)
+- feat: replace HTML scraper with EPUB parser for JW.org workbook import
+- feat: extract German titles, 3 song numbers, durations, bible readings from structured XHTML
+- feat: reliable section detection via `dc-icon--gem/wheat/sheep` CSS class markers
+- refactor: remove all old HTML parser functions (parseWorkbookHtml, parseWorkbookSimple, 10+ helpers)
+- refactor: remove dead fetchWorkbookEdition HTML fetcher
+- chore: add jszip dependency, bump parser version to 2.0-epub
+
 ## v2026.03.24.3
 
 ### Fix: ProgramCard slot keys + doubled Schlussgebet (#208)
