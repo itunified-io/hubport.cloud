@@ -82,6 +82,10 @@ export const PERMISSIONS = {
   SPEAKERS_VIEW: "app:speakers.view",
   SPEAKERS_EDIT: "app:speakers.edit",
 
+  // Away periods (availability)
+  AWAY_PERIODS_VIEW: "app:away_periods.view",
+  AWAY_PERIODS_EDIT: "app:away_periods.edit",
+
   // Territories
   TERRITORIES_VIEW: "app:territories.view",
   TERRITORIES_EDIT: "app:territories.edit",
