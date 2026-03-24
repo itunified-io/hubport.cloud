@@ -11,6 +11,7 @@ import {
   previewStudyImport,
   commitStudyImport,
 } from "../lib/importers/jw/weekend-study-importer.js";
+import { checkStudyAvailability } from "../lib/importers/jw/jw-availability.js";
 import prisma from "../lib/prisma.js";
 
 const StudyImportBody = Type.Object({
@@ -33,6 +34,29 @@ export async function weekendStudyRoutes(app: FastifyInstance): Promise<void> {
         },
         orderBy: { weekOf: "desc" },
       });
+    },
+  );
+
+  // Available study editions (checks JW.org + local DB import status)
+  app.get<{ Querystring: { language?: string } }>(
+    "/weekend-study/available",
+    { preHandler: requirePermission(PERMISSIONS.WEEKEND_STUDY_VIEW) },
+    async (request) => {
+      const language = (request.query.language as string) || "de";
+      const editions = await checkStudyAvailability(language);
+
+      // Enrich with import status from DB
+      const imported = await prisma.weekendStudyEdition.findMany({
+        where: { language },
+        select: { id: true, issueKey: true },
+      });
+      const importedMap = new Map(imported.map((e) => [e.issueKey, e.id]));
+
+      return editions.map((ed) => ({
+        ...ed,
+        imported: importedMap.has(ed.issueCode),
+        importedEditionId: importedMap.get(ed.issueCode) ?? null,
+      }));
     },
   );
 
