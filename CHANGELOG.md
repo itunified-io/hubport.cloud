@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.2
+
+### Fix: Meeting Periods workbookPart + Version Bump (#205)
+- fix: add `workbookPart: true` to meeting-periods assignments include — fixes section grouping, song bars, subtitles
+- chore: bump version to 2026.03.24.1 across root, hub-app, hub-api
+
 ## v2026.03.24.1
 
 ### MidweekPlanner UI Rewrite (#203)
