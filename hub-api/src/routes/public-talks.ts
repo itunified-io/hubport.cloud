@@ -9,6 +9,7 @@ import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { audit } from "../lib/policy-engine.js";
 import prisma from "../lib/prisma.js";
+import { seedPublicTalks } from "../lib/seed-public-talks.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
 type IdParamsType = Static<typeof IdParams>;
@@ -55,6 +56,15 @@ export async function publicTalkRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const talk = await prisma.publicTalk.create({ data: request.body });
       return reply.code(201).send(talk);
+    },
+  );
+
+  // Seed / reimport public talk catalog from JSON
+  app.post(
+    "/public-talks/seed",
+    { preHandler: requirePermission(PERMISSIONS.MANAGE_PUBLIC_TALKS) },
+    async () => {
+      return seedPublicTalks();
     },
   );
 
