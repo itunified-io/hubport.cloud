@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.6
+
+### Fix: Orphaned assignments on workbook reimport (#208)
+- fix: delete auto_seeded assignments before re-seeding on reimport — fixes orphaned workbookPartId causing generic English fallback titles
+- fix: add onDelete: SetNull to workbookPart relation in Prisma schema
+- chore: bump APP_VERSION to 2026.03.24.6
+
 ## v2026.03.24.5
 
 ### Fix: Seed chairman/prayer assignment slots (#208)
