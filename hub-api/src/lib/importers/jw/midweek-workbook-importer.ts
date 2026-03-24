@@ -85,7 +85,35 @@ export async function commitWorkbookImport(
       },
     });
 
-    // 2. Delete existing weeks/parts for reimport (cascade handles parts)
+    // 2. Clear auto-seeded assignments BEFORE deleting weeks/parts.
+    // WorkbookPart deletion would fail if MeetingAssignment still references
+    // them via workbookPartId FK (DB constraint is NO ACTION by default).
+    const existingWeeks = await tx.workbookWeek.findMany({
+      where: { editionId: dbEdition.id },
+      select: { id: true },
+    });
+    if (existingWeeks.length > 0) {
+      // Find all meetings linked to these weeks and delete their auto-seeded assignments
+      const linkedMeetings = await tx.meeting.findMany({
+        where: { workbookWeekId: { in: existingWeeks.map((w) => w.id) } },
+        select: { id: true },
+      });
+      if (linkedMeetings.length > 0) {
+        await tx.meetingAssignment.deleteMany({
+          where: {
+            meetingId: { in: linkedMeetings.map((m) => m.id) },
+            source: "auto_seeded",
+          },
+        });
+        // Unlink meetings from weeks (prevents cascade issues)
+        await tx.meeting.updateMany({
+          where: { workbookWeekId: { in: existingWeeks.map((w) => w.id) } },
+          data: { workbookWeekId: null },
+        });
+      }
+    }
+
+    // Now safe to delete weeks/parts (no FK references remain)
     await tx.workbookWeek.deleteMany({
       where: { editionId: dbEdition.id },
     });
@@ -220,16 +248,6 @@ export async function commitWorkbookImport(
         meetingId = meeting.id;
         meetingsCreated++;
       }
-
-      // Clean up existing auto-seeded assignments (reimport scenario).
-      // Without this, old assignments with orphaned workbookPartId survive
-      // and cause the UI to fall back to generic English slot labels.
-      await tx.meetingAssignment.deleteMany({
-        where: {
-          meetingId,
-          source: "auto_seeded",
-        },
-      });
 
       // Seed assignment slots for program parts from workbook
       if (dbWeek?.parts) {
