@@ -19,44 +19,11 @@ export interface JwFetchResult {
   fetchedAt: Date;
 }
 
-/**
- * Fetch a workbook edition page from JW.org.
- * Uses the meeting workbook publication listing.
- */
-export async function fetchWorkbookEdition(
-  language: string,
-  yearMonth: string,
-): Promise<JwFetchResult> {
-  // JW.org uses specific language codes and publication codes
-  // mwb = Meeting Workbook
-  const [year, month] = yearMonth.split("-");
-  const issueDate = `${year}${month.padStart(2, "0")}`;
-
-  // Try the HTML content endpoint first
-  const url = `${JW_BASE_URL}/${language}/библиотека/программа-встреч/mwb-${year}/${issueDate}/`;
-  const fallbackUrl = `${JW_BASE_URL}/${language}/library/jw-meeting-workbook/mwb-${year}/${issueDate}/`;
-
-  // Try language-appropriate URL patterns
-  const urls = [
-    `${JW_BASE_URL}/finder?wtlocale=${getWtLocale(language)}&pub=mwb&issue=${issueDate}`,
-    fallbackUrl,
-  ];
-
-  let lastError: Error | null = null;
-
-  for (const tryUrl of urls) {
-    try {
-      const html = await fetchWithRetry(tryUrl);
-      const checksum = createHash("sha256").update(html).digest("hex");
-      return { html, url: tryUrl, checksum, fetchedAt: new Date() };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-    }
-  }
-
-  throw new Error(
-    `Failed to fetch workbook edition ${yearMonth} for language ${language}: ${lastError?.message}`,
-  );
+export interface JwEpubResult {
+  data: ArrayBuffer;
+  url: string;
+  checksum: string;
+  fetchedAt: Date;
 }
 
 /**
@@ -126,6 +93,77 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<strin
     } catch (err) {
       if (attempt === retries) throw err;
       // Brief backoff before retry
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  throw new Error("Unreachable");
+}
+
+/**
+ * Fetch the EPUB file for a workbook edition from JW CDN.
+ * Uses the pub-media API to discover the download URL, then fetches the binary.
+ */
+export async function fetchWorkbookEpub(
+  language: string,
+  yearMonth: string,
+): Promise<JwEpubResult> {
+  const [year, month] = yearMonth.split("-");
+  const issueCode = `${year}${month.padStart(2, "0")}`;
+  const wtLocale = getWtLocale(language);
+
+  // 1. Query pub-media API for EPUB download URL
+  const apiUrl = `${JW_PUB_API}?output=json&pub=mwb&fileformat=EPUB&alllangs=0&langwritten=${wtLocale}&issue=${issueCode}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const apiRes = await fetch(apiUrl, {
+    signal: controller.signal,
+    headers: { Accept: "application/json", "User-Agent": "hubport.cloud/1.0 (meeting-planner)" },
+  });
+  clearTimeout(timeout);
+
+  if (!apiRes.ok) {
+    throw new Error(`pub-media API returned ${apiRes.status} for mwb ${issueCode} (${wtLocale})`);
+  }
+
+  const apiData = (await apiRes.json()) as {
+    files?: Record<string, { EPUB?: { file: { url: string; checksum: string } }[] }>;
+  };
+
+  const langFiles = apiData.files?.[wtLocale];
+  const epubEntry = langFiles?.EPUB?.[0];
+  if (!epubEntry?.file?.url) {
+    throw new Error(`No EPUB available for mwb ${issueCode} in language ${wtLocale}`);
+  }
+
+  // 2. Download the EPUB binary
+  const epubUrl = epubEntry.file.url;
+  const epubRes = await fetchBinaryWithRetry(epubUrl);
+  const checksum = createHash("sha256").update(Buffer.from(epubRes)).digest("hex");
+
+  return { data: epubRes, url: epubUrl, checksum, fetchedAt: new Date() };
+}
+
+/**
+ * Fetch a URL as binary (ArrayBuffer) with retry.
+ */
+async function fetchBinaryWithRetry(url: string, retries = MAX_RETRIES): Promise<ArrayBuffer> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000); // 30s for binary download
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { "User-Agent": "hubport.cloud/1.0 (meeting-planner)" },
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return await response.arrayBuffer();
+    } catch (err) {
+      if (attempt === retries) throw err;
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }
   }
