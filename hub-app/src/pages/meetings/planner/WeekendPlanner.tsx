@@ -92,7 +92,7 @@ export function WeekendPlanner() {
       const res = await fetch(`${apiUrl}/weekend-study/import/commit`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ language: "de", yearMonth }),
+        body: JSON.stringify({ language: "de", issueKey: yearMonth.replace("-", "") }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Import failed" }));

@@ -101,9 +101,9 @@ export function StudyStrip({
                   <button
                     onClick={(e) => { e.stopPropagation(); onImport(ed.yearMonth); }}
                     disabled={importingMonth !== null}
-                    className="block mt-px mx-auto text-[7px] font-bold text-[var(--amber)] hover:text-[var(--amber-light)] disabled:opacity-50 cursor-pointer leading-none"
+                    className="w-full mt-0.5 px-1 py-px text-[7px] bg-[var(--amber)] text-black font-bold rounded hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer leading-tight"
                   >
-                    {importingMonth === ed.yearMonth ? "..." : "+"}
+                    {importingMonth === ed.yearMonth ? "..." : "Import"}
                   </button>
                 )}
               </div>
