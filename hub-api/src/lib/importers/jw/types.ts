@@ -67,5 +67,7 @@ export interface StudyImportResult {
   editionId: string;
   weeksCreated: number;
   meetingsLinked: number;
+  meetingsCreated: number;
+  slotsSeeded: number;
   warnings: string[];
 }

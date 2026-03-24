@@ -49,8 +49,8 @@ async function start(): Promise<void> {
     timeWindow: "1 minute",
   });
 
-  // Multipart (file uploads, max 2MB)
-  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
+  // Multipart (file uploads, max 10MB — JWPUB files can be 5-10MB)
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);
@@ -114,6 +114,7 @@ async function start(): Promise<void> {
     app.log.info("Upserting meeting slot templates...");
     await seedSlotTemplates();
     app.log.info("Slot templates up to date");
+
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }

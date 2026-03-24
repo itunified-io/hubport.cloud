@@ -170,4 +170,51 @@ async function fetchBinaryWithRetry(url: string, retries = MAX_RETRIES): Promise
   throw new Error("Unreachable");
 }
 
+/**
+ * Fetch the EPUB file for a Watchtower Study edition from JW CDN.
+ * Uses the pub-media API to discover the download URL, then fetches the binary.
+ *
+ * @param language ISO 639-1 language code (e.g., "de")
+ * @param issueKey Issue code in YYYYMM format (e.g., "202603")
+ */
+export async function fetchStudyEpub(
+  language: string,
+  issueKey: string,
+): Promise<JwEpubResult> {
+  const wtLocale = getWtLocale(language);
+
+  // 1. Query pub-media API for EPUB download URL (pub=w for Watchtower Study)
+  const apiUrl = `${JW_PUB_API}?output=json&pub=w&fileformat=EPUB&alllangs=0&langwritten=${wtLocale}&issue=${issueKey}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const apiRes = await fetch(apiUrl, {
+    signal: controller.signal,
+    headers: { Accept: "application/json", "User-Agent": "hubport.cloud/1.0 (meeting-planner)" },
+  });
+  clearTimeout(timeout);
+
+  if (!apiRes.ok) {
+    throw new Error(`pub-media API returned ${apiRes.status} for w ${issueKey} (${wtLocale})`);
+  }
+
+  const apiData = (await apiRes.json()) as {
+    files?: Record<string, { EPUB?: { file: { url: string; checksum: string } }[] }>;
+  };
+
+  const langFiles = apiData.files?.[wtLocale];
+  const epubEntry = langFiles?.EPUB?.[0];
+  if (!epubEntry?.file?.url) {
+    throw new Error(`No EPUB available for w ${issueKey} in language ${wtLocale}`);
+  }
+
+  // 2. Download the EPUB binary
+  const epubUrl = epubEntry.file.url;
+  const epubRes = await fetchBinaryWithRetry(epubUrl);
+  const checksum = createHash("sha256").update(Buffer.from(epubRes)).digest("hex");
+
+  return { data: epubRes, url: epubUrl, checksum, fetchedAt: new Date() };
+}
+
 export { getWtLocale };
