@@ -241,6 +241,29 @@ export async function commitWorkbookImport(
         }
       }
 
+      // Seed standalone program slots (chairman, prayers) — these are program
+      // category but not linked to workbook parts
+      const seededSlotIds = new Set(
+        (dbWeek?.parts ?? [])
+          .map((p) => findSlotTemplateForPart(p.partType, slotTemplates)?.id)
+          .filter(Boolean),
+      );
+      const STANDALONE_SLOTS = ["chairman_midweek", "opening_prayer_midweek", "closing_prayer_midweek"];
+      const standaloneTemplates = slotTemplates.filter(
+        (t) => STANDALONE_SLOTS.includes(t.slotKey) && !seededSlotIds.has(t.id),
+      );
+      for (const tmpl of standaloneTemplates) {
+        await tx.meetingAssignment.create({
+          data: {
+            meetingId,
+            slotTemplateId: tmpl.id,
+            status: "pending",
+            source: "auto_seeded",
+          },
+        });
+        slotsSeeded++;
+      }
+
       // Seed duty slots (sound, video, attendants, etc.)
       const dutyTemplates = slotTemplates.filter((t) => t.category === "duty");
       for (const duty of dutyTemplates) {
