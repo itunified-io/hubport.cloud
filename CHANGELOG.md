@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.10
+
+### Feat: Part details, JW links, dock-style UI, decrypt publisher names (#208)
+- feat: render sourceRef as subtitle below program part titles
+- feat: make part titles clickable → opens JW Library (sourceUrl from EPUB)
+- feat: remove redundant page header (visible in sidebar)
+- feat: dock-style edition thumbnails in right sidebar (active = bigger + blue glow)
+- fix: decrypt nested publisher names in meeting period response (encrypted PII was shown as ciphertext)
+
 ## v2026.03.24.9
 
 ### Fix: Month parsing in EPUB date ranges (#208)
