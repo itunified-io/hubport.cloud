@@ -162,23 +162,7 @@ export function MidweekPlanner() {
   }
 
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-3.5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">Midweek Meeting Planner</h1>
-      </div>
-
-      {/* Workbook Strip */}
-      <WorkbookStrip
-        editions={editions}
-        activeYearMonth={activeYearMonth}
-        importingMonth={importingMonth}
-        loading={editionsLoading}
-        error={importError}
-        onSelect={handleSelectEdition}
-        onImport={handleImport}
-      />
-
+    <div className="max-w-[1280px] mx-auto px-6 py-4 space-y-3">
       {/* Week Navigator */}
       {meetings.length > 0 && (
         <WeekNavigator
@@ -188,7 +172,7 @@ export function MidweekPlanner() {
         />
       )}
 
-      {/* Two-column layout: Program + Sidebar */}
+      {/* Two-column layout: Program + Sidebar (editions + duties) */}
       {currentMeeting ? (
         <div className="grid grid-cols-[1fr_240px] gap-4 max-[1000px]:grid-cols-1">
           <ProgramCard
@@ -196,20 +180,41 @@ export function MidweekPlanner() {
             locked={currentMeeting.status === "locked"}
             onEditAssignment={(id, slotKey, title) => setPicker({ assignmentId: id, slotKey, title })}
           />
-          <DutySidebar
-            assignments={dutyAssignments}
-            assignedCount={assignedCount}
-            openCount={openCount}
-            status={activePeriod?.status ?? "draft"}
-            locked={currentMeeting.status === "locked"}
-            onEditAssignment={(id, slotKey, title) => setPicker({ assignmentId: id, slotKey, title })}
-            onPublish={handlePublish}
-            onPrint={handlePrint}
-          />
+          <div className="flex flex-col gap-2.5">
+            {/* Workbook editions — dock-style in sidebar */}
+            <WorkbookStrip
+              editions={editions}
+              activeYearMonth={activeYearMonth}
+              importingMonth={importingMonth}
+              loading={editionsLoading}
+              error={importError}
+              onSelect={handleSelectEdition}
+              onImport={handleImport}
+            />
+            <DutySidebar
+              assignments={dutyAssignments}
+              assignedCount={assignedCount}
+              openCount={openCount}
+              status={activePeriod?.status ?? "draft"}
+              locked={currentMeeting.status === "locked"}
+              onEditAssignment={(id, slotKey, title) => setPicker({ assignmentId: id, slotKey, title })}
+              onPublish={handlePublish}
+              onPrint={handlePrint}
+            />
+          </div>
         </div>
       ) : (
-        <div className="text-center py-8 text-[var(--text-muted)]">
-          <p>No meetings yet</p>
+        <div className="text-center py-12 text-[var(--text-muted)]">
+          <WorkbookStrip
+            editions={editions}
+            activeYearMonth={activeYearMonth}
+            importingMonth={importingMonth}
+            loading={editionsLoading}
+            error={importError}
+            onSelect={handleSelectEdition}
+            onImport={handleImport}
+          />
+          <p className="mt-6">No meetings yet</p>
           <p className="text-sm mt-1">Import a workbook above to start planning.</p>
         </div>
       )}
