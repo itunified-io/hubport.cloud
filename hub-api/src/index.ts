@@ -29,7 +29,6 @@ import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
-import { seedPublicTalks } from "./lib/seed-public-talks.js";
 
 const app = Fastify({
   logger: {
@@ -50,8 +49,8 @@ async function start(): Promise<void> {
     timeWindow: "1 minute",
   });
 
-  // Multipart (file uploads, max 2MB)
-  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
+  // Multipart (file uploads, max 10MB — JWPUB files can be 5-10MB)
+  await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);
@@ -116,9 +115,6 @@ async function start(): Promise<void> {
     await seedSlotTemplates();
     app.log.info("Slot templates up to date");
 
-    app.log.info("Seeding public talk catalog...");
-    const talkResult = await seedPublicTalks();
-    app.log.info(`Public talk catalog up to date (${talkResult.created} created, ${talkResult.updated} updated, ${talkResult.total} total)`);
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }
