@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.1
+
+### MidweekPlanner UI Rewrite (#203)
+- feat: rewrite MidweekPlanner to match approved mockup — one-meeting-per-page, two-column layout
+- feat: WorkbookStrip with edition thumbnails, Now/imported badges, import buttons
+- feat: WeekNavigator with chevron arrows, date display, dot indicators
+- feat: ProgramCard with JW section colors, song bars, prayer rows, stacked student names
+- feat: DutySidebar with grouped duties (Technik/Ordnung/Reinigung), stats, publish/print actions
+- refactor: split monolithic 437-line component into 7 focused sub-components under `midweek/`
+
 ## v2026.03.23.7
 
 ### JW Meeting Planning — Midweek, Weekend, Public Talks (#201)
