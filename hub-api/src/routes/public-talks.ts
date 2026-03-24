@@ -69,12 +69,8 @@ export async function publicTalkRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "No file uploaded" });
       }
 
-      // Collect file buffer from the multipart stream
-      const chunks: Buffer[] = [];
-      for await (const chunk of file.file) {
-        chunks.push(chunk);
-      }
-      const fileBuffer = Buffer.concat(chunks);
+      // Collect file buffer using Fastify's built-in toBuffer()
+      const fileBuffer = await file.toBuffer();
 
       if (fileBuffer.length === 0) {
         return reply.code(400).send({ error: "Uploaded file is empty" });

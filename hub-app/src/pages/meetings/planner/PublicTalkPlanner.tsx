@@ -139,10 +139,10 @@ export function PublicTalkPlanner() {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={[
-          "rounded-[var(--radius)] border-2 border-dashed p-4 flex items-center justify-center gap-3 cursor-pointer transition-all",
+          "rounded-[var(--radius)] border-2 border-dashed px-6 py-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all",
           dragOver
-            ? "border-[var(--amber)] bg-[var(--amber)]/[0.06]"
-            : "border-[var(--border)] bg-[var(--bg-1)] hover:border-[var(--border-2)] hover:bg-[var(--bg-2)]",
+            ? "border-[var(--amber)] bg-[var(--amber)]/[0.06] scale-[1.01]"
+            : "border-[var(--border)] bg-[var(--bg-1)] hover:border-[var(--amber)]/40 hover:bg-[var(--bg-2)]",
         ].join(" ")}
       >
         <input
@@ -153,27 +153,42 @@ export function PublicTalkPlanner() {
           className="hidden"
         />
         {importing ? (
-          <span className="text-sm text-[var(--text-muted)]">Importing...</span>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-[var(--amber)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-[var(--amber)] font-medium">Importing talk catalog...</span>
+          </div>
         ) : (
           <>
-            <FileUp size={20} className={dragOver ? "text-[var(--amber)]" : "text-[var(--text-muted)]"} />
-            <div className="text-sm">
-              <span className={dragOver ? "text-[var(--amber)] font-medium" : "text-[var(--text-muted)]"}>
-                Drop S-34 JWPUB file here
-              </span>
-              <span className="text-[var(--text-muted)]"> or click to upload</span>
-              {talkCount > 0 && (
-                <span className="ml-2 text-xs text-[var(--text-muted)]">({talkCount} talks loaded)</span>
-              )}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dragOver ? "bg-[var(--amber)]/[0.12]" : "bg-[var(--glass-2)]"}`}>
+              <FileUp size={18} className={dragOver ? "text-[var(--amber)]" : "text-[var(--text-muted)]"} />
             </div>
+            <div className="text-center">
+              <p className={`text-sm font-medium ${dragOver ? "text-[var(--amber)]" : "text-[var(--text)]"}`}>
+                {talkCount > 0 ? "Update talk catalog" : "Import talk catalog"}
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Drop S-34 .jwpub file or click to browse
+              </p>
+            </div>
+            {talkCount > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--green)]/[0.1] text-[var(--green)] font-medium">
+                {talkCount} talks loaded
+              </span>
+            )}
           </>
         )}
       </div>
-      {importError && <p className="text-sm text-[var(--red)]">{importError}</p>}
+      {importError && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--red)]/[0.08] border border-[var(--red)]/20">
+          <span className="text-sm text-[var(--red)]">{importError}</span>
+        </div>
+      )}
       {importResult && (
-        <p className="text-sm text-[var(--green)]">
-          ✓ {importResult.created} created, {importResult.updated} updated, {importResult.discontinued} discontinued
-        </p>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--green)]/[0.08] border border-[var(--green)]/20">
+          <span className="text-sm text-[var(--green)]">
+            ✓ {importResult.created} created, {importResult.updated} updated, {importResult.discontinued} discontinued
+          </span>
+        </div>
       )}
 
       {/* Tabs */}
