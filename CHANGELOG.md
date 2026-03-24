@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.3
+
+### Fix: ProgramCard slot keys + doubled Schlussgebet (#208)
+- fix: chairman/prayer slot keys use `_midweek` suffix — `startsWith` match
+- fix: exclude chairman/prayer from `groupBySection` — no more doubled Schlussgebet
+
 ## v2026.03.24.2
 
 ### Fix: Meeting Periods workbookPart + Version Bump (#205)
