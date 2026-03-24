@@ -99,31 +99,58 @@ export async function parseJwpubTalks(buffer: Buffer): Promise<JwpubTalkResult> 
   try {
     db = new SQL.Database(dbBuffer);
 
-    // 6. Query Document table for talks
-    const stmt = db.prepare(
-      "SELECT DocumentId, Title, Content FROM Document WHERE Title LIKE 'Nr.%'",
-    );
+    // 6. Discover table structure and find talks
+    // First, list all tables to handle different JWPUB layouts
+    const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+    const tableNames = tables[0]?.values.map((r) => String(r[0])) ?? [];
 
+    // Try Document table first (standard JWPUB layout)
     const talks: ParsedTalk[] = [];
 
-    while (stmt.step()) {
-      const row = stmt.getAsObject() as {
-        DocumentId: number;
-        Title: string;
-        Content: unknown;
-      };
+    if (tableNames.includes("Document")) {
+      // Sample titles for debugging
+      const sample = db.exec("SELECT Title FROM Document LIMIT 5");
+      const sampleTitles = sample[0]?.values.map((r) => String(r[0])) ?? [];
 
-      const match = TALK_NUMBER_RE.exec(row.Title);
-      if (!match) continue;
+      // Try multiple title patterns
+      const patterns: [RegExp, string][] = [
+        [/Nr\.\s*(\d+)\s+(.*)/, "Nr."],        // German: "Nr. 19 Wie kann man..."
+        [/No\.\s*(\d+)\s+(.*)/, "No."],         // English: "No. 19 How can one..."
+        [/Núm\.\s*(\d+)\s+(.*)/, "Núm."],       // Spanish: "Núm. 19 ..."
+        [/^(\d+)\.\s+(.+)/, "numeric"],          // Numeric: "19. Title"
+        [/(\d+)\s*[-–—]\s*(.+)/, "dash"],        // Dash: "19 – Title"
+      ];
 
-      const talkNumber = parseInt(match[1], 10);
-      const title = match[2].trim();
-      const hasMediaContent = row.Content != null && row.Content !== "";
+      const stmt = db.prepare("SELECT DocumentId, Title, Content FROM Document");
 
-      talks.push({ talkNumber, title, hasMediaContent });
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as { DocumentId: number; Title: string; Content: unknown };
+        for (const [pattern] of patterns) {
+          const match = pattern.exec(row.Title);
+          if (match) {
+            const talkNumber = parseInt(match[1], 10);
+            const title = match[2].trim();
+            if (talkNumber > 0 && talkNumber < 500 && title.length > 3) {
+              talks.push({ talkNumber, title, hasMediaContent: row.Content != null && row.Content !== "" });
+            }
+            break;
+          }
+        }
+      }
+      stmt.free();
+
+      // If no talks found, throw with diagnostic info
+      if (talks.length === 0) {
+        throw new Error(
+          `No talks matched in Document table. Tables: [${tableNames.join(", ")}]. ` +
+          `Sample titles: ${JSON.stringify(sampleTitles.slice(0, 5))}`,
+        );
+      }
+    } else {
+      throw new Error(
+        `No 'Document' table found. Available tables: [${tableNames.join(", ")}]`,
+      );
     }
-
-    stmt.free();
 
     // Sort by talk number
     talks.sort((a, b) => a.talkNumber - b.talkNumber);
