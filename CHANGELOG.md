@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.5
+
+### Fix: Seed chairman/prayer assignment slots (#208)
+- fix: chairman, opening prayer, closing prayer slots now seeded during workbook import
+- chore: bump APP_VERSION to 2026.03.24.5
+
 ## v2026.03.24.4
 
 ### Feat: EPUB-based workbook parser (#208)
