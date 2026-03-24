@@ -59,12 +59,28 @@ export function generateSetupToken(): string {
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+/**
+ * AES-256-GCM encryption key — exactly 32 bytes, base64-encoded in env var.
+ *
+ * Generate: `python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"`
+ * Result:   44-char base64 string (e.g., "K7gNU3sdo+OL0wNhqoVWhr3g6s1xYv72ol/pe/Unols=")
+ *
+ * Stored in Vault at `kv/hubport-cloud/{env}/central-api` → ESO syncs to K8s Secret.
+ * MUST be base64-encoded 32 bytes — NOT hex-encoded (64 chars hex = 48 bytes after b64 decode = crash).
+ */
 const ENCRYPTION_KEY = () => {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is required — refusing to run without encryption');
   }
-  return Buffer.from(key, 'base64');
+  const buf = Buffer.from(key, 'base64');
+  if (buf.length !== 32) {
+    throw new Error(
+      `ENCRYPTION_KEY must be exactly 32 bytes (base64-encoded). Got ${buf.length} bytes. ` +
+      `Generate with: python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"`,
+    );
+  }
+  return buf;
 };
 
 export function encryptToken(plaintext: string): string {
