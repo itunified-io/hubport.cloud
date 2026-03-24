@@ -44,7 +44,7 @@ export function SpeakerPicker({ talk, meetingId, apiUrl, headers, onScheduled, o
         headers,
         body: JSON.stringify({
           meetingId,
-          talkId: talk.id,
+          publicTalkId: talk.id,
           speakerId: speaker.id,
           mode: speaker.isLocal ? "local" : "guest",
         }),
