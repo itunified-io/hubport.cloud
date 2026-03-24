@@ -8,6 +8,8 @@ import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { audit } from "../lib/policy-engine.js";
 import prisma from "../lib/prisma.js";
+import { decrypt } from "../lib/crypto.js";
+import { getEncryptionKey } from "../lib/vault-client.js";
 
 const IdParams = Type.Object({
   id: Type.String({ format: "uuid" }),
@@ -72,6 +74,11 @@ export async function meetingPeriodRoutes(app: FastifyInstance): Promise<void> {
       if (!period) {
         return reply.code(404).send({ error: "Period not found" });
       }
+
+      // Decrypt nested Publisher fields (assignee/assistant) — the encryption
+      // extension only handles top-level Publisher queries, not nested includes
+      await decryptNestedPublishers(period);
+
       return period;
     },
   );
@@ -264,4 +271,44 @@ export async function meetingPeriodRoutes(app: FastifyInstance): Promise<void> {
       return { cleaned: removed };
     },
   );
+}
+
+/* ---- Helpers ---- */
+
+const PUBLISHER_ENCRYPTED_FIELDS = ["firstName", "lastName", "displayName", "email", "phone"];
+
+/**
+ * Decrypt Publisher PII fields in nested meeting period data.
+ * The Prisma encryption extension only handles top-level Publisher queries;
+ * nested includes (assignee/assistant inside assignments) bypass it.
+ */
+async function decryptNestedPublishers(period: Record<string, unknown>): Promise<void> {
+  let key: Buffer | null = null;
+
+  const meetings = period.meetings as Array<Record<string, unknown>> | undefined;
+  if (!meetings) return;
+
+  for (const meeting of meetings) {
+    const assignments = meeting.assignments as Array<Record<string, unknown>> | undefined;
+    if (!assignments) continue;
+
+    for (const assignment of assignments) {
+      for (const field of ["assignee", "assistant"] as const) {
+        const pub = assignment[field] as Record<string, unknown> | null;
+        if (!pub) continue;
+
+        for (const pf of PUBLISHER_ENCRYPTED_FIELDS) {
+          const val = pub[pf];
+          if (typeof val === "string" && val.includes(":")) {
+            try {
+              if (!key) key = await getEncryptionKey();
+              pub[pf] = decrypt(val, key);
+            } catch {
+              // Legacy unencrypted or non-matching pattern — leave as-is
+            }
+          }
+        }
+      }
+    }
+  }
 }
