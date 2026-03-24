@@ -51,7 +51,6 @@ RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
 # Copy built artifacts
 COPY --from=builder /app/hub-app/dist ./hub-app/dist/
 COPY --from=builder /app/hub-api/dist ./hub-api/dist/
-COPY --from=builder /app/hub-api/src/data ./hub-api/src/data/
 COPY --from=builder /app/hub-api/prisma ./hub-api/prisma/
 COPY --from=builder /app/setup-wizard/dist ./setup-wizard/dist/
 COPY --from=builder /app/node_modules ./node_modules/

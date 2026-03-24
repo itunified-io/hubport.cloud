@@ -10,7 +10,6 @@ import { PERMISSIONS } from "../lib/permissions.js";
 import { audit } from "../lib/policy-engine.js";
 import prisma from "../lib/prisma.js";
 import { parseJwpubTalks } from "../lib/importers/jw/jwpub-talk-parser.js";
-import { seedPublicTalks } from "../lib/seed-public-talks.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
 type IdParamsType = Static<typeof IdParams>;
@@ -178,21 +177,6 @@ export async function publicTalkRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Re-seed public talk catalog from bundled JSON (admin only)
-  app.post(
-    "/public-talks/seed",
-    { preHandler: requirePermission(PERMISSIONS.MANAGE_PUBLIC_TALKS) },
-    async (request, reply) => {
-      const result = await seedPublicTalks();
-      await audit(
-        "public_talk.seed",
-        request.user?.sub ?? "unknown",
-        "PublicTalk",
-        "catalog-reseed",
-      );
-      return reply.send(result);
-    },
-  );
 
   // ─── Schedule ─────────────────────────────────────────────────────
 
