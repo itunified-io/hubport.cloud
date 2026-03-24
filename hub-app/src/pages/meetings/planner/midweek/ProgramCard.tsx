@@ -15,13 +15,13 @@ export function ProgramCard({ meeting, locked, onEditAssignment }: ProgramCardPr
   const songs = meeting.workbookWeek?.songNumbers ?? [];
   const assignments = meeting.assignments ?? [];
 
-  // Find chairman assignment
-  const chairman = assignments.find((a) => a.slotTemplate.slotKey === "chairman");
+  // Find chairman assignment (slot key includes meeting type suffix)
+  const chairman = assignments.find((a) => a.slotTemplate.slotKey.startsWith("chairman"));
   const chairmanName = formatName(chairman?.assignee);
 
   // Find prayer assignments
-  const openingPrayer = assignments.find((a) => a.slotTemplate.slotKey === "opening_prayer");
-  const closingPrayer = assignments.find((a) => a.slotTemplate.slotKey === "closing_prayer");
+  const openingPrayer = assignments.find((a) => a.slotTemplate.slotKey.startsWith("opening_prayer"));
+  const closingPrayer = assignments.find((a) => a.slotTemplate.slotKey.startsWith("closing_prayer"));
 
   // Group program assignments by section
   const programBySection = groupBySection(assignments);
@@ -242,10 +242,14 @@ function getPartIcon(partType?: string) {
   }
 }
 
+/** Slot keys handled explicitly in ProgramCard layout — exclude from section grouping */
+const EXPLICIT_SLOTS = new Set(["chairman_midweek", "chairman_weekend", "opening_prayer_midweek", "opening_prayer_weekend", "closing_prayer_midweek", "closing_prayer_weekend"]);
+
 function groupBySection(assignments: Assignment[]) {
   const result: Record<SectionKey, Assignment[]> = { treasures: [], ministry: [], living: [] };
   for (const a of assignments) {
     if (a.slotTemplate.category !== "program") continue;
+    if (EXPLICIT_SLOTS.has(a.slotTemplate.slotKey)) continue;
     const sec = (a.workbookPart?.section ?? "treasures") as SectionKey;
     if (result[sec]) result[sec].push(a);
   }
