@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.22
+
+### Feat: S-34 JWPUB import + Public Talk Catalog UI (#208, #221)
+- feat: drag-and-drop S-34 JWPUB upload zone on Public Talk Planner (100MB limit)
+- feat: Catalog tab with searchable talk list (number, title, discontinued badge)
+- fix: JWPUB parser handles multiple title formats (Nr. N, No. N, N. Title, N – Title)
+- fix: use `file.toBuffer()` for reliable multipart stream handling
+- fix: remove auto-seeded catalog — S-34 JWPUB is sole import source
+- fix: polished upload zone UI (circular icon, spinner, styled alerts)
+
 ## v2026.03.24.13
 
 ### Feat: Public talk catalog seed (#221)
