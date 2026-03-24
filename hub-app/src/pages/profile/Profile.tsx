@@ -4,6 +4,7 @@ import { User, Shield, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
 import { SecuritySection } from "./SecuritySection";
+import { AvailabilitySection } from "./AvailabilitySection";
 
 interface PublisherProfile {
   id: string;
@@ -167,6 +168,9 @@ export function Profile() {
           </button>
         </div>
       )}
+
+      {/* Availability — away periods */}
+      {profile && <AvailabilitySection publisherId={profile.id} />}
 
       {/* Danger zone */}
       <div className="p-4 border border-[var(--red)] border-opacity-30 rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">

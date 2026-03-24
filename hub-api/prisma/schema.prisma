@@ -173,6 +173,8 @@ model Publisher {
   campaignInvites    CampaignInvite[]
   assignedParts      MeetingAssignment[] @relation("AssignedParts")
   assistedParts      MeetingAssignment[] @relation("AssistedParts")
+  awayPeriods        AwayPeriod[]
+  speaker            Speaker?            @relation("PublisherSpeaker")
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -507,18 +509,32 @@ model Speaker {
   id                String        @id @default(uuid())
   firstName         String        /// @encrypted
   lastName          String        /// @encrypted
-  congregationName  String?       /// Source congregation name
+  congregationName  String?       /// Source congregation name (encrypted for manual speakers)
   email             String?       /// @encrypted — contact email
   phone             String?       /// @encrypted — contact phone
-  isLocal           Boolean       @default(true)
+  publisherId       String?       @unique /// FK to Publisher — set for local speakers, null for manual/hubport
+  publisher         Publisher?    @relation("PublisherSpeaker", fields: [publisherId], references: [id])
+  source            SpeakerSource @default(local)
+  isLocal           Boolean       @default(true) /// @deprecated — use source enum. Kept for migration.
   status            SpeakerStatus @default(active)
+  monthlyInviteCap  Int           @default(4) /// Max talks per month (speaker sets in profile)
+  sharePhone        Boolean       @default(false) /// Privacy: share phone with partners
+  shareEmail        Boolean       @default(false) /// Privacy: share email with partners
+  shareAvailability Boolean       @default(true)  /// Privacy: share availability with partners
   notes             String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  schedules PublicTalkSchedule[]
+  schedules  PublicTalkSchedule[]
+  talks      SpeakerTalk[]
 
-  @@index([isLocal, status])
+  @@index([source, status])
+}
+
+enum SpeakerSource {
+  local    /// Own congregation publisher
+  hubport  /// From hubport.cloud partner (federated)
+  manual   /// Manually added (not on hubport.cloud)
 }
 
 model PublicTalk {
@@ -531,6 +547,34 @@ model PublicTalk {
   updatedAt    DateTime @updatedAt
 
   schedules PublicTalkSchedule[]
+  speakers  SpeakerTalk[]
+}
+
+model SpeakerTalk {
+  id           String     @id @default(uuid())
+  speakerId    String
+  speaker      Speaker    @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+  publicTalkId String
+  publicTalk   PublicTalk @relation(fields: [publicTalkId], references: [id], onDelete: Cascade)
+
+  @@unique([speakerId, publicTalkId])
+  @@index([speakerId])
+  @@index([publicTalkId])
+}
+
+model AwayPeriod {
+  id          String    @id @default(uuid())
+  publisherId String
+  publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  startDate   DateTime  @db.Date
+  endDate     DateTime  @db.Date
+  reason      String?   /// @encrypted — AES-256-GCM
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([publisherId, startDate, endDate])
+  @@index([publisherId])
+  @@index([startDate, endDate])
 }
 
 model PublicTalkSchedule {
