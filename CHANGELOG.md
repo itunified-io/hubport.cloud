@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.7
+
+### Fix: Reimport FK constraint failure (#208)
+- fix: delete auto_seeded assignments and unlink meetings BEFORE deleting weeks/parts
+- Root cause: DB FK constraint (NO ACTION) on workbookPartId blocked WorkbookPart cascade deletion, silently rolling back the entire import transaction
+
 ## v2026.03.24.6
 
 ### Fix: Orphaned assignments on workbook reimport (#208)
