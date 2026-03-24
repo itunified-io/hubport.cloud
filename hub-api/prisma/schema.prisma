@@ -474,7 +474,7 @@ model MeetingAssignment {
 
   meeting      Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   slotTemplate MeetingSlotTemplate @relation(fields: [slotTemplateId], references: [id])
-  workbookPart WorkbookPart?       @relation(fields: [workbookPartId], references: [id])
+  workbookPart WorkbookPart?       @relation(fields: [workbookPartId], references: [id], onDelete: SetNull)
   assignee     Publisher?          @relation("AssignedParts", fields: [assigneePublisherId], references: [id])
   assistant    Publisher?          @relation("AssistedParts", fields: [assistantPublisherId], references: [id])
 
