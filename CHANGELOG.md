@@ -1,6 +1,21 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.25
+
+### Feat: Publisher Availability + Speaker Catalog Foundation (#222)
+- feat: AwayPeriod model — publishers mark date ranges as unavailable (encrypted reason)
+- feat: away-periods CRUD routes (GET/POST/DELETE) with RBAC permissions
+- feat: shared `getPublisherAvailability()` utility — reused by midweek, weekend, public talk planners
+- feat: AvailabilitySection component in Profile page (add/delete away periods)
+- feat: SpeakerTalk join model — maps speakers to their public talk repertoire
+- feat: SpeakerSource enum (local/hubport/manual) replacing boolean `isLocal`
+- feat: Speaker privacy fields (sharePhone, shareEmail, shareAvailability)
+- feat: Speaker monthlyInviteCap (default 4, set in profile)
+- feat: Speaker publisherId FK for local speaker → publisher link
+- feat: Enhanced speakers route with talk numbers, source filter
+- feat: POST /speakers/import-csv for bulk CSV import of manual guest speakers
+
 ## v2026.03.24.23
 
 ### Fix: Encryption key validation + Vault key format (#208)
