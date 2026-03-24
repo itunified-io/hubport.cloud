@@ -1,12 +1,20 @@
 /**
- * Weekend study importer — parses Watchtower Study edition data from JW.org.
+ * Weekend study importer — parses Watchtower Study edition EPUB from JW CDN.
+ *
+ * Parser rules:
+ * - Use EPUB from JW CDN (structured XHTML, reliable extraction)
+ * - Normalize to internal types, not display strings
+ * - Idempotent by edition identity and checksum
+ * - Support preview before commit
+ * - Auto-create weekend meetings when importing study weeks
+ * - Reimport cleanup: delete assignments → unlink meetings → delete weeks → recreate
  */
 
-import { fetchStudyEdition } from "./jw-client.js";
+import { fetchStudyEpub } from "./jw-client.js";
+import { parseWtStudyEpub } from "./wt-study-epub-parser.js";
 import { validateStudyEdition } from "./import-validator.js";
 import type {
   ImportedStudyEdition,
-  ImportedStudyWeek,
   ImportPreview,
   StudyImportResult,
 } from "./types.js";
@@ -14,13 +22,16 @@ import prisma from "../../prisma.js";
 
 /**
  * Preview a study edition import.
+ * Fetches the EPUB from JW CDN, parses it, and returns structured data + warnings.
  */
 export async function previewStudyImport(
   language: string,
   issueKey: string,
 ): Promise<ImportPreview<ImportedStudyEdition>> {
-  const fetched = await fetchStudyEdition(language, issueKey);
-  const edition = parseStudyHtml(fetched.html, language, issueKey, fetched.checksum);
+  const fetched = await fetchStudyEpub(language, issueKey);
+  const edition = await parseWtStudyEpub(
+    fetched.data, language, issueKey, fetched.checksum,
+  );
 
   const validation = validateStudyEdition(edition);
   if (!validation.valid) {
@@ -41,6 +52,16 @@ export async function previewStudyImport(
 
 /**
  * Commit a study edition import.
+ *
+ * Transaction cleanup order (critical for FK constraints):
+ * 1. Delete auto_seeded assignments for linked meetings
+ * 2. Unlink meetings from study weeks (weekendStudyWeekId = null)
+ * 3. Delete existing study weeks
+ * 4. Upsert edition
+ * 5. Create new study weeks
+ * 6. For each week: find or CREATE weekend meeting
+ * 7. Link meeting to study week
+ * 8. Seed weekend slot templates
  */
 export async function commitStudyImport(
   edition: ImportedStudyEdition,
@@ -49,7 +70,7 @@ export async function commitStudyImport(
   const warnings: string[] = [];
 
   return await prisma.$transaction(async (tx) => {
-    // 1. Upsert edition
+    // 1. Upsert WeekendStudyEdition
     const dbEdition = await tx.weekendStudyEdition.upsert({
       where: {
         language_issueKey: {
@@ -59,23 +80,53 @@ export async function commitStudyImport(
       },
       update: {
         checksum: edition.checksum,
-        rawMetadata: { parserVersion: "1.0", fetchedAt: new Date().toISOString() },
+        rawMetadata: { parserVersion: "2.0-epub", fetchedAt: new Date().toISOString() },
         importedAt: new Date(),
       },
       create: {
         language: edition.language,
         issueKey: edition.issueKey,
         checksum: edition.checksum,
-        rawMetadata: { parserVersion: "1.0", fetchedAt: new Date().toISOString() },
+        rawMetadata: { parserVersion: "2.0-epub", fetchedAt: new Date().toISOString() },
       },
     });
 
-    // 2. Delete existing weeks for reimport
+    // 2. Reimport cleanup — delete assignments FIRST (FK constraint safety)
+    const existingWeeks = await tx.weekendStudyWeek.findMany({
+      where: { editionId: dbEdition.id },
+      select: { id: true },
+    });
+
+    if (existingWeeks.length > 0) {
+      // Find all meetings linked to these study weeks
+      const linkedMeetings = await tx.meeting.findMany({
+        where: { weekendStudyWeekId: { in: existingWeeks.map((w) => w.id) } },
+        select: { id: true },
+      });
+
+      if (linkedMeetings.length > 0) {
+        // Delete auto-seeded assignments (prevents FK issues on study week deletion)
+        await tx.meetingAssignment.deleteMany({
+          where: {
+            meetingId: { in: linkedMeetings.map((m) => m.id) },
+            source: "auto_seeded",
+          },
+        });
+
+        // Unlink meetings from study weeks
+        await tx.meeting.updateMany({
+          where: { weekendStudyWeekId: { in: existingWeeks.map((w) => w.id) } },
+          data: { weekendStudyWeekId: null },
+        });
+      }
+    }
+
+    // 3. Now safe to delete existing weeks (no FK references remain)
     await tx.weekendStudyWeek.deleteMany({
       where: { editionId: dbEdition.id },
     });
 
-    // 3. Create study weeks
+    // 4. Create new study weeks
     let weeksCreated = 0;
     for (const week of edition.weeks) {
       await tx.weekendStudyWeek.create({
@@ -92,26 +143,44 @@ export async function commitStudyImport(
       weeksCreated++;
     }
 
-    // 4. Link study weeks to existing weekend meetings
+    // 5. Link study weeks to existing or NEW weekend meetings + seed slots
     let meetingsLinked = 0;
+    let meetingsCreated = 0;
+    let slotsSeeded = 0;
+
+    // Get congregation settings for default weekend day/time
+    const settings = await tx.congregationSettings.findFirst();
+    const weekendDay = settings?.defaultWeekendDay ?? 0; // 0 = Sunday
+    const weekendTime = settings?.defaultWeekendTime ?? "10:00";
+
+    // Get all weekend + shared slot templates
+    const slotTemplates = await tx.meetingSlotTemplate.findMany({
+      where: {
+        meetingType: { in: ["weekend", "all"] },
+        isActive: true,
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+
     for (const week of edition.weeks) {
       const studyWeek = await tx.weekendStudyWeek.findFirst({
         where: { editionId: dbEdition.id, weekOf: new Date(week.weekOf) },
       });
       if (!studyWeek) continue;
 
-      // Find weekend meeting on or near this Sunday
+      // Calculate meeting date based on congregation's weekend day
       const sunday = new Date(week.weekOf);
-      const settings = await tx.congregationSettings.findFirst();
-      const weekendDay = settings?.defaultWeekendDay ?? 0;
-
-      // Calculate meeting date for this week
       const meetingDate = new Date(sunday);
       if (weekendDay !== 0) {
-        meetingDate.setDate(sunday.getDate() + weekendDay);
+        // Adjust from Sunday to configured day (e.g., Saturday = 6)
+        const dayOffset = weekendDay >= sunday.getDay()
+          ? weekendDay - sunday.getDay()
+          : weekendDay - sunday.getDay() + 7;
+        meetingDate.setDate(sunday.getDate() + dayOffset);
       }
 
-      const meeting = await tx.meeting.findFirst({
+      // Find existing weekend meeting for this date
+      let meeting = await tx.meeting.findFirst({
         where: {
           type: "weekend",
           date: meetingDate,
@@ -119,11 +188,64 @@ export async function commitStudyImport(
       });
 
       if (meeting) {
+        // Link existing meeting to study week
         await tx.meeting.update({
           where: { id: meeting.id },
           data: { weekendStudyWeekId: studyWeek.id },
         });
         meetingsLinked++;
+      } else {
+        // AUTO-CREATE weekend meeting
+        meeting = await tx.meeting.create({
+          data: {
+            title: "Weekend Meeting",
+            type: "weekend",
+            date: meetingDate,
+            startTime: weekendTime,
+            weekendStudyWeekId: studyWeek.id,
+            status: "draft",
+          },
+        });
+        meetingsCreated++;
+        meetingsLinked++;
+      }
+
+      // Seed weekend program slots (chairman, prayers, public talk, WT conductor/reader)
+      const WEEKEND_PROGRAM_SLOTS = [
+        "chairman_weekend",
+        "opening_prayer_weekend",
+        "public_talk",
+        "wt_conductor",
+        "wt_reader",
+        "closing_prayer_weekend",
+      ];
+      const programTemplates = slotTemplates.filter(
+        (t) => WEEKEND_PROGRAM_SLOTS.includes(t.slotKey) && t.category === "program",
+      );
+      for (const tmpl of programTemplates) {
+        await tx.meetingAssignment.create({
+          data: {
+            meetingId: meeting.id,
+            slotTemplateId: tmpl.id,
+            status: "pending",
+            source: "auto_seeded",
+          },
+        });
+        slotsSeeded++;
+      }
+
+      // Seed shared duty slots (sound, video, attendants, etc.)
+      const dutyTemplates = slotTemplates.filter((t) => t.category === "duty");
+      for (const duty of dutyTemplates) {
+        await tx.meetingAssignment.create({
+          data: {
+            meetingId: meeting.id,
+            slotTemplateId: duty.id,
+            status: "pending",
+            source: "auto_seeded",
+          },
+        });
+        slotsSeeded++;
       }
     }
 
@@ -131,130 +253,9 @@ export async function commitStudyImport(
       editionId: dbEdition.id,
       weeksCreated,
       meetingsLinked,
+      meetingsCreated,
+      slotsSeeded,
       warnings,
     };
   });
-}
-
-/**
- * Parse study edition HTML into normalized data.
- */
-export function parseStudyHtml(
-  html: string,
-  language: string,
-  issueKey: string,
-  checksum: string,
-): ImportedStudyEdition {
-  const weeks: ImportedStudyWeek[] = [];
-
-  // Try to extract study articles from HTML
-  // Watchtower Study articles typically have specific class patterns
-  const articlePattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
-  const articles = [...html.matchAll(articlePattern)];
-
-  let sortOrder = 0;
-  for (const match of articles) {
-    const articleHtml = match[1];
-
-    // Extract title
-    const titleMatch = articleHtml.match(/<h[12][^>]*>([^<]+)<\/h[12]>/);
-    const title = titleMatch ? cleanText(titleMatch[1]) : "";
-    if (!title) continue;
-
-    // Skip non-study articles (e.g., life stories, questions)
-    if (isStudyArticle(articleHtml)) {
-      sortOrder++;
-
-      // Extract study article URL
-      const urlMatch = articleHtml.match(/href="([^"]+)"/);
-      const url = urlMatch ? urlMatch[1] : null;
-
-      // Calculate week date (Sundays)
-      const weekDate = calculateStudyWeekDate(issueKey, sortOrder);
-
-      weeks.push({
-        weekOf: weekDate,
-        articleTitle: title,
-        articleUrl: url ? ensureAbsoluteUrl(url) : null,
-        studyNumber: sortOrder,
-        sourceRef: null,
-        sortOrder,
-      });
-    }
-  }
-
-  // Fallback if structured parsing finds nothing
-  if (weeks.length === 0) {
-    return createPlaceholderStudyEdition(language, issueKey, checksum);
-  }
-
-  return { language, issueKey, checksum, weeks };
-}
-
-function isStudyArticle(html: string): boolean {
-  // Study articles typically contain paragraph numbering and questions
-  return /(?:study|estudio|étude|studium)/i.test(html) ||
-    /class="[^"]*(?:study|qu)[^"]*"/i.test(html);
-}
-
-function cleanText(html: string): string {
-  return html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function ensureAbsoluteUrl(url: string): string {
-  if (url.startsWith("http")) return url;
-  return `https://www.jw.org${url}`;
-}
-
-function calculateStudyWeekDate(issueKey: string, articleIndex: number): string {
-  // issueKey format: "YYYYMM" or "w_YYYY_MM"
-  const match = issueKey.match(/(\d{4})[\-_]?(\d{2})/);
-  if (!match) {
-    const now = new Date();
-    now.setDate(now.getDate() + (articleIndex - 1) * 7);
-    return now.toISOString().split("T")[0];
-  }
-
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-
-  // Calculate the nth Sunday of the month
-  const firstDay = new Date(year, month - 1, 1);
-  const daysUntilSunday = (7 - firstDay.getDay()) % 7;
-  const firstSunday = new Date(year, month - 1, 1 + daysUntilSunday);
-  const targetSunday = new Date(firstSunday);
-  targetSunday.setDate(firstSunday.getDate() + (articleIndex - 1) * 7);
-
-  return targetSunday.toISOString().split("T")[0];
-}
-
-function createPlaceholderStudyEdition(
-  language: string,
-  issueKey: string,
-  checksum: string,
-): ImportedStudyEdition {
-  const match = issueKey.match(/(\d{4})[\-_]?(\d{2})/);
-  const year = match ? parseInt(match[1], 10) : new Date().getFullYear();
-  const month = match ? parseInt(match[2], 10) : new Date().getMonth() + 1;
-
-  const weeks: ImportedStudyWeek[] = [];
-  const firstDay = new Date(year, month - 1, 1);
-  const daysUntilSunday = (7 - firstDay.getDay()) % 7;
-  let sunday = new Date(year, month - 1, 1 + daysUntilSunday);
-
-  for (let i = 0; i < 4; i++) {
-    if (sunday.getMonth() >= month && i > 0) break;
-    weeks.push({
-      weekOf: sunday.toISOString().split("T")[0],
-      articleTitle: `Study Article ${i + 1}`,
-      articleUrl: null,
-      studyNumber: i + 1,
-      sourceRef: null,
-      sortOrder: i,
-    });
-    sunday = new Date(sunday);
-    sunday.setDate(sunday.getDate() + 7);
-  }
-
-  return { language, issueKey, checksum, weeks };
 }
