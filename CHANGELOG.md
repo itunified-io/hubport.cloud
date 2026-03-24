@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.13
+
+### Feat: Public talk catalog seed (#221)
+- feat: 194-talk DE+EN catalog JSON auto-seeded on startup (source: sws2apps/organized-app i18n)
+- feat: POST /public-talks/seed endpoint for admin-triggered reseed (RBAC: MANAGE_PUBLIC_TALKS)
+- feat: `discontinued` boolean field on PublicTalk model for outline revision tracking
+- fix: SpeakerPicker payload `talkId` → `publicTalkId` (matches API schema)
+- fix: bump Sidebar version display
+
 ## v2026.03.24.11
 
 ### Feat: Weekend meeting planner (#219)
