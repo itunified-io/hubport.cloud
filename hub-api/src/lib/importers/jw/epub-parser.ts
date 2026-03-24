@@ -340,37 +340,64 @@ function extractSourceRef(html: string): string | null {
 /* ---- Date Calculation ---- */
 
 /**
- * Calculate the Monday (weekOf) date from yearMonth and sort order.
- * The TOC provides date ranges like "6.-12. Juli" or "27. Juli–2. August".
+ * Calculate the Monday (weekOf) date from yearMonth and date range text.
+ *
+ * The dateRange contains the actual month name (e.g., "6.-12. April", "30. März–5. April").
+ * We parse the FIRST month name to determine the correct month for the start day.
+ * This avoids the broken sortOrder-based heuristic for bimonthly editions.
  */
 function calculateWeekOf(yearMonth: string, sortOrder: number, dateRange: string): string | null {
-  const [year, month] = yearMonth.split("-").map(Number);
+  const [year] = yearMonth.split("-").map(Number);
 
-  // Try to extract start day from date range
+  // Extract start day from date range
   const dayMatch = dateRange.match(/^(\d+)/);
-  if (dayMatch) {
-    const day = parseInt(dayMatch[1], 10);
-    // For bimonthly editions: determine which month based on sortOrder and day
-    let m = month;
-    if (sortOrder >= 4 || (sortOrder >= 3 && day < 10)) {
-      m = month + 1;
-    }
-    let y = year;
-    if (m > 12) { m -= 12; y++; }
-
-    const date = new Date(y, m - 1, day);
-    // Snap to Monday
-    const dayOfWeek = date.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    date.setDate(date.getDate() + mondayOffset);
-    return date.toISOString().split("T")[0];
+  if (!dayMatch) {
+    // Fallback: generate from sortOrder
+    const [, month] = yearMonth.split("-").map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const daysUntilMonday = (8 - firstDay.getDay()) % 7;
+    const monday = new Date(year, month - 1, firstDay.getDate() + daysUntilMonday + sortOrder * 7);
+    return monday.toISOString().split("T")[0];
   }
 
-  // Fallback: generate from sortOrder
-  const firstDay = new Date(year, month - 1, 1);
-  const daysUntilMonday = (8 - firstDay.getDay()) % 7;
-  const monday = new Date(year, month - 1, firstDay.getDate() + daysUntilMonday + sortOrder * 7);
-  return monday.toISOString().split("T")[0];
+  const day = parseInt(dayMatch[1], 10);
+
+  // Parse month from first month name in dateRange (multilingual)
+  const m = parseMonthFromText(dateRange) ?? parseInt(yearMonth.split("-")[1], 10);
+
+  let y = year;
+  let month = m;
+  if (month > 12) { month -= 12; y++; }
+
+  const date = new Date(y, month - 1, day);
+  // Snap to Monday
+  const dayOfWeek = date.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  date.setDate(date.getDate() + mondayOffset);
+  return date.toISOString().split("T")[0];
+}
+
+/** Extract month number from the FIRST month name in a text string. */
+function parseMonthFromText(text: string): number | null {
+  const monthNames: [RegExp, number][] = [
+    [/januar/i, 1], [/february|februar/i, 2], [/märz|march|mars/i, 3],
+    [/april|avril/i, 4], [/mai|may/i, 5], [/juni|june|juin/i, 6],
+    [/juli|july|juillet/i, 7], [/august|août/i, 8], [/september|septembre/i, 9],
+    [/oktober|october|octobre/i, 10], [/november|novembre/i, 11], [/dezember|december|décembre/i, 12],
+  ];
+
+  // Find the first month name and its position in the text
+  let earliest: { pos: number; month: number } | null = null;
+  for (const [pattern, num] of monthNames) {
+    const match = text.match(pattern);
+    if (match && match.index !== undefined) {
+      if (!earliest || match.index < earliest.pos) {
+        earliest = { pos: match.index, month: num };
+      }
+    }
+  }
+
+  return earliest?.month ?? null;
 }
 
 /* ---- Utilities ---- */
