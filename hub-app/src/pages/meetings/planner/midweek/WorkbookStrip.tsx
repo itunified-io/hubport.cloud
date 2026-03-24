@@ -73,13 +73,18 @@ export function WorkbookStrip({
               </div>
               <div className="px-1 py-[3px]">
                 <span className="text-[8px] font-medium text-[var(--text-muted)] leading-tight block">{ed.label}</span>
-                {ed.available && !ed.imported && (
+                {ed.available && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onImport(ed.yearMonth); }}
                     disabled={importingMonth !== null}
-                    className="w-full mt-0.5 px-1 py-px text-[8px] bg-[var(--amber)] text-black font-bold rounded hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer"
+                    className={[
+                      "w-full mt-0.5 px-1 py-px text-[8px] font-bold rounded disabled:opacity-50 cursor-pointer",
+                      ed.imported
+                        ? "bg-transparent border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-2)]"
+                        : "bg-[var(--amber)] text-black hover:bg-[var(--amber-light)]",
+                    ].join(" ")}
                   >
-                    {importingMonth === ed.yearMonth ? "..." : "Import"}
+                    {importingMonth === ed.yearMonth ? "..." : ed.imported ? "↻" : "Import"}
                   </button>
                 )}
               </div>
