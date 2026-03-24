@@ -4,9 +4,7 @@
  * Upserted on startup — safe to call multiple times.
  */
 
-import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import catalog from "../data/public-talks-catalog.json" with { type: "json" };
 import prisma from "./prisma.js";
 
 interface CatalogEntry {
@@ -15,23 +13,17 @@ interface CatalogEntry {
   title_en: string;
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function loadCatalog(): CatalogEntry[] {
-  const path = join(__dirname, "..", "data", "public-talks-catalog.json");
-  return JSON.parse(readFileSync(path, "utf-8"));
-}
+const typedCatalog = catalog as CatalogEntry[];
 
 export async function seedPublicTalks(
   language: string = "de",
 ): Promise<{ created: number; updated: number; discontinued: number }> {
-  const catalog = loadCatalog();
   const titleKey = `title_${language}` as keyof CatalogEntry;
 
   let created = 0;
   let updated = 0;
 
-  for (const entry of catalog) {
+  for (const entry of typedCatalog) {
     const title = (entry[titleKey] as string) || entry.title_de;
     const existing = await prisma.publicTalk.findUnique({
       where: { talkNumber: entry.talkNumber },
@@ -58,7 +50,7 @@ export async function seedPublicTalks(
   }
 
   // Mark talks NOT in catalog as discontinued
-  const catalogNumbers = catalog.map((e) => e.talkNumber);
+  const catalogNumbers = typedCatalog.map((e) => e.talkNumber);
   const { count: discontinued } = await prisma.publicTalk.updateMany({
     where: {
       talkNumber: { notIn: catalogNumbers },
@@ -68,7 +60,7 @@ export async function seedPublicTalks(
   });
 
   console.log(
-    `[seed-public-talks] created=${created} updated=${updated} discontinued=${discontinued} total=${catalog.length}`,
+    `[seed-public-talks] created=${created} updated=${updated} discontinued=${discontinued} total=${typedCatalog.length}`,
   );
 
   return { created, updated, discontinued };
