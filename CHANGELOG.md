@@ -1,6 +1,17 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.11
+
+### Feat: Weekend meeting planner (#219)
+- feat: JWPUB-based public talk catalog import (S-34mp parser, SQLite extraction via sql.js)
+- feat: WT Study EPUB parser with auto-meeting creation and weekend slot seeding
+- feat: weekend planner UI rewrite — program card (talk green + study blue), duty sidebar, picker modals
+- feat: TalkPicker modal — searchable public talk catalog with number/title filter
+- feat: SpeakerPicker modal — speaker directory with local/guest badges, creates schedule entries
+- feat: StudyStrip — compact WT Study edition thumbnails in sidebar (56px cards, Now/checkmark badges)
+- refactor: reuse midweek WeekNavigator and AssignmentPicker for weekend planner
+
 ## v2026.03.24.10
 
 ### Feat: Part details, JW links, dock-style UI, decrypt publisher names (#208)
