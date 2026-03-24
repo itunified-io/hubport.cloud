@@ -29,13 +29,14 @@ export function PublicTalkPlanner() {
   const { user } = useAuth();
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
-  const [activeTab, setActiveTab] = useState<"schedule" | "speakers">("schedule");
+  const [talks, setTalks] = useState<{ id: string; talkNumber: number; title: string; discontinued: boolean }[]>([]);
+  const [activeTab, setActiveTab] = useState<"schedule" | "speakers" | "catalog">("schedule");
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; updated: number; discontinued: number } | null>(null);
   const [importError, setImportError] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [talkCount, setTalkCount] = useState(0);
+  const [talkSearch, setTalkSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const apiUrl = getApiUrl();
@@ -47,26 +48,23 @@ export function PublicTalkPlanner() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schedRes, speakRes] = await Promise.all([
+      const [schedRes, speakRes, talksRes] = await Promise.all([
         fetch(`${apiUrl}/public-talks/schedule?upcoming=true`, { headers }),
         fetch(`${apiUrl}/speakers`, { headers }),
+        fetch(`${apiUrl}/public-talks`, { headers }),
       ]);
       if (schedRes.ok) setSchedule(await schedRes.json());
       if (speakRes.ok) setSpeakers(await speakRes.json());
+      if (talksRes.ok) {
+        const data = await talksRes.json();
+        setTalks(Array.isArray(data) ? data : []);
+      }
     } finally {
       setLoading(false);
     }
   }, [apiUrl, user?.access_token]);
 
-  const loadTalkCount = useCallback(async () => {
-    const res = await fetch(`${apiUrl}/public-talks`, { headers });
-    if (res.ok) {
-      const talks = await res.json();
-      setTalkCount(Array.isArray(talks) ? talks.length : 0);
-    }
-  }, [apiUrl, user?.access_token]);
-
-  useEffect(() => { loadData(); loadTalkCount(); }, [loadData, loadTalkCount]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleImportFile = async (file: File) => {
     if (!file.name.endsWith(".jwpub")) {
@@ -91,7 +89,7 @@ export function PublicTalkPlanner() {
       }
       const result = await res.json();
       setImportResult({ created: result.created, updated: result.updated, discontinued: result.discontinued });
-      loadTalkCount();
+      loadData();
     } catch { setImportError("Network error"); }
     finally { setImporting(false); }
   };
@@ -164,15 +162,15 @@ export function PublicTalkPlanner() {
             </div>
             <div className="text-center">
               <p className={`text-sm font-medium ${dragOver ? "text-[var(--amber)]" : "text-[var(--text)]"}`}>
-                {talkCount > 0 ? "Update talk catalog" : "Import talk catalog"}
+                {talks.length > 0 ? "Update talk catalog" : "Import talk catalog"}
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Drop S-34 .jwpub file or click to browse
               </p>
             </div>
-            {talkCount > 0 && (
+            {talks.length > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--green)]/[0.1] text-[var(--green)] font-medium">
-                {talkCount} talks loaded
+                {talks.length} talks loaded
               </span>
             )}
           </>
@@ -202,6 +200,16 @@ export function PublicTalkPlanner() {
           }`}
         >
           Schedule
+        </button>
+        <button
+          onClick={() => setActiveTab("catalog")}
+          className={`px-4 py-2 text-sm font-medium cursor-pointer ${
+            activeTab === "catalog"
+              ? "text-[var(--amber)] border-b-2 border-[var(--amber)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text)]"
+          }`}
+        >
+          Catalog {talks.length > 0 && <span className="ml-1 text-xs opacity-60">({talks.length})</span>}
         </button>
         <button
           onClick={() => setActiveTab("speakers")}
@@ -284,6 +292,45 @@ export function PublicTalkPlanner() {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* Catalog Tab */}
+      {activeTab === "catalog" && (
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Search talks..."
+            value={talkSearch}
+            onChange={(e) => setTalkSearch(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--amber)]"
+          />
+          {talks.length === 0 ? (
+            <p className="text-center py-8 text-[var(--text-muted)]">
+              No talks imported. Upload an S-34 JWPUB file above.
+            </p>
+          ) : (
+            <div className="space-y-0.5">
+              {talks
+                .filter((t) => !talkSearch || t.title.toLowerCase().includes(talkSearch.toLowerCase()) || String(t.talkNumber).includes(talkSearch))
+                .map((talk) => (
+                  <div
+                    key={talk.id}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-[var(--radius-sm)] ${talk.discontinued ? "opacity-40" : "hover:bg-[var(--bg-2)]"}`}
+                  >
+                    <span className="text-xs font-mono text-[var(--amber)] w-8 text-right shrink-0">
+                      {talk.talkNumber}
+                    </span>
+                    <span className={`text-sm ${talk.discontinued ? "line-through text-[var(--text-muted)]" : "text-[var(--text)]"}`}>
+                      {talk.title}
+                    </span>
+                    {talk.discontinued && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500 ml-auto">discontinued</span>
+                    )}
+                  </div>
+                ))}
+            </div>
           )}
         </div>
       )}
