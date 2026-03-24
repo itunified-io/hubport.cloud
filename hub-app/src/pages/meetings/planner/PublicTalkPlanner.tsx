@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Upload, FileUp } from "lucide-react";
+import { FileUp } from "lucide-react";
 import { useAuth } from "../../../auth/useAuth";
 import { getApiUrl } from "../../../lib/config";
 
