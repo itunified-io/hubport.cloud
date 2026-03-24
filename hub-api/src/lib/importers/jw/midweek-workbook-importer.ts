@@ -221,6 +221,16 @@ export async function commitWorkbookImport(
         meetingsCreated++;
       }
 
+      // Clean up existing auto-seeded assignments (reimport scenario).
+      // Without this, old assignments with orphaned workbookPartId survive
+      // and cause the UI to fall back to generic English slot labels.
+      await tx.meetingAssignment.deleteMany({
+        where: {
+          meetingId,
+          source: "auto_seeded",
+        },
+      });
+
       // Seed assignment slots for program parts from workbook
       if (dbWeek?.parts) {
         for (const part of dbWeek.parts) {
