@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.8
+
+### Fix: Show reimport button for imported editions (#208)
+- fix: Import button was hidden for already-imported editions — now shows ↻ reimport button
+- This was the final blocker preventing the EPUB parser from running on existing data
+
 ## v2026.03.24.7
 
 ### Fix: Reimport FK constraint failure (#208)
