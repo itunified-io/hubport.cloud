@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.23
+
+### Fix: Encryption key validation + Vault key format (#208)
+- fix: validate ENCRYPTION_KEY is exactly 32 bytes on startup (fail-fast with generation command)
+- fix: Vault keys regenerated as proper base64-encoded 32-byte values (UAT + Prod)
+- docs: ADR-0082 updated with key format spec, Vault paths, hex-vs-base64 pitfall
+
 ## v2026.03.24.22
 
 ### Feat: S-34 JWPUB import + Public Talk Catalog UI (#208, #221)
