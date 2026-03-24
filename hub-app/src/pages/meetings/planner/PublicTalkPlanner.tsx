@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Upload, FileUp } from "lucide-react";
 import { useAuth } from "../../../auth/useAuth";
 import { getApiUrl } from "../../../lib/config";
 
@@ -30,6 +31,12 @@ export function PublicTalkPlanner() {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [activeTab, setActiveTab] = useState<"schedule" | "speakers">("schedule");
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; discontinued: number } | null>(null);
+  const [importError, setImportError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [talkCount, setTalkCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const apiUrl = getApiUrl();
   const headers = {
@@ -51,7 +58,56 @@ export function PublicTalkPlanner() {
     }
   }, [apiUrl, user?.access_token]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loadTalkCount = useCallback(async () => {
+    const res = await fetch(`${apiUrl}/public-talks`, { headers });
+    if (res.ok) {
+      const talks = await res.json();
+      setTalkCount(Array.isArray(talks) ? talks.length : 0);
+    }
+  }, [apiUrl, user?.access_token]);
+
+  useEffect(() => { loadData(); loadTalkCount(); }, [loadData, loadTalkCount]);
+
+  const handleImportFile = async (file: File) => {
+    if (!file.name.endsWith(".jwpub")) {
+      setImportError("Please upload a .jwpub file (S-34)");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${apiUrl}/public-talks/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user?.access_token}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Import failed" }));
+        setImportError(err.error || "Import failed");
+        return;
+      }
+      const result = await res.json();
+      setImportResult({ created: result.created, updated: result.updated, discontinued: result.discontinued });
+      loadTalkCount();
+    } catch { setImportError("Network error"); }
+    finally { setImporting(false); }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleImportFile(file);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImportFile(file);
+    e.target.value = "";
+  };
 
   const handleInvite = async (id: string) => {
     await fetch(`${apiUrl}/public-talks/schedule/${id}/invite`, { method: "POST", headers });
@@ -75,6 +131,50 @@ export function PublicTalkPlanner() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-[var(--text)]">Public Talk Planner</h1>
+
+      {/* S-34 JWPUB Import */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={[
+          "rounded-[var(--radius)] border-2 border-dashed p-4 flex items-center justify-center gap-3 cursor-pointer transition-all",
+          dragOver
+            ? "border-[var(--amber)] bg-[var(--amber)]/[0.06]"
+            : "border-[var(--border)] bg-[var(--bg-1)] hover:border-[var(--border-2)] hover:bg-[var(--bg-2)]",
+        ].join(" ")}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".jwpub"
+          onChange={handleFileInput}
+          className="hidden"
+        />
+        {importing ? (
+          <span className="text-sm text-[var(--text-muted)]">Importing...</span>
+        ) : (
+          <>
+            <FileUp size={20} className={dragOver ? "text-[var(--amber)]" : "text-[var(--text-muted)]"} />
+            <div className="text-sm">
+              <span className={dragOver ? "text-[var(--amber)] font-medium" : "text-[var(--text-muted)]"}>
+                Drop S-34 JWPUB file here
+              </span>
+              <span className="text-[var(--text-muted)]"> or click to upload</span>
+              {talkCount > 0 && (
+                <span className="ml-2 text-xs text-[var(--text-muted)]">({talkCount} talks loaded)</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      {importError && <p className="text-sm text-[var(--red)]">{importError}</p>}
+      {importResult && (
+        <p className="text-sm text-[var(--green)]">
+          ✓ {importResult.created} created, {importResult.updated} updated, {importResult.discontinued} discontinued
+        </p>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
