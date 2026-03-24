@@ -5,8 +5,9 @@ export interface WorkbookPart {
   section: string;
   partType: string;
   title: string;
-  subtitle?: string;
   durationMinutes: number | null;
+  sourceRef: string | null;
+  sourceUrl: string | null;
   requiresAssistant: boolean;
 }
 

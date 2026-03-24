@@ -195,8 +195,9 @@ function extractPartsFromSection(html: string, section: Section): Omit<ImportedP
     const durationMatch = afterH3.match(/\((\d+)\s*Min\.?\)/);
     const duration = durationMatch ? parseInt(durationMatch[1], 10) : null;
 
-    // Extract source reference (scripture or publication ref)
+    // Extract source reference (scripture or publication ref) and JW Library URL
     const sourceRef = extractSourceRef(afterH3);
+    const sourceUrl = extractSourceUrl(afterH3);
 
     // Infer part type from title and section
     const partType = inferPartTypeFromEpub(title, section, afterH3);
@@ -211,7 +212,7 @@ function extractPartsFromSection(html: string, section: Section): Omit<ImportedP
       title,
       durationMinutes: duration,
       sourceRef,
-      sourceUrl: null,
+      sourceUrl,
       requiresAssistant,
     });
   }
@@ -333,6 +334,33 @@ function extractSourceRef(html: string): string | null {
   // Extract publication reference from italic text
   const pubMatch = html.match(/<em>([^<]+)<\/em>/);
   if (pubMatch) return cleanText(pubMatch[1]);
+
+  return null;
+}
+
+/**
+ * Extract a JW Library URL from the HTML context after a part heading.
+ *
+ * Constructs a JW.org finder URL from scripture references (noteref links)
+ * so users can open the source material directly in JW Library.
+ * Example: "Jer 13:1-14" → "https://www.jw.org/finder?wtlocale=X&bible=24013001"
+ */
+function extractSourceUrl(html: string): string | null {
+  // Look for JW.org finder links already in the HTML
+  const finderMatch = html.match(/href="(https:\/\/www\.jw\.org\/finder\?[^"]+)"/);
+  if (finderMatch) return finderMatch[1].replace(/&amp;/g, "&");
+
+  // Look for publication references in <em> tags (e.g., "lmd Lektion 5")
+  // and construct WOL links from them
+  const pubMatch = html.match(/<a[^>]*href="[^"]*"[^>]*><em>([^<]+)<\/em>/);
+  if (pubMatch) {
+    const pubRef = cleanText(pubMatch[1]);
+    // Common publications: lmd, th, lfb, lff, jr, w, g
+    const pubCode = pubRef.match(/^(lmd|th|lfb|lff|jr|w\d{2}|g\d{2})/i);
+    if (pubCode) {
+      return `https://www.jw.org/finder?wtlocale=X&pub=${pubCode[1].toLowerCase()}`;
+    }
+  }
 
   return null;
 }

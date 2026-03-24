@@ -1,6 +1,6 @@
 // hub-app/src/pages/meetings/planner/midweek/ProgramCard.tsx
 import {
-  Mic, Star, BookOpen, Users, Music, HandHelping,
+  Mic, Star, BookOpen, Users, Music, HandHelping, ExternalLink,
 } from "lucide-react";
 import { SECTION_COLORS, type SectionKey } from "./constants";
 import type { PeriodMeeting, Assignment, Publisher } from "./types";
@@ -175,7 +175,8 @@ function PartRow({
   const colors = SECTION_COLORS[section];
   const part = assignment.workbookPart;
   const title = part?.title ?? assignment.slotTemplate.label;
-  const subtitle = part?.subtitle;
+  const sourceRef = part?.sourceRef;
+  const sourceUrl = part?.sourceUrl;
   const duration = part?.durationMinutes;
   const hasAssistant = part?.requiresAssistant;
   const name = formatName(assignment.assignee);
@@ -186,8 +187,20 @@ function PartRow({
     <div className={`flex items-center gap-2.5 px-3.5 py-2 hover:bg-white/[0.02] transition-colors ${showBorder ? "border-t border-white/[0.03]" : ""}`}>
       <Icon size={13} className={`shrink-0 ${colors.text}`} />
       <div className="flex-1 min-w-0">
-        <div className="text-xs leading-snug truncate">{title}</div>
-        {subtitle && <div className="text-[10px] text-zinc-600 mt-px">{subtitle}</div>}
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs leading-snug truncate block hover:underline cursor-pointer"
+            title="In JW Library öffnen"
+          >
+            {title} <ExternalLink size={9} className="inline-block mb-px opacity-40" />
+          </a>
+        ) : (
+          <div className="text-xs leading-snug truncate">{title}</div>
+        )}
+        {sourceRef && <div className="text-[10px] text-zinc-600 mt-px truncate">{sourceRef}</div>}
       </div>
       <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
         {duration && <span className="text-[10px] text-zinc-600">{duration} min</span>}
