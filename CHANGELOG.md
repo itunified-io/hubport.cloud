@@ -1,6 +1,11 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.24.9
+
+### Fix: Month parsing in EPUB date ranges (#208)
+- fix: parse actual month name from dateRange instead of sortOrder heuristic — fixes empty weeks in bimonthly editions where weeks cross month boundaries
+
 ## v2026.03.24.8
 
 ### Fix: Show reimport button for imported editions (#208)
