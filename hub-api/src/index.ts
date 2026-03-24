@@ -51,7 +51,7 @@ async function start(): Promise<void> {
   });
 
   // Multipart (file uploads, max 10MB — JWPUB files can be 5-10MB)
-  await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB — S-34 JWPUB can be ~20 MB
+  await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }); // 100 MB
 
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);
