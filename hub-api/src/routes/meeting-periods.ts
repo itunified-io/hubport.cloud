@@ -59,6 +59,7 @@ export async function meetingPeriodRoutes(app: FastifyInstance): Promise<void> {
               assignments: {
                 include: {
                   slotTemplate: true,
+                  workbookPart: true,
                   assignee: { select: { id: true, firstName: true, lastName: true, displayName: true } },
                   assistant: { select: { id: true, firstName: true, lastName: true, displayName: true } },
                 },
