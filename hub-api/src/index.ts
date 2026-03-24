@@ -29,6 +29,7 @@ import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
+import { seedPublicTalks } from "./lib/seed-public-talks.js";
 
 const app = Fastify({
   logger: {
@@ -114,6 +115,10 @@ async function start(): Promise<void> {
     app.log.info("Upserting meeting slot templates...");
     await seedSlotTemplates();
     app.log.info("Slot templates up to date");
+
+    app.log.info("Seeding public talk catalog...");
+    await seedPublicTalks();
+    app.log.info("Public talk catalog up to date");
 
   } catch {
     app.log.error("Database connection failed — endpoints may fail");

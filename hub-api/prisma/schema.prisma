@@ -522,12 +522,13 @@ model Speaker {
 }
 
 model PublicTalk {
-  id        String   @id @default(uuid())
-  talkNumber Int     @unique /// Official talk number
-  title     String
-  outline   String?  /// Optional outline/description
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  talkNumber   Int      @unique /// Official talk number
+  title        String
+  outline      String?  /// Optional outline/description
+  discontinued Boolean  @default(false) /// true = no longer in active catalog
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   schedules PublicTalkSchedule[]
 }
