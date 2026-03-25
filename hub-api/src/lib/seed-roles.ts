@@ -52,20 +52,37 @@ const SYSTEM_ROLES: SeedRole[] = [
   },
   {
     name: "LM Overseer",
-    description: "Life & Ministry meeting overseer",
+    description: "Life & Ministry meeting overseer — midweek planning lifecycle owner",
     scope: "midweek",
     permissions: [
       P.MEETINGS_VIEW, P.MEETINGS_EDIT, P.MEETINGS_PUBLISH,
-      P.PUBLISHERS_VIEW_MINIMAL, P.MANAGE_PROGRAM,
+      P.PUBLISHERS_VIEW_MINIMAL, P.MANAGE_PROGRAM, P.MANAGE_MIDWEEK_PROGRAM,
+      P.WORKBOOKS_VIEW, P.WORKBOOKS_IMPORT,
+      P.MEETING_PERIODS_VIEW, P.MEETING_PERIODS_MANAGE,
+      P.MEETING_ASSIGNMENTS_VIEW, P.MEETING_ASSIGNMENTS_EDIT,
     ],
   },
   {
     name: "WT Conductor",
-    description: "Watchtower study conductor",
+    description: "Watchtower study conductor — weekend study planning owner",
     scope: "weekend",
     permissions: [
       P.MEETINGS_VIEW, P.MEETINGS_EDIT,
-      P.PUBLISHERS_VIEW_MINIMAL,
+      P.PUBLISHERS_VIEW_MINIMAL, P.MANAGE_WEEKEND_PROGRAM,
+      P.WEEKEND_STUDY_VIEW, P.WEEKEND_STUDY_IMPORT,
+      P.MEETING_ASSIGNMENTS_VIEW, P.MEETING_ASSIGNMENTS_EDIT,
+    ],
+  },
+  {
+    name: "Public Talk Coordinator",
+    description: "Public talk planning — speaker directory, talk scheduling, invitations",
+    scope: "weekend",
+    permissions: [
+      P.MEETINGS_VIEW, P.MEETINGS_EDIT,
+      P.PUBLISHERS_VIEW_MINIMAL, P.MANAGE_PUBLIC_TALKS,
+      P.PUBLIC_TALKS_VIEW, P.PUBLIC_TALKS_EDIT,
+      P.SPEAKERS_VIEW, P.SPEAKERS_EDIT,
+      P.MEETING_ASSIGNMENTS_VIEW,
     ],
   },
   {
@@ -197,13 +214,14 @@ const SYSTEM_ROLES: SeedRole[] = [
   },
   {
     name: "Technik Responsible",
-    description: "Technical team lead — manages tech assignments",
+    description: "Technical team lead — manages tech duty assignments",
     scope: "all",
     permissions: [
-      P.MANAGE_TECHNIK,
+      P.MANAGE_TECHNIK, P.MANAGE_MEETING_DUTIES,
       P.PRIVILEGE_TECHNICAL_SOUND, P.PRIVILEGE_TECHNICAL_VIDEO,
       P.PRIVILEGE_TECHNICAL_MICROPHONE, P.PRIVILEGE_TECHNICAL_STAGE,
       P.MEETINGS_VIEW, P.PUBLISHERS_VIEW_MINIMAL,
+      P.MEETING_ASSIGNMENTS_VIEW, P.MEETING_ASSIGNMENTS_EDIT,
     ],
   },
   {
@@ -290,10 +308,13 @@ const SYSTEM_ROLES: SeedRole[] = [
   },
   {
     name: "Vortragsplaner",
-    description: "Public talk planner / scheduler",
+    description: "Public talk planner / scheduler (German alias for Public Talk Coordinator)",
     scope: "weekend",
     permissions: [
-      P.MANAGE_PROGRAM, P.PRIVILEGE_PUBLIC_TALK, P.PUBLISHERS_VIEW_MINIMAL, P.MEETINGS_VIEW,
+      P.MANAGE_PROGRAM, P.MANAGE_PUBLIC_TALKS,
+      P.PRIVILEGE_PUBLIC_TALK, P.PUBLISHERS_VIEW_MINIMAL, P.MEETINGS_VIEW,
+      P.PUBLIC_TALKS_VIEW, P.PUBLIC_TALKS_EDIT,
+      P.SPEAKERS_VIEW, P.SPEAKERS_EDIT,
     ],
   },
   {

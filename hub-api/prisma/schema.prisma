@@ -56,6 +56,74 @@ enum OnboardingStep {
   complete
 }
 
+/// Meeting planning status lifecycle
+enum PlanningStatus {
+  draft
+  open
+  published
+  locked
+  archived
+}
+
+/// Meeting-level status
+enum MeetingStatus {
+  draft
+  published
+  locked
+}
+
+/// Assignment source — how the assignment was created
+enum AssignmentSource {
+  auto_seeded
+  manual
+  imported
+}
+
+/// Assignment status
+enum AssignmentStatus {
+  pending
+  assigned
+  confirmed
+  declined
+  cancelled
+  substituted
+}
+
+/// Public talk schedule mode
+enum TalkMode {
+  local
+  incoming_guest
+  outgoing_guest
+}
+
+/// Public talk invitation state
+enum InvitationState {
+  draft
+  invited
+  confirmed
+  declined
+  cancelled
+}
+
+/// Speaker status
+enum SpeakerStatus {
+  active
+  inactive
+}
+
+/// Workbook part section
+enum WorkbookSection {
+  treasures          // Schätze aus Gottes Wort
+  ministry           // Uns im Dienst verbessern
+  living             // Unser Leben als Christ
+}
+
+/// Meeting slot category
+enum SlotCategory {
+  program            // Program part (content)
+  duty               // Operational duty (sound, video, etc.)
+}
+
 // ─── Publisher ────────────────────────────────────────────────────────
 
 model Publisher {
@@ -103,6 +171,10 @@ model Publisher {
   serviceGroupId  String?
   gardenDuties       GardenDutyMember[]
   campaignInvites    CampaignInvite[]
+  assignedParts      MeetingAssignment[] @relation("AssignedParts")
+  assistedParts      MeetingAssignment[] @relation("AssistedParts")
+  awayPeriods        AwayPeriod[]
+  speaker            Speaker?            @relation("PublisherSpeaker")
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -195,16 +267,339 @@ model TerritoryAssignment {
 }
 
 model Meeting {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   title     String
-  type      String // midweek, weekend, special
+  type      String        // midweek, weekend, special
   date      DateTime
-  startTime String // "19:00"
-  endTime   String? // "21:00"
+  startTime String        // "19:00"
+  endTime   String?       // "21:00"
   location  String?
   notes     String?
+  status    MeetingStatus @default(draft)
+
+  // Planning linkage
+  meetingPeriodId    String?
+  workbookWeekId     String?
+  weekendStudyWeekId String?
+  publishedAt        DateTime?
+  publishedBy        String?   /// keycloakSub of publisher
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  meetingPeriod    MeetingPeriod?    @relation(fields: [meetingPeriodId], references: [id])
+  workbookWeek     WorkbookWeek?     @relation(fields: [workbookWeekId], references: [id])
+  weekendStudyWeek WeekendStudyWeek? @relation(fields: [weekendStudyWeekId], references: [id])
+  assignments      MeetingAssignment[]
+  talkSchedules    PublicTalkSchedule[]
+
+  @@index([date])
+  @@index([meetingPeriodId])
+  @@index([type, date])
+}
+
+// ─── Congregation Settings ──────────────────────────────────────────
+
+model CongregationSettings {
+  id            String   @id @default(uuid())
+  language      String   @default("de") /// Congregation language (ISO 639-1)
+  jwLanguageCode String  @default("de") /// JW.org language code
+  defaultMidweekDay  Int @default(3)    /// 0=Sun, 1=Mon, ... 3=Wed
+  defaultMidweekTime String @default("19:00")
+  defaultWeekendDay  Int @default(0)    /// 0=Sun
+  defaultWeekendTime String @default("10:00")
+  defaultLocation    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Meeting Periods ────────────────────────────────────────────────
+
+model MeetingPeriod {
+  id              String         @id @default(uuid())
+  type            String         // midweek_workbook, weekend_study
+  status          PlanningStatus @default(draft)
+  language        String
+  startDate       DateTime
+  endDate         DateTime
+  sourceEditionId String?        /// WorkbookEdition or WeekendStudyEdition id
+  openedBy        String?        /// keycloakSub
+  openedAt        DateTime?
+  publishedBy     String?
+  publishedAt     DateTime?
+  lockedBy        String?
+  lockedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  meetings Meeting[]
+
+  @@index([type, status])
+  @@index([startDate, endDate])
+}
+
+// ─── Workbook Import ────────────────────────────────────────────────
+
+model WorkbookEdition {
+  id                    String   @id @default(uuid())
+  language              String
+  yearMonth             String   /// e.g. "2026-03", "2026-04"
+  sourceUrl             String?
+  sourcePublicationCode String?  /// e.g. "mwb"
+  checksum              String?  /// SHA-256 of source content
+  rawMetadata           Json?    /// Raw import metadata for debugging
+  importedAt            DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  weeks WorkbookWeek[]
+
+  @@unique([language, yearMonth])
+  @@index([language])
+}
+
+model WorkbookWeek {
+  id          String   @id @default(uuid())
+  editionId   String
+  weekOf      DateTime /// Monday of the week
+  dateRange   String?  /// e.g. "March 23–29"
+  theme       String?  /// Main scripture/theme
+  bibleReading String? /// Bible reading reference
+  songNumbers  Int[]   /// Song numbers for the week [opening, middle, closing]
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  edition  WorkbookEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  parts    WorkbookPart[]
+  meetings Meeting[]
+
+  @@unique([editionId, weekOf])
+  @@index([editionId])
+  @@index([weekOf])
+}
+
+model WorkbookPart {
+  id               String          @id @default(uuid())
+  weekId           String
+  section          WorkbookSection
+  partType         String          /// Normalized type: "talk", "bible_reading", "initial_call", etc.
+  title            String          /// Part title from workbook
+  durationMinutes  Int?
+  sourceRef        String?         /// Reference to source material
+  sourceUrl        String?
+  requiresAssistant Boolean        @default(false)
+  sortOrder        Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  week        WorkbookWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  assignments MeetingAssignment[]
+
+  @@index([weekId])
+  @@index([section])
+}
+
+// ─── Weekend Study Import ───────────────────────────────────────────
+
+model WeekendStudyEdition {
+  id           String   @id @default(uuid())
+  language     String
+  issueKey     String   /// e.g. "w_2026_03"
+  checksum     String?
+  rawMetadata  Json?
+  importedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  weeks WeekendStudyWeek[]
+
+  @@unique([language, issueKey])
+}
+
+model WeekendStudyWeek {
+  id           String   @id @default(uuid())
+  editionId    String
+  weekOf       DateTime /// Sunday of the study week
+  articleTitle String
+  articleUrl   String?
+  studyNumber  Int?     /// Study article number (e.g., 1, 2, 3...)
+  sourceRef    String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  edition  WeekendStudyEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  meetings Meeting[]
+
+  @@unique([editionId, weekOf])
+  @@index([editionId])
+  @@index([weekOf])
+}
+
+// ─── Meeting Slot Templates ─────────────────────────────────────────
+
+model MeetingSlotTemplate {
+  id              String       @id @default(uuid())
+  meetingType     String       // midweek, weekend, all
+  slotKey         String       @unique /// e.g. "chairman_midweek", "sound", "opening_prayer"
+  label           String       /// Human-readable label
+  category        SlotCategory @default(program)
+  requiredPrivileges String[]  /// Permission keys required to fill this slot
+  allowsAssistant Boolean      @default(false)
+  requiresAssistant Boolean    @default(false)
+  sortOrder       Int          @default(0)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  assignments MeetingAssignment[]
+
+  @@index([meetingType])
+}
+
+// ─── Meeting Assignments ────────────────────────────────────────────
+
+model MeetingAssignment {
+  id                   String           @id @default(uuid())
+  meetingId            String
+  slotTemplateId       String
+  workbookPartId       String?          /// Links to specific workbook part (midweek)
+  assigneePublisherId  String?          /// Assigned publisher
+  assistantPublisherId String?          /// Assistant/householder
+  status               AssignmentStatus @default(pending)
+  source               AssignmentSource @default(manual)
+  notes                String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  meeting      Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  slotTemplate MeetingSlotTemplate @relation(fields: [slotTemplateId], references: [id])
+  workbookPart WorkbookPart?       @relation(fields: [workbookPartId], references: [id], onDelete: SetNull)
+  assignee     Publisher?          @relation("AssignedParts", fields: [assigneePublisherId], references: [id])
+  assistant    Publisher?          @relation("AssistedParts", fields: [assistantPublisherId], references: [id])
+
+  @@unique([meetingId, slotTemplateId, workbookPartId])
+  @@index([meetingId])
+  @@index([assigneePublisherId])
+  @@index([assistantPublisherId])
+}
+
+// ─── Assignment History (Immutable Audit) ───────────────────────────
+
+model AssignmentHistory {
+  id             String   @id @default(uuid())
+  assignmentId   String
+  action         String   /// create, update, unassign, substitute, publish, lock, reopen
+  actorId        String   /// keycloakSub
+  previousState  Json?
+  newState       Json?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([assignmentId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+// ─── Speakers & Public Talks ────────────────────────────────────────
+
+model Speaker {
+  id                String        @id @default(uuid())
+  firstName         String        /// @encrypted
+  lastName          String        /// @encrypted
+  congregationName  String?       /// Source congregation name (encrypted for manual speakers)
+  email             String?       /// @encrypted — contact email
+  phone             String?       /// @encrypted — contact phone
+  publisherId       String?       @unique /// FK to Publisher — set for local speakers, null for manual/hubport
+  publisher         Publisher?    @relation("PublisherSpeaker", fields: [publisherId], references: [id])
+  source            SpeakerSource @default(local)
+  isLocal           Boolean       @default(true) /// @deprecated — use source enum. Kept for migration.
+  status            SpeakerStatus @default(active)
+  monthlyInviteCap  Int           @default(4) /// Max talks per month (speaker sets in profile)
+  sharePhone        Boolean       @default(false) /// Privacy: share phone with partners
+  shareEmail        Boolean       @default(false) /// Privacy: share email with partners
+  shareAvailability Boolean       @default(true)  /// Privacy: share availability with partners
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  schedules  PublicTalkSchedule[]
+  talks      SpeakerTalk[]
+
+  @@index([source, status])
+}
+
+enum SpeakerSource {
+  local    /// Own congregation publisher
+  hubport  /// From hubport.cloud partner (federated)
+  manual   /// Manually added (not on hubport.cloud)
+}
+
+model PublicTalk {
+  id           String   @id @default(uuid())
+  talkNumber   Int      @unique /// Official talk number
+  title        String
+  outline      String?  /// Optional outline/description
+  discontinued Boolean  @default(false) /// true = no longer in active catalog
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  schedules PublicTalkSchedule[]
+  speakers  SpeakerTalk[]
+}
+
+model SpeakerTalk {
+  id           String     @id @default(uuid())
+  speakerId    String
+  speaker      Speaker    @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+  publicTalkId String
+  publicTalk   PublicTalk @relation(fields: [publicTalkId], references: [id], onDelete: Cascade)
+
+  @@unique([speakerId, publicTalkId])
+  @@index([speakerId])
+  @@index([publicTalkId])
+}
+
+model AwayPeriod {
+  id          String    @id @default(uuid())
+  publisherId String
+  publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  startDate   DateTime  @db.Date
+  endDate     DateTime  @db.Date
+  reason      String?   /// @encrypted — AES-256-GCM
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([publisherId, startDate, endDate])
+  @@index([publisherId])
+  @@index([startDate, endDate])
+}
+
+model PublicTalkSchedule {
+  id            String          @id @default(uuid())
+  meetingId     String
+  speakerId     String
+  publicTalkId  String?
+  mode          TalkMode        @default(local)
+  invitationState InvitationState @default(draft)
+  invitedAt     DateTime?
+  confirmedAt   DateTime?
+  declinedAt    DateTime?
+  cancelledAt   DateTime?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  meeting    Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  speaker    Speaker    @relation(fields: [speakerId], references: [id])
+  publicTalk PublicTalk? @relation(fields: [publicTalkId], references: [id])
+
+  @@unique([meetingId, speakerId])
+  @@index([meetingId])
+  @@index([speakerId])
+  @@index([invitationState])
 }
 
 // ─── Security (ADR-0077) ──────────────────────────────────────────────

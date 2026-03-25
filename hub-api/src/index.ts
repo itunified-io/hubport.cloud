@@ -18,9 +18,20 @@ import { cleaningRoutes } from "./routes/cleaning.js";
 import { jitsiRoutes } from "./routes/jitsi.js";
 import { sharingRoutes } from "./routes/sharing.js";
 import { internalRoutes } from "./routes/internal.js";
+import { workbookRoutes } from "./routes/workbooks.js";
+import { meetingPeriodRoutes } from "./routes/meeting-periods.js";
+import { meetingAssignmentRoutes } from "./routes/meeting-assignments.js";
+import { weekendStudyRoutes } from "./routes/weekend-study.js";
+import { speakerRoutes } from "./routes/speakers.js";
+import { publicTalkRoutes } from "./routes/public-talks.js";
+import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
+import { awayPeriodRoutes } from "./routes/away-periods.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
+import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
+import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
+
 
 const app = Fastify({
   logger: {
@@ -41,8 +52,8 @@ async function start(): Promise<void> {
     timeWindow: "1 minute",
   });
 
-  // Multipart (file uploads, max 2MB)
-  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } });
+  // Multipart (file uploads, max 10MB — JWPUB files can be 5-10MB)
+  await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }); // 100 MB
 
   // Auth (JWT via Keycloak JWKS)
   await registerAuth(app);
@@ -71,6 +82,14 @@ async function start(): Promise<void> {
   await app.register(jitsiRoutes);
   await app.register(sharingRoutes);
   await app.register(internalRoutes);
+  await app.register(workbookRoutes);
+  await app.register(meetingPeriodRoutes);
+  await app.register(meetingAssignmentRoutes);
+  await app.register(weekendStudyRoutes);
+  await app.register(speakerRoutes);
+  await app.register(publicTalkRoutes);
+  await app.register(congregationSettingsRoutes);
+  await app.register(awayPeriodRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
@@ -96,6 +115,12 @@ async function start(): Promise<void> {
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
     app.log.info("System roles up to date");
+
+    app.log.info("Upserting meeting slot templates...");
+    await seedSlotTemplates();
+    app.log.info("Slot templates up to date");
+
+
   } catch {
     app.log.error("Database connection failed — endpoints may fail");
   }
@@ -118,6 +143,8 @@ async function start(): Promise<void> {
   await app.listen({ port, host });
   // Start API token auto-rotation
   startTokenRotationJob(app.log);
+  // Start workbook auto-fetch (checks for new editions every 12h)
+  startWorkbookAutoFetch(app.log);
   app.log.info(`hub-api listening on ${host}:${port}`);
 }
 

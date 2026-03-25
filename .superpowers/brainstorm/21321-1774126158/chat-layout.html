@@ -1,0 +1,151 @@
+<h2>Chat UI Layout — LinkedIn Style</h2>
+<p class="subtitle">Which layout approach for the hubport chat?</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0a0c;">
+      <!-- LinkedIn-style mockup -->
+      <div style="display: flex; height: 360px; border: 1px solid #27272a; border-radius: 8px; overflow: hidden; font-size: 12px;">
+        <!-- Left panel -->
+        <div style="width: 280px; border-right: 1px solid #27272a; display: flex; flex-direction: column;">
+          <!-- Search -->
+          <div style="padding: 12px; border-bottom: 1px solid #27272a;">
+            <div style="background: #18181b; border-radius: 6px; padding: 8px 12px; color: #71717a; font-size: 11px;">🔍 Suchen...</div>
+          </div>
+          <!-- Tabs -->
+          <div style="display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid #27272a;">
+            <span style="background: #d97706; color: #000; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;">Alle</span>
+            <span style="color: #71717a; padding: 3px 10px; font-size: 10px;">Ungelesen</span>
+            <span style="color: #71717a; padding: 3px 10px; font-size: 10px;">Spaces</span>
+          </div>
+          <!-- Conversations -->
+          <div style="flex: 1; overflow: auto;">
+            <div style="padding: 10px 12px; background: #18181b; border-left: 3px solid #d97706; display: flex; gap: 10px; align-items: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: #22c55e33; display: flex; align-items: center; justify-content: center; color: #22c55e; font-weight: 600; font-size: 13px; flex-shrink: 0;">SK</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between;"><span style="color: #e4e4e7; font-weight: 500;">Sascha Keck</span><span style="color: #71717a; font-size: 10px;">09:27</span></div>
+                <div style="color: #a1a1aa; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Hi, wann ist Diensttreff?</div>
+              </div>
+            </div>
+            <div style="padding: 10px 12px; display: flex; gap: 10px; align-items: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: #d9770633; display: flex; align-items: center; justify-content: center; color: #d97706; font-weight: 600; font-size: 13px; flex-shrink: 0;">⚙️</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between;"><span style="color: #e4e4e7; font-weight: 500;"># Technik</span><span style="color: #71717a; font-size: 10px;">Gestern</span></div>
+                <div style="color: #a1a1aa; font-size: 11px;">Max: Beamer ist repariert</div>
+              </div>
+            </div>
+            <div style="padding: 10px 12px; display: flex; gap: 10px; align-items: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: #3b82f633; display: flex; align-items: center; justify-content: center; color: #3b82f6; font-weight: 600; font-size: 13px; flex-shrink: 0;">🧹</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between;"><span style="color: #e4e4e7; font-weight: 500;"># Reinigung</span><span style="color: #71717a; font-size: 10px;">Mo</span></div>
+                <div style="color: #a1a1aa; font-size: 11px;">Anna: Wer kann Samstag?</div>
+              </div>
+            </div>
+            <div style="padding: 10px 12px; display: flex; gap: 10px; align-items: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: #a855f733; display: flex; align-items: center; justify-content: center; color: #a855f7; font-weight: 600; font-size: 13px; flex-shrink: 0;">👔</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between;"><span style="color: #e4e4e7; font-weight: 500;"># Älteste</span><span style="color: #71717a; font-size: 10px;">So</span></div>
+                <div style="color: #a1a1aa; font-size: 11px;">3 neue Nachrichten</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Right panel -->
+        <div style="flex: 1; display: flex; flex-direction: column; background: #050507;">
+          <!-- Header -->
+          <div style="padding: 12px 16px; border-bottom: 1px solid #27272a; display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #22c55e33; display: flex; align-items: center; justify-content: center; color: #22c55e; font-weight: 600; font-size: 12px;">SK</div>
+            <div>
+              <div style="color: #e4e4e7; font-weight: 500; font-size: 13px;">Sascha Keck</div>
+              <div style="color: #22c55e; font-size: 10px;">● Online</div>
+            </div>
+          </div>
+          <!-- Messages -->
+          <div style="flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto;">
+            <div style="display: flex; gap: 8px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #22c55e33; display: flex; align-items: center; justify-content: center; color: #22c55e; font-size: 10px; flex-shrink: 0;">SK</div>
+              <div>
+                <div style="color: #71717a; font-size: 10px;">Sascha · 09:27</div>
+                <div style="background: #18181b; padding: 8px 12px; border-radius: 0 12px 12px 12px; color: #e4e4e7; font-size: 12px; max-width: 300px;">Hi, wann ist nächster Diensttreff?</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-direction: row-reverse;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #d9770633; display: flex; align-items: center; justify-content: center; color: #d97706; font-size: 10px; flex-shrink: 0;">BB</div>
+              <div style="text-align: right;">
+                <div style="color: #71717a; font-size: 10px;">Du · 09:28</div>
+                <div style="background: #d9770620; padding: 8px 12px; border-radius: 12px 0 12px 12px; color: #e4e4e7; font-size: 12px; max-width: 300px; text-align: left;">Samstag 10 Uhr am Saal 👍</div>
+              </div>
+            </div>
+          </div>
+          <!-- Input -->
+          <div style="padding: 12px 16px; border-top: 1px solid #27272a;">
+            <div style="background: #18181b; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 8px;">
+              <span style="color: #e4e4e7; font-size: 12px; flex: 1;">Nachricht verfassen...</span>
+              <span style="color: #71717a; font-size: 14px;">📷</span>
+              <span style="color: #71717a; font-size: 14px;">📎</span>
+              <span style="color: #71717a; font-size: 14px;">😀</span>
+              <span style="background: #d97706; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;">Senden</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Full Page Chat (LinkedIn Desktop)</h3>
+      <p>Two-panel layout filling the content area. Left: conversation list with search + filter tabs. Right: message thread with input bar. Replaces Element iframe entirely.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0a0c;">
+      <!-- Bottom-right popup mockup -->
+      <div style="height: 360px; position: relative;">
+        <!-- Faded main content -->
+        <div style="opacity: 0.3; padding: 20px; color: #71717a;">
+          <div style="font-size: 16px; color: #e4e4e7; margin-bottom: 12px;">Dashboard</div>
+          <div style="background: #18181b; height: 60px; border-radius: 8px; margin-bottom: 8px;"></div>
+          <div style="background: #18181b; height: 60px; border-radius: 8px; margin-bottom: 8px;"></div>
+          <div style="background: #18181b; height: 60px; border-radius: 8px;"></div>
+        </div>
+        <!-- Chat popup bottom-right -->
+        <div style="position: absolute; bottom: 0; right: 0; width: 340px; border: 1px solid #27272a; border-radius: 12px 12px 0 0; background: #0a0a0c; overflow: hidden; box-shadow: 0 -4px 20px rgba(0,0,0,0.5);">
+          <!-- Header -->
+          <div style="padding: 10px 14px; background: #18181b; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #d97706; font-size: 14px;">💬</span>
+              <span style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Nachrichten</span>
+              <span style="background: #d97706; color: #000; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600;">3</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span style="color: #71717a; font-size: 12px;">✏️</span>
+              <span style="color: #71717a; font-size: 12px;">▲</span>
+            </div>
+          </div>
+          <!-- Conversation list (compact) -->
+          <div style="max-height: 200px; overflow: auto;">
+            <div style="padding: 8px 14px; display: flex; gap: 8px; align-items: center; background: #18181b40;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #22c55e33; display: flex; align-items: center; justify-content: center; color: #22c55e; font-size: 10px;">SK</div>
+              <div style="flex: 1;">
+                <div style="color: #e4e4e7; font-size: 12px;">Sascha Keck</div>
+                <div style="color: #71717a; font-size: 10px;">Hi, wann ist Diensttreff?</div>
+              </div>
+              <span style="color: #71717a; font-size: 10px;">09:27</span>
+            </div>
+            <div style="padding: 8px 14px; display: flex; gap: 8px; align-items: center;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #d9770633; display: flex; align-items: center; justify-content: center; color: #d97706; font-size: 10px;">⚙️</div>
+              <div style="flex: 1;">
+                <div style="color: #e4e4e7; font-size: 12px;"># Technik</div>
+                <div style="color: #71717a; font-size: 10px;">Beamer repariert</div>
+              </div>
+              <span style="color: #71717a; font-size: 10px;">Gest.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Bottom-Right Popup (LinkedIn Widget)</h3>
+      <p>Chat widget pinned to bottom-right corner, collapsible. Shows conversation list when expanded. Clicking a conversation opens inline thread. User can keep working on other pages while chatting.</p>
+    </div>
+  </div>
+</div>

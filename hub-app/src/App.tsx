@@ -12,6 +12,9 @@ import { TerritoryList } from "./pages/territories/TerritoryList";
 import { TerritoryMap } from "./pages/territories/TerritoryMap";
 import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
+import { MidweekPlanner } from "./pages/meetings/planner/MidweekPlanner";
+import { WeekendPlanner } from "./pages/meetings/planner/WeekendPlanner";
+import { PublicTalkPlanner } from "./pages/meetings/planner/PublicTalkPlanner";
 import { Settings } from "./pages/settings/Settings";
 import { SharingPartners } from "./pages/sharing/SharingPartners";
 import { RoleList } from "./pages/users/RoleList";
@@ -151,6 +154,32 @@ export function App() {
           element={
             <PermissionGuard requires="app:meetings.edit">
               <MeetingForm />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Meeting Planning */}
+        <Route
+          path="/meetings/planner"
+          element={
+            <PermissionGuard requires={["app:meeting_assignments.view", "manage:midweek_program"]} any>
+              <MidweekPlanner />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/meetings/weekend"
+          element={
+            <PermissionGuard requires={["app:meeting_assignments.view", "manage:weekend_program"]} any>
+              <WeekendPlanner />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/meetings/public-talks"
+          element={
+            <PermissionGuard requires={["app:public_talks.view", "manage:public_talks"]} any>
+              <PublicTalkPlanner />
             </PermissionGuard>
           }
         />

@@ -1,7 +1,13 @@
+/**
+ * Meeting CRUD routes — extended with planning-aware behavior.
+ * Migrated from legacy requireRole() to permission-based guards.
+ */
+
 import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
-import { requireRole } from "../lib/rbac.js";
+import { requirePermission } from "../lib/rbac.js";
+import { PERMISSIONS } from "../lib/permissions.js";
 
 const MeetingBody = Type.Object({
   title: Type.String({ minLength: 1 }),
@@ -26,28 +32,62 @@ const IdParams = Type.Object({
 type IdParamsType = Static<typeof IdParams>;
 
 export async function meetingRoutes(app: FastifyInstance): Promise<void> {
-  // List upcoming meetings — all authenticated users
+  // List upcoming meetings — all users with meetings.view
   app.get(
     "/meetings",
-    { preHandler: requireRole("viewer") },
-    async () => {
+    { preHandler: requirePermission(PERMISSIONS.MEETINGS_VIEW) },
+    async (request) => {
+      const { type, past } = request.query as { type?: string; past?: string };
+      const where: Record<string, unknown> = {};
+      if (type) where.type = type;
+      if (past !== "true") {
+        where.date = { gte: new Date() };
+      }
+
       return prisma.meeting.findMany({
-        where: { date: { gte: new Date() } },
+        where,
+        include: {
+          workbookWeek: { select: { theme: true, dateRange: true } },
+          weekendStudyWeek: { select: { articleTitle: true } },
+          _count: { select: { assignments: true } },
+        },
         orderBy: { date: "asc" },
       });
     },
   );
 
-  // Get one meeting — all authenticated
+  // Get one meeting with full assignment details
   app.get<{ Params: IdParamsType }>(
     "/meetings/:id",
     {
-      preHandler: requireRole("viewer"),
+      preHandler: requirePermission(PERMISSIONS.MEETINGS_VIEW),
       schema: { params: IdParams },
     },
     async (request, reply) => {
       const meeting = await prisma.meeting.findUnique({
         where: { id: request.params.id },
+        include: {
+          workbookWeek: {
+            include: { parts: { orderBy: { sortOrder: "asc" } } },
+          },
+          weekendStudyWeek: true,
+          meetingPeriod: { select: { id: true, status: true, type: true } },
+          assignments: {
+            include: {
+              slotTemplate: true,
+              workbookPart: true,
+              assignee: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+              assistant: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+            },
+            orderBy: { slotTemplate: { sortOrder: "asc" } },
+          },
+          talkSchedules: {
+            include: {
+              speaker: true,
+              publicTalk: true,
+            },
+          },
+        },
       });
       if (!meeting) {
         return reply.code(404).send({ error: "Not found" });
@@ -56,11 +96,11 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Create meeting — elder+
+  // Create meeting — meetings.edit permission
   app.post<{ Body: MeetingBodyType }>(
     "/meetings",
     {
-      preHandler: requireRole("elder"),
+      preHandler: requirePermission(PERMISSIONS.MEETINGS_EDIT),
       schema: { body: MeetingBody },
     },
     async (request, reply) => {
@@ -68,17 +108,18 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
         data: {
           ...request.body,
           date: new Date(request.body.date),
+          status: "draft",
         },
       });
       return reply.code(201).send(meeting);
     },
   );
 
-  // Update meeting — elder+
+  // Update meeting — meetings.edit permission
   app.put<{ Params: IdParamsType; Body: MeetingBodyType }>(
     "/meetings/:id",
     {
-      preHandler: requireRole("elder"),
+      preHandler: requirePermission(PERMISSIONS.MEETINGS_EDIT),
       schema: { params: IdParams, body: MeetingBody },
     },
     async (request, reply) => {
@@ -87,6 +128,9 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
       });
       if (!existing) {
         return reply.code(404).send({ error: "Not found" });
+      }
+      if (existing.status === "locked") {
+        return reply.code(409).send({ error: "Meeting is locked — cannot edit" });
       }
       const meeting = await prisma.meeting.update({
         where: { id: request.params.id },
@@ -99,11 +143,11 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Delete meeting — admin only
+  // Delete meeting — admin only (wildcard permission)
   app.delete<{ Params: IdParamsType }>(
     "/meetings/:id",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission(PERMISSIONS.WILDCARD),
       schema: { params: IdParams },
     },
     async (request, reply) => {
@@ -113,10 +157,91 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
       if (!existing) {
         return reply.code(404).send({ error: "Not found" });
       }
+      if (existing.status === "locked") {
+        return reply.code(409).send({ error: "Meeting is locked — cannot delete" });
+      }
       await prisma.meeting.delete({
         where: { id: request.params.id },
       });
       return reply.code(204).send();
+    },
+  );
+
+  // Get assignments for a meeting
+  app.get<{ Params: IdParamsType }>(
+    "/meetings/:id/assignments",
+    {
+      preHandler: requirePermission(PERMISSIONS.MEETING_ASSIGNMENTS_VIEW),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const meeting = await prisma.meeting.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!meeting) {
+        return reply.code(404).send({ error: "Meeting not found" });
+      }
+
+      return prisma.meetingAssignment.findMany({
+        where: { meetingId: request.params.id },
+        include: {
+          slotTemplate: true,
+          workbookPart: true,
+          assignee: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+          assistant: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+        },
+        orderBy: { slotTemplate: { sortOrder: "asc" } },
+      });
+    },
+  );
+
+  // Seed assignment slots for a meeting from slot templates
+  app.post<{ Params: IdParamsType }>(
+    "/meetings/:id/seed-slots",
+    {
+      preHandler: requirePermission(PERMISSIONS.MEETING_ASSIGNMENTS_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const meeting = await prisma.meeting.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!meeting) {
+        return reply.code(404).send({ error: "Meeting not found" });
+      }
+
+      // Get applicable slot templates
+      const templates = await prisma.meetingSlotTemplate.findMany({
+        where: {
+          meetingType: { in: [meeting.type, "all"] },
+          isActive: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      });
+
+      // Check which slots already exist
+      const existingSlots = await prisma.meetingAssignment.findMany({
+        where: { meetingId: meeting.id },
+        select: { slotTemplateId: true },
+      });
+      const existingSlotIds = new Set(existingSlots.map((s) => s.slotTemplateId));
+
+      let created = 0;
+      for (const template of templates) {
+        if (!existingSlotIds.has(template.id)) {
+          await prisma.meetingAssignment.create({
+            data: {
+              meetingId: meeting.id,
+              slotTemplateId: template.id,
+              status: "pending",
+              source: "auto_seeded",
+            },
+          });
+          created++;
+        }
+      }
+
+      return { meetingId: meeting.id, slotsCreated: created };
     },
   );
 }

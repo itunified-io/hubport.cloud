@@ -1,0 +1,213 @@
+<h2>Chat Widget — Spaces View</h2>
+<p class="subtitle">Bottom-right popup with Spaces navigation. How should Spaces appear?</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0a0c;">
+      <div style="height: 480px; position: relative; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <!-- Faded background -->
+        <div style="opacity: 0.15; padding: 20px; color: #71717a;">
+          <div style="font-size: 14px; color: #e4e4e7; margin-bottom: 10px;">Verkündiger</div>
+          <div style="background: #18181b; height: 40px; border-radius: 6px; margin-bottom: 6px;"></div>
+          <div style="background: #18181b; height: 40px; border-radius: 6px; margin-bottom: 6px;"></div>
+          <div style="background: #18181b; height: 40px; border-radius: 6px;"></div>
+        </div>
+
+        <!-- Chat widget expanded -->
+        <div style="position: absolute; bottom: 0; right: 0; width: 380px; border: 1px solid #27272a; border-radius: 14px 14px 0 0; background: #0a0a0c; overflow: hidden; box-shadow: 0 -8px 32px rgba(0,0,0,0.6);">
+          <!-- Header bar -->
+          <div style="padding: 10px 16px; background: linear-gradient(135deg, #18181b, #1a1a1f); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #27272a;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #d9770630; display: flex; align-items: center; justify-content: center;">
+                <span style="color: #d97706; font-size: 13px;">💬</span>
+              </div>
+              <span style="color: #e4e4e7; font-weight: 600; font-size: 14px;">Nachrichten</span>
+              <span style="background: #d97706; color: #000; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700;">3</span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <span style="color: #71717a; font-size: 13px; cursor: pointer;">✏️</span>
+              <span style="color: #71717a; font-size: 11px; cursor: pointer;">▼</span>
+            </div>
+          </div>
+
+          <!-- Tabs: Alle | Spaces -->
+          <div style="display: flex; border-bottom: 1px solid #27272a;">
+            <div style="flex: 1; padding: 8px; text-align: center; color: #71717a; font-size: 11px; cursor: pointer;">Alle</div>
+            <div style="flex: 1; padding: 8px; text-align: center; color: #d97706; font-size: 11px; font-weight: 600; border-bottom: 2px solid #d97706; cursor: pointer;">Spaces</div>
+            <div style="flex: 1; padding: 8px; text-align: center; color: #71717a; font-size: 11px; cursor: pointer;">DMs</div>
+          </div>
+
+          <!-- Spaces list -->
+          <div style="max-height: 340px; overflow: auto;">
+            <!-- Space: Versammlung (expandable) -->
+            <div style="padding: 10px 16px; border-bottom: 1px solid #27272a10;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: #d9770620; display: flex; align-items: center; justify-content: center; color: #d97706; font-size: 14px;">🏛️</div>
+                <div style="flex: 1;">
+                  <div style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Versammlung</div>
+                  <div style="color: #71717a; font-size: 10px;">6 Kanäle</div>
+                </div>
+                <span style="color: #71717a; font-size: 10px;">▾</span>
+              </div>
+              <!-- Channels in space -->
+              <div style="margin-left: 42px; display: flex; flex-direction: column; gap: 2px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: #18181b; cursor: pointer;">
+                  <span style="color: #d97706; font-size: 11px;">#</span>
+                  <span style="color: #e4e4e7; font-size: 12px; flex: 1;">Allgemein</span>
+                  <span style="background: #d97706; color: #000; font-size: 9px; padding: 1px 5px; border-radius: 6px; font-weight: 700;">2</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #a855f7; font-size: 11px;">🔒</span>
+                  <span style="color: #a1a1aa; font-size: 12px;">Älteste</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #71717a; font-size: 11px;">#</span>
+                  <span style="color: #a1a1aa; font-size: 12px;">Predigtdienst</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Space: Dienste -->
+            <div style="padding: 10px 16px; border-bottom: 1px solid #27272a10;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: #3b82f620; display: flex; align-items: center; justify-content: center; color: #3b82f6; font-size: 14px;">🔧</div>
+                <div style="flex: 1;">
+                  <div style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Dienste</div>
+                  <div style="color: #71717a; font-size: 10px;">4 Kanäle</div>
+                </div>
+                <span style="color: #71717a; font-size: 10px;">▾</span>
+              </div>
+              <div style="margin-left: 42px; display: flex; flex-direction: column; gap: 2px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #71717a; font-size: 11px;">#</span>
+                  <span style="color: #a1a1aa; font-size: 12px; flex: 1;">Technik</span>
+                  <span style="background: #3b82f6; color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 6px; font-weight: 700;">1</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #71717a; font-size: 11px;">#</span>
+                  <span style="color: #a1a1aa; font-size: 12px;">Ordnungsdienst</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #71717a; font-size: 11px;">#</span>
+                  <span style="color: #a1a1aa; font-size: 12px;">Reinigung</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer;">
+                  <span style="color: #71717a; font-size: 11px;">#</span>
+                  <span style="color: #a1a1aa; font-size: 12px;">Garten</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Collapsible Spaces (Tree View)</h3>
+      <p>Spaces as expandable sections with nested channels. Space header shows icon + name + channel count. Channels indent underneath. Lock icon for private rooms (Älteste). Unread badges on individual channels.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0a0c;">
+      <div style="height: 480px; position: relative; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <!-- Faded background -->
+        <div style="opacity: 0.15; padding: 20px; color: #71717a;">
+          <div style="font-size: 14px; color: #e4e4e7; margin-bottom: 10px;">Dashboard</div>
+          <div style="background: #18181b; height: 40px; border-radius: 6px; margin-bottom: 6px;"></div>
+          <div style="background: #18181b; height: 40px; border-radius: 6px;"></div>
+        </div>
+
+        <!-- Chat widget -->
+        <div style="position: absolute; bottom: 0; right: 0; width: 380px; border: 1px solid #27272a; border-radius: 14px 14px 0 0; background: #0a0a0c; overflow: hidden; box-shadow: 0 -8px 32px rgba(0,0,0,0.6);">
+          <!-- Header -->
+          <div style="padding: 10px 16px; background: linear-gradient(135deg, #18181b, #1a1a1f); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #27272a;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #d9770630; display: flex; align-items: center; justify-content: center;">
+                <span style="color: #d97706; font-size: 13px;">💬</span>
+              </div>
+              <span style="color: #e4e4e7; font-weight: 600; font-size: 14px;">Nachrichten</span>
+              <span style="background: #d97706; color: #000; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700;">3</span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <span style="color: #71717a; font-size: 13px; cursor: pointer;">✏️</span>
+              <span style="color: #71717a; font-size: 11px; cursor: pointer;">▼</span>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div style="display: flex; border-bottom: 1px solid #27272a;">
+            <div style="flex: 1; padding: 8px; text-align: center; color: #71717a; font-size: 11px;">Alle</div>
+            <div style="flex: 1; padding: 8px; text-align: center; color: #d97706; font-size: 11px; font-weight: 600; border-bottom: 2px solid #d97706;">Spaces</div>
+            <div style="flex: 1; padding: 8px; text-align: center; color: #71717a; font-size: 11px;">DMs</div>
+          </div>
+
+          <!-- Spaces as flat pills / cards -->
+          <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto;">
+            <!-- Space card -->
+            <div style="background: #18181b; border-radius: 10px; padding: 12px; cursor: pointer; border: 1px solid #27272a;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <div style="width: 36px; height: 36px; border-radius: 10px; background: #d9770620; display: flex; align-items: center; justify-content: center; color: #d97706; font-size: 16px;">🏛️</div>
+                <div style="flex: 1;">
+                  <div style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Versammlung</div>
+                  <div style="color: #71717a; font-size: 10px;">Allgemein · Älteste · Predigtdienst</div>
+                </div>
+                <span style="background: #d97706; color: #000; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;">2</span>
+              </div>
+            </div>
+
+            <div style="background: #18181b; border-radius: 10px; padding: 12px; cursor: pointer; border: 1px solid #27272a;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 10px; background: #3b82f620; display: flex; align-items: center; justify-content: center; color: #3b82f6; font-size: 16px;">🔧</div>
+                <div style="flex: 1;">
+                  <div style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Dienste</div>
+                  <div style="color: #71717a; font-size: 10px;">Technik · Ordnung · Reinigung · Garten</div>
+                </div>
+                <span style="background: #3b82f6; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;">1</span>
+              </div>
+            </div>
+
+            <div style="background: #18181b; border-radius: 10px; padding: 12px; cursor: pointer; border: 1px solid transparent;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 10px; background: #22c55e20; display: flex; align-items: center; justify-content: center; color: #22c55e; font-size: 16px;">📋</div>
+                <div style="flex: 1;">
+                  <div style="color: #e4e4e7; font-weight: 600; font-size: 13px;">Predigtdienst</div>
+                  <div style="color: #71717a; font-size: 10px;">Dienstgruppen · Treffpunkte</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Space Cards (Flat List)</h3>
+      <p>Spaces as cards. Click a Space card to drill into its channels (new view replaces list). Channel names shown as preview text. Clean and simple — no nesting visible until you tap in.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>Pre-Seeded Spaces</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <tr style="border-bottom: 1px solid #333;">
+      <th style="text-align: left; padding: 8px; color: #d97706;">Space</th>
+      <th style="text-align: left; padding: 8px; color: #d97706;">Channels</th>
+      <th style="text-align: left; padding: 8px; color: #d97706;">Access</th>
+    </tr>
+    <tr style="border-bottom: 1px solid #222;">
+      <td style="padding: 8px;">🏛️ Versammlung</td>
+      <td style="padding: 8px;">#allgemein, 🔒#älteste, #predigtdienst</td>
+      <td style="padding: 8px;">All publishers (älteste = elder role only)</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #222;">
+      <td style="padding: 8px;">🔧 Dienste</td>
+      <td style="padding: 8px;">#technik, #ordnungsdienst, #reinigung, #garten</td>
+      <td style="padding: 8px;">Per AppRole assignment</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px;">📋 Predigtdienst</td>
+      <td style="padding: 8px;">Per service group (auto-created)</td>
+      <td style="padding: 8px;">Service group members + overseer</td>
+    </tr>
+  </table>
+</div>

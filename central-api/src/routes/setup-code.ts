@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { portalAuth } from '../portal/auth.js';
+import { decryptToken } from '../lib/crypto.js';
 import {
   generateSetupCode,
   generateDeviceCode,
@@ -184,9 +185,9 @@ export async function setupCodeRoutes(app: FastifyInstance): Promise<void> {
       tenantId: tenant.id,
       slug: tenant.subdomain,
       name: tenant.name,
-      email: tenant.email,
-      firstName: tenant.ownerFirstName || '',
-      lastName: tenant.ownerLastName || '',
+      email: tenant.email ? decryptToken(tenant.email) : '',
+      firstName: tenant.ownerFirstName ? decryptToken(tenant.ownerFirstName) : '',
+      lastName: tenant.ownerLastName ? decryptToken(tenant.ownerLastName) : '',
       centralApiUrl,
       portalUrl,
       role: tenant.role,
