@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.25.2
+
+### Fix: docker-compose template missing HUBPORT_TENANT_ID and HUBPORT_API_TOKEN (#225)
+- fix: rename `TENANT_ID` → `HUBPORT_TENANT_ID` in docker-compose.yml (name mismatch with hub-api code)
+- fix: add `HUBPORT_API_TOKEN` to docker-compose.yml (needed for sharing + token rotation)
+- fix: update `.env.example` with correct variable names
+
 ## v2026.03.25.1
 
 ### Fix: Sharing partner connection returns Unauthorized (#223)

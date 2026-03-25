@@ -15,7 +15,8 @@ services:
       - VAULT_ADDR=http://vault:8200
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=hubport
-      - TENANT_ID=${TENANT_ID}
+      - HUBPORT_TENANT_ID=${HUBPORT_TENANT_ID}
+      - HUBPORT_API_TOKEN=${HUBPORT_API_TOKEN}
       - CENTRAL_API_URL=${CENTRAL_API_URL:-https://api.hubport.cloud}
       - APP_PORT=3000
       - API_PORT=3001
