@@ -108,7 +108,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       select: { id: true, name: true, subdomain: true, status: true },
     });
 
-    if (!tenant || tenant.status !== 'active') {
+    if (!tenant || tenant.status !== 'ACTIVE') {
       return reply.status(404).send({ error: 'Congregation not found' });
     }
 
