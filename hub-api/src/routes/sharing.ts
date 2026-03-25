@@ -77,7 +77,7 @@ export async function sharingRoutes(app: FastifyInstance) {
 
       if (!approveRes.ok) return reply.code(approveRes.status).send({ error: "Failed to create sharing request" });
 
-      const approval = await approveRes.json();
+      const approval = await approveRes.json() as Record<string, unknown>;
       return reply.code(201).send({
         ...approval,
         partner: { id: target.id, name: target.name, subdomain: target.subdomain },
