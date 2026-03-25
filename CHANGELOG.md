@@ -1,6 +1,17 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.25.1
+
+### Fix: Sharing partner connection returns Unauthorized (#223)
+- fix: add `apiTokenAuth` guards to all central-api `/sharing/*` routes
+- feat: `POST /sharing/request` — request partnership by subdomain (central-api)
+- feat: `GET /sharing/resolve/:subdomain` — lookup tenant by subdomain (central-api)
+- feat: hub-api sharing routes (`GET /partners`, `POST /connect`, `DELETE /partners/:id`)
+- feat: full SharingPartners UI — add partner form, partner list, disconnect
+- fix: `/sharing` route PermissionGuard uses `app:sharing.view` (was `app:settings.view`)
+- i18n: sharing partner flow strings (de-DE, en-US)
+
 ## v2026.03.23.5
 
 ### Installer E2E Fixes — Invite, RBAC, Encryption, JWT
