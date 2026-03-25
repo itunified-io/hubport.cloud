@@ -98,6 +98,23 @@ export async function tenantRoutes(app: FastifyInstance) {
     return reply.send(tenant);
   });
 
+  // Lookup tenant by subdomain — used by hub-api sharing partner discovery
+  app.get('/lookup', async (request, reply) => {
+    const { subdomain } = request.query as { subdomain?: string };
+    if (!subdomain) return reply.status(400).send({ error: 'subdomain query param required' });
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { subdomain },
+      select: { id: true, name: true, subdomain: true, status: true },
+    });
+
+    if (!tenant || tenant.status !== 'active') {
+      return reply.status(404).send({ error: 'Congregation not found' });
+    }
+
+    return reply.send({ id: tenant.id, name: tenant.name, subdomain: tenant.subdomain });
+  });
+
   // Get tenant info (tenant-authenticated)
   app.get('/:id', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };

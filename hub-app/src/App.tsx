@@ -230,7 +230,7 @@ export function App() {
         <Route
           path="/sharing"
           element={
-            <PermissionGuard requires="app:settings.view">
+            <PermissionGuard requires="app:sharing.view">
               <SharingPartners />
             </PermissionGuard>
           }
