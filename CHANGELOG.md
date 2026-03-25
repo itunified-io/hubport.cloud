@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.25.1
+
+### Fix: Sharing partner connection returns Unauthorized (#223)
+- fix: add `apiTokenAuth` guards to all central-api `/sharing/*` routes
+- fix: hub-api sharing routes now include Authorization header when calling central-api
+- feat: `POST /sharing/request` + `GET /sharing/resolve/:subdomain` (central-api)
+- fix: `/sharing` route PermissionGuard uses `app:sharing.view` (was `app:settings.view`)
+
 ## v2026.03.24.25
 
 ### Feat: Publisher Availability + Speaker Catalog Foundation (#222)
@@ -15,127 +23,6 @@ Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 - feat: Speaker publisherId FK for local speaker → publisher link
 - feat: Enhanced speakers route with talk numbers, source filter
 - feat: POST /speakers/import-csv for bulk CSV import of manual guest speakers
-
-## v2026.03.24.23
-
-### Fix: Encryption key validation + Vault key format (#208)
-- fix: validate ENCRYPTION_KEY is exactly 32 bytes on startup (fail-fast with generation command)
-- fix: Vault keys regenerated as proper base64-encoded 32-byte values (UAT + Prod)
-- docs: ADR-0082 updated with key format spec, Vault paths, hex-vs-base64 pitfall
-
-## v2026.03.24.22
-
-### Feat: S-34 JWPUB import + Public Talk Catalog UI (#208, #221)
-- feat: drag-and-drop S-34 JWPUB upload zone on Public Talk Planner (100MB limit)
-- feat: Catalog tab with searchable talk list (number, title, discontinued badge)
-- fix: JWPUB parser handles multiple title formats (Nr. N, No. N, N. Title, N – Title)
-- fix: use `file.toBuffer()` for reliable multipart stream handling
-- fix: remove auto-seeded catalog — S-34 JWPUB is sole import source
-- fix: polished upload zone UI (circular icon, spinner, styled alerts)
-
-## v2026.03.24.13
-
-### Feat: Public talk catalog seed (#221)
-- feat: 194-talk DE+EN catalog JSON auto-seeded on startup (source: sws2apps/organized-app i18n)
-- feat: POST /public-talks/seed endpoint for admin-triggered reseed (RBAC: MANAGE_PUBLIC_TALKS)
-- feat: `discontinued` boolean field on PublicTalk model for outline revision tracking
-- fix: SpeakerPicker payload `talkId` → `publicTalkId` (matches API schema)
-- fix: bump Sidebar version display
-
-## v2026.03.24.11
-
-### Feat: Weekend meeting planner (#219)
-- feat: JWPUB-based public talk catalog import (S-34mp parser, SQLite extraction via sql.js)
-- feat: WT Study EPUB parser with auto-meeting creation and weekend slot seeding
-- feat: weekend planner UI rewrite — program card (talk green + study blue), duty sidebar, picker modals
-- feat: TalkPicker modal — searchable public talk catalog with number/title filter
-- feat: SpeakerPicker modal — speaker directory with local/guest badges, creates schedule entries
-- feat: StudyStrip — compact WT Study edition thumbnails in sidebar (56px cards, Now/checkmark badges)
-- refactor: reuse midweek WeekNavigator and AssignmentPicker for weekend planner
-
-## v2026.03.24.10
-
-### Feat: Part details, JW links, dock-style UI, decrypt publisher names (#208)
-- feat: render sourceRef as subtitle below program part titles
-- feat: make part titles clickable → opens JW Library (sourceUrl from EPUB)
-- feat: remove redundant page header (visible in sidebar)
-- feat: dock-style edition thumbnails in right sidebar (active = bigger + blue glow)
-- fix: decrypt nested publisher names in meeting period response (encrypted PII was shown as ciphertext)
-
-## v2026.03.24.9
-
-### Fix: Month parsing in EPUB date ranges (#208)
-- fix: parse actual month name from dateRange instead of sortOrder heuristic — fixes empty weeks in bimonthly editions where weeks cross month boundaries
-
-## v2026.03.24.8
-
-### Fix: Show reimport button for imported editions (#208)
-- fix: Import button was hidden for already-imported editions — now shows ↻ reimport button
-- This was the final blocker preventing the EPUB parser from running on existing data
-
-## v2026.03.24.7
-
-### Fix: Reimport FK constraint failure (#208)
-- fix: delete auto_seeded assignments and unlink meetings BEFORE deleting weeks/parts
-- Root cause: DB FK constraint (NO ACTION) on workbookPartId blocked WorkbookPart cascade deletion, silently rolling back the entire import transaction
-
-## v2026.03.24.6
-
-### Fix: Orphaned assignments on workbook reimport (#208)
-- fix: delete auto_seeded assignments before re-seeding on reimport — fixes orphaned workbookPartId causing generic English fallback titles
-- fix: add onDelete: SetNull to workbookPart relation in Prisma schema
-- chore: bump APP_VERSION to 2026.03.24.6
-
-## v2026.03.24.5
-
-### Fix: Seed chairman/prayer assignment slots (#208)
-- fix: chairman, opening prayer, closing prayer slots now seeded during workbook import
-- chore: bump APP_VERSION to 2026.03.24.5
-
-## v2026.03.24.4
-
-### Feat: EPUB-based workbook parser (#208)
-- feat: replace HTML scraper with EPUB parser for JW.org workbook import
-- feat: extract German titles, 3 song numbers, durations, bible readings from structured XHTML
-- feat: reliable section detection via `dc-icon--gem/wheat/sheep` CSS class markers
-- refactor: remove all old HTML parser functions (parseWorkbookHtml, parseWorkbookSimple, 10+ helpers)
-- refactor: remove dead fetchWorkbookEdition HTML fetcher
-- chore: add jszip dependency, bump parser version to 2.0-epub
-
-## v2026.03.24.3
-
-### Fix: ProgramCard slot keys + doubled Schlussgebet (#208)
-- fix: chairman/prayer slot keys use `_midweek` suffix — `startsWith` match
-- fix: exclude chairman/prayer from `groupBySection` — no more doubled Schlussgebet
-
-## v2026.03.24.2
-
-### Fix: Meeting Periods workbookPart + Version Bump (#205)
-- fix: add `workbookPart: true` to meeting-periods assignments include — fixes section grouping, song bars, subtitles
-- chore: bump version to 2026.03.24.1 across root, hub-app, hub-api
-
-## v2026.03.24.1
-
-### MidweekPlanner UI Rewrite (#203)
-- feat: rewrite MidweekPlanner to match approved mockup — one-meeting-per-page, two-column layout
-- feat: WorkbookStrip with edition thumbnails, Now/imported badges, import buttons
-- feat: WeekNavigator with chevron arrows, date display, dot indicators
-- feat: ProgramCard with JW section colors, song bars, prayer rows, stacked student names
-- feat: DutySidebar with grouped duties (Technik/Ordnung/Reinigung), stats, publish/print actions
-- refactor: split monolithic 437-line component into 7 focused sub-components under `midweek/`
-
-## v2026.03.23.7
-
-### JW Meeting Planning — Midweek, Weekend, Public Talks (#201)
-- feat: 15 new Prisma models for meeting planning domain (periods, workbook editions/weeks/parts, weekend study, slot templates, assignments, speakers, public talks, congregation settings)
-- feat: server-side JW.org workbook + study importer with preview/commit workflow
-- feat: eligibility engine with privilege/gender/scope checks
-- feat: 7 new API route modules (workbooks, meeting-periods, assignments, weekend-study, speakers, public-talks, congregation-settings)
-- feat: 3 planner UI pages (MidweekPlanner, WeekendPlanner, PublicTalkPlanner)
-- feat: 16 new permissions + 4 management scopes + Public Talk Coordinator role
-- feat: canonical slot template seeder (24 program + duty slots)
-- feat: immutable assignment history audit trail
-- refactor: migrated meetings.ts from legacy requireRole() to requirePermission()
 
 ## v2026.03.23.5
 

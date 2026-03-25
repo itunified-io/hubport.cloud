@@ -16,6 +16,7 @@ import { securityRoutes } from "./routes/security.js";
 import { serviceGroupRoutes } from "./routes/service-groups.js";
 import { cleaningRoutes } from "./routes/cleaning.js";
 import { jitsiRoutes } from "./routes/jitsi.js";
+import { sharingRoutes } from "./routes/sharing.js";
 import { internalRoutes } from "./routes/internal.js";
 import { workbookRoutes } from "./routes/workbooks.js";
 import { meetingPeriodRoutes } from "./routes/meeting-periods.js";
@@ -25,7 +26,6 @@ import { speakerRoutes } from "./routes/speakers.js";
 import { publicTalkRoutes } from "./routes/public-talks.js";
 import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
 import { awayPeriodRoutes } from "./routes/away-periods.js";
-import { sharingRoutes } from "./routes/sharing.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
@@ -80,6 +80,7 @@ async function start(): Promise<void> {
   await app.register(serviceGroupRoutes);
   await app.register(cleaningRoutes);
   await app.register(jitsiRoutes);
+  await app.register(sharingRoutes);
   await app.register(internalRoutes);
   await app.register(workbookRoutes);
   await app.register(meetingPeriodRoutes);
@@ -89,7 +90,6 @@ async function start(): Promise<void> {
   await app.register(publicTalkRoutes);
   await app.register(congregationSettingsRoutes);
   await app.register(awayPeriodRoutes);
-  await app.register(sharingRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
