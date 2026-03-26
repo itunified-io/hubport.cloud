@@ -1,7 +1,7 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
-## v2026.03.26.3
+## v2026.03.26.5
 
 ### Dashboard vault unseal guide + matrix-admin vault integration (#233)
 - chore: add collapsible Maintenance section to portal dashboard with Vault unseal instructions after server reboot
