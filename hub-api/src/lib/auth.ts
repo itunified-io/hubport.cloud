@@ -81,7 +81,7 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     // Only require auth for API routes — SPA static files are public
     // (the SPA itself handles auth via Keycloak OIDC in the browser)
-    const API_PREFIXES = ["/publishers", "/territories", "/meetings", "/permissions", "/onboarding", "/roles", "/users", "/audit", "/security", "/service-groups", "/cleaning", "/workbooks", "/meeting-periods", "/meeting-assignments", "/weekend-study", "/speakers", "/public-talks", "/congregation-settings"];
+    const API_PREFIXES = ["/publishers", "/territories", "/meetings", "/permissions", "/onboarding", "/roles", "/users", "/audit", "/security", "/service-groups", "/cleaning", "/workbooks", "/meeting-periods", "/meeting-assignments", "/weekend-study", "/speakers", "/public-talks", "/congregation-settings", "/sharing"];
     const path = request.url.split("?")[0];
     if (!API_PREFIXES.some((p) => path.startsWith(p))) return;
 
