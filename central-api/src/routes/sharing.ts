@@ -338,6 +338,58 @@ export async function sharingRoutes(app: FastifyInstance) {
     return reply.send(territories);
   });
 
+  // ─── Shared Speakers ────────────────────────────────────────────────
+
+  // Push visiting speaker data (only speakers with privilege:publicTalkVisiting)
+  app.put('/speakers/:tenantId', { preHandler: apiTokenAuth }, async (request, reply) => {
+    const { tenantId } = request.params as { tenantId: string };
+    const data = request.body;
+
+    const speaker = await prisma.sharedSpeaker.upsert({
+      where: { tenantId },
+      update: { data: data as object },
+      create: { tenantId, data: data as object },
+    });
+
+    return reply.send(speaker);
+  });
+
+  // Query shared speakers (only approved partners with 'speakers' category)
+  app.get('/speakers', { preHandler: apiTokenAuth }, async (request, reply) => {
+    const tenantId = (request as unknown as Record<string, unknown>).tenantId as string;
+    const { tenantIds } = request.query as { tenantIds?: string };
+    if (!tenantIds) return reply.status(400).send({ error: 'tenantIds query param required' });
+
+    const ids = tenantIds.split(',');
+
+    const approvedPartners = await prisma.sharingApproval.findMany({
+      where: {
+        status: 'APPROVED',
+        OR: [
+          { requesterId: tenantId, approverId: { in: ids } },
+          { approverId: tenantId, requesterId: { in: ids } },
+        ],
+      },
+      select: { requesterId: true, approverId: true, acceptedCategories: true },
+    });
+
+    const allowedIds = approvedPartners
+      .filter((a) => {
+        const cats = (a.acceptedCategories as string[]) || [];
+        return cats.includes('speakers');
+      })
+      .map((a) => (a.requesterId === tenantId ? a.approverId : a.requesterId));
+
+    const filteredIds = ids.filter((id) => allowedIds.includes(id));
+    if (filteredIds.length === 0) return reply.send([]);
+
+    const speakers = await prisma.sharedSpeaker.findMany({
+      where: { tenantId: { in: filteredIds } },
+    });
+
+    return reply.send(speakers);
+  });
+
   // Push talk data
   app.put('/talks/:tenantId', { preHandler: apiTokenAuth }, async (request, reply) => {
     const { tenantId } = request.params as { tenantId: string };

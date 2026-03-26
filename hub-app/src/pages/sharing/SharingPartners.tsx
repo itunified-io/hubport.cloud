@@ -268,7 +268,7 @@ function PartnerList({
               {/* Category badges */}
               {p.acceptedCategories && (
                 <div className="flex gap-1 mt-1.5">
-                  {p.acceptedCategories.map((c) => <CategoryBadge key={c} category={c} />)}
+                  {p.acceptedCategories.filter((c) => ALL_CATEGORIES.includes(c as SharingCategory)).map((c) => <CategoryBadge key={c} category={c} />)}
                 </div>
               )}
             </div>
@@ -513,7 +513,7 @@ function IncomingRequests({
                 <FormattedMessage id="sharing.incoming.offered" />
               </p>
               <div className="flex gap-1">
-                {req.offeredCategories.map((c) => <CategoryBadge key={c} category={c} />)}
+                {req.offeredCategories.filter((c) => ALL_CATEGORIES.includes(c as SharingCategory)).map((c) => <CategoryBadge key={c} category={c} />)}
               </div>
             </div>
 
@@ -644,7 +644,7 @@ function ApproveRequestDialog({
           <FormattedMessage id="sharing.approve.categories" />
         </p>
         <div className="flex gap-2">
-          {request.offeredCategories.map((cat) => {
+          {request.offeredCategories.filter((c) => ALL_CATEGORIES.includes(c as SharingCategory)).map((cat) => {
             const Icon = CATEGORY_ICONS[cat] || Mic;
             const active = acceptedCategories.includes(cat);
             return (
@@ -762,7 +762,7 @@ function VisibilitySettings({
       <p className="text-[10px] text-[var(--text-muted)]">
         <FormattedMessage id="sharing.visibility.hint" />
       </p>
-      {acceptedCategories.map((cat) => {
+      {acceptedCategories.filter((c) => ALL_CATEGORIES.includes(c as SharingCategory)).map((cat) => {
         const Icon = CATEGORY_ICONS[cat] || Mic;
         const enabled = (visibility[cat] || "enabled") !== "disabled";
         const roleInfo = CATEGORY_ROLES[cat];

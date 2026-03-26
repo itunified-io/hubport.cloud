@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { FileUp } from "lucide-react";
+import { FileUp, RefreshCw, Users, Globe } from "lucide-react";
+import { FormattedMessage } from "react-intl";
 import { useAuth } from "../../../auth/useAuth";
 import { getApiUrl } from "../../../lib/config";
 
@@ -21,8 +22,28 @@ interface Speaker {
   lastName: string;
   congregationName?: string;
   isLocal: boolean;
+  source?: string;
   status: string;
   _count: { schedules: number };
+}
+
+interface Partner {
+  tenantId: string;
+  name: string;
+  subdomain: string;
+  status: string;
+  acceptedCategories: string[] | null;
+}
+
+interface SharedSpeaker {
+  speakerId: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  email?: string | null;
+  shareAvailability?: boolean;
+  monthlyInviteCap?: number | null;
+  talks: { talkNumber: number; title: string }[];
 }
 
 export function PublicTalkPlanner() {
@@ -30,8 +51,12 @@ export function PublicTalkPlanner() {
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [talks, setTalks] = useState<{ id: string; talkNumber: number; title: string; discontinued: boolean }[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [partnerSpeakers, setPartnerSpeakers] = useState<Record<string, SharedSpeaker[]>>({});
   const [activeTab, setActiveTab] = useState<"schedule" | "speakers" | "catalog">("schedule");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number } | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ created: number; updated: number; discontinued: number } | null>(null);
   const [importError, setImportError] = useState("");
@@ -48,10 +73,11 @@ export function PublicTalkPlanner() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [schedRes, speakRes, talksRes] = await Promise.all([
+      const [schedRes, speakRes, talksRes, partnersRes] = await Promise.all([
         fetch(`${apiUrl}/public-talks/schedule?upcoming=true`, { headers }),
         fetch(`${apiUrl}/speakers`, { headers }),
         fetch(`${apiUrl}/public-talks`, { headers }),
+        fetch(`${apiUrl}/sharing/partners`, { headers }),
       ]);
       if (schedRes.ok) setSchedule(await schedRes.json());
       if (speakRes.ok) setSpeakers(await speakRes.json());
@@ -59,12 +85,54 @@ export function PublicTalkPlanner() {
         const data = await talksRes.json();
         setTalks(Array.isArray(data) ? data : []);
       }
+      if (partnersRes.ok) {
+        const p = (await partnersRes.json()) as Partner[];
+        const activePartners = p.filter(
+          (pr) => pr.status === "APPROVED" && pr.acceptedCategories?.includes("speakers"),
+        );
+        setPartners(activePartners);
+
+        // Fetch shared speakers from each active partner
+        const pSpeakers: Record<string, SharedSpeaker[]> = {};
+        await Promise.all(
+          activePartners.map(async (pr) => {
+            try {
+              const res = await fetch(`${apiUrl}/sharing/speakers/${pr.tenantId}`, { headers });
+              if (res.ok) {
+                const data = await res.json();
+                pSpeakers[pr.tenantId] = Array.isArray(data) ? data : [];
+              }
+            } catch { /* ignore fetch errors for individual partners */ }
+          }),
+        );
+        setPartnerSpeakers(pSpeakers);
+      }
     } finally {
       setLoading(false);
     }
   }, [apiUrl, user?.access_token]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`${apiUrl}/sharing/speakers/sync`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setSyncResult(result);
+        // Reload to refresh partner speakers too
+        loadData();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleImportFile = async (file: File) => {
     if (!file.name.endsWith(".jwpub")) {
@@ -337,44 +405,140 @@ export function PublicTalkPlanner() {
 
       {/* Speakers Tab */}
       {activeTab === "speakers" && (
-        <div className="space-y-2">
-          {speakers.length === 0 ? (
-            <p className="text-center py-8 text-[var(--text-muted)]">No speakers registered</p>
-          ) : (
-            speakers.map((speaker) => (
-              <div
-                key={speaker.id}
-                className="flex items-center justify-between p-3 bg-[var(--bg-1)] rounded-[var(--radius)] border border-[var(--border)]"
-              >
-                <div>
-                  <span className="font-medium text-[var(--text)]">
-                    {speaker.firstName} {speaker.lastName}
-                  </span>
-                  {speaker.congregationName && (
-                    <span className="ml-2 text-sm text-[var(--text-muted)]">
-                      ({speaker.congregationName})
+        <div className="space-y-4">
+          {/* Sync button + result */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-[var(--text)] flex items-center gap-2">
+              <Users size={14} />
+              <FormattedMessage id="speakers.directory.local" />
+            </h2>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--amber)] bg-[#d9770614] rounded-[var(--radius-sm)] hover:bg-[#d9770628] transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
+              <FormattedMessage id="speakers.sync" />
+            </button>
+          </div>
+          {syncResult && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--green)]/[0.08] border border-[var(--green)]/20">
+              <span className="text-sm text-[var(--green)]">
+                <FormattedMessage id="speakers.sync.result" values={{ count: syncResult.synced }} />
+              </span>
+            </div>
+          )}
+
+          {/* Local speakers */}
+          <div className="space-y-1">
+            {speakers.length === 0 ? (
+              <p className="text-center py-4 text-[var(--text-muted)]">
+                <FormattedMessage id="speakers.directory.empty" />
+              </p>
+            ) : (
+              speakers.map((speaker) => (
+                <div
+                  key={speaker.id}
+                  className="flex items-center justify-between px-3 py-2.5 bg-[var(--bg-1)] rounded-[var(--radius-sm)] border border-[var(--border)]"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-sm text-[var(--text)] truncate">
+                      {speaker.firstName} {speaker.lastName}
                     </span>
-                  )}
+                    {speaker.congregationName && !speaker.isLocal && (
+                      <span className="text-xs text-[var(--text-muted)] truncate">
+                        ({speaker.congregationName})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      {speaker._count.schedules} <FormattedMessage id="speakers.talks" />
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                        speaker.source === "hubport"
+                          ? "bg-purple-600/20 text-purple-400"
+                          : speaker.source === "manual"
+                            ? "bg-orange-600/20 text-orange-400"
+                            : "bg-blue-600/20 text-blue-400"
+                      }`}
+                    >
+                      {speaker.source === "hubport" ? "Partner" : speaker.source === "manual" ? "Manual" : "Local"}
+                    </span>
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        speaker.status === "active" ? "bg-green-500" : "bg-gray-500"
+                      }`}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {speaker._count.schedules} talks
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full ${
-                      speaker.isLocal ? "bg-blue-600/20 text-blue-400" : "bg-purple-600/20 text-purple-400"
-                    }`}
-                  >
-                    {speaker.isLocal ? "Local" : "Guest"}
-                  </span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      speaker.status === "active" ? "bg-green-500" : "bg-gray-500"
-                    }`}
-                  />
-                </div>
-              </div>
-            ))
+              ))
+            )}
+          </div>
+
+          {/* Partner speakers */}
+          {partners.length > 0 && (
+            <div className="space-y-3 mt-4">
+              <h2 className="text-sm font-medium text-[var(--text)] flex items-center gap-2">
+                <Globe size={14} />
+                <FormattedMessage id="speakers.directory.partners" />
+              </h2>
+              {partners.map((partner) => {
+                const pSpeakers = partnerSpeakers[partner.tenantId] || [];
+                return (
+                  <div key={partner.tenantId} className="space-y-1">
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-xs font-semibold text-[var(--amber)]">{partner.name}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        {pSpeakers.length} <FormattedMessage id="speakers.available" />
+                      </span>
+                    </div>
+                    {pSpeakers.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)] px-3 py-2 bg-[var(--bg-1)] rounded-[var(--radius-sm)] border border-[var(--border)]">
+                        <FormattedMessage id="speakers.partner.empty" />
+                      </p>
+                    ) : (
+                      pSpeakers.map((s) => (
+                        <div
+                          key={s.speakerId}
+                          className="px-3 py-2.5 bg-[var(--bg-1)] rounded-[var(--radius-sm)] border border-[var(--border)]"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm text-[var(--text)]">
+                              {s.firstName} {s.lastName}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {s.shareAvailability && s.monthlyInviteCap && (
+                                <span className="text-[10px] text-[var(--text-muted)]">
+                                  {s.monthlyInviteCap}x/<FormattedMessage id="speakers.perMonth" />
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-600/20 text-purple-400">
+                                Partner
+                              </span>
+                            </div>
+                          </div>
+                          {s.talks.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {s.talks.map((t) => (
+                                <span
+                                  key={t.talkNumber}
+                                  className="px-1.5 py-0.5 text-[10px] font-mono bg-[var(--glass)] text-[var(--text-muted)] rounded"
+                                  title={t.title}
+                                >
+                                  #{t.talkNumber}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

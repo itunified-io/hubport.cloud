@@ -37,6 +37,7 @@ model Tenant {
   sharingApprovedBy SharingApproval[] @relation("approver")
   sharedTerritories SharedTerritory[]
   sharedTalks       SharedTalk[]
+  sharedSpeakers    SharedSpeaker[]
   apiTokens         TenantApiToken[]
   passkeys          TenantPasskey[]
   setupCodes        SetupCode[]
@@ -142,6 +143,17 @@ model SharedTalk {
   id        String   @id @default(uuid())
   tenantId  String   @unique
   data      Json
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+/// Visiting speakers shared by a tenant for partner congregations to browse/invite.
+/// Only speakers with privilege:publicTalkVisiting are pushed here.
+model SharedSpeaker {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json     /// Array of { name, talks[], sharePhone?, shareEmail?, shareAvailability?, monthlyInviteCap }
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
