@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.1
+
+### Fix: Sharing routes return 401 — missing from API_PREFIXES + API token provisioning (#227)
+- fix: add `/sharing` to `API_PREFIXES` in hub-api auth middleware (JWT was never verified for sharing routes)
+- feat: `POST /admin/internal/provision-api-token` endpoint (central-api) for programmatic M2M token creation
+
 ## v2026.03.25.2
 
 ### Fix: docker-compose template missing HUBPORT_TENANT_ID and HUBPORT_API_TOKEN (#225)

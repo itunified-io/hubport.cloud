@@ -10,6 +10,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../lib/email.js';
 import { shell, tenantRow, tenantDetail, statsCard, readOnlyBanner } from './ui.js';
+import { generateApiToken, TOKEN_EXPIRY_MS } from '../lib/tokens.js';
 
 interface SentEmail {
   to: string;
@@ -171,6 +172,42 @@ export async function adminRoutes(app: FastifyInstance) {
     const setupUrl = `${portalBase}/portal/setup?token=${setupToken}`;
 
     return reply.send({ ok: true, setupToken, setupUrl });
+  });
+
+  // Internal-only endpoint for MCP skill to provision an M2M API token.
+  // Called during tenant approval so sharing and token-rotation work immediately.
+  // Auth: ADMIN_SECRET — operator-only (same as provision-auth)
+  app.post('/internal/provision-api-token', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
+    if (!validateAdminAuth(req.headers.authorization)) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing admin secret' });
+    }
+
+    const body = req.body as { tenantId: string } | null;
+    if (!body?.tenantId) {
+      return reply.status(400).send({ error: 'Missing tenantId' });
+    }
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
+    if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
+
+    // Check for existing active token
+    const activeToken = await prisma.tenantApiToken.findFirst({
+      where: { tenantId: body.tenantId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (activeToken) {
+      return reply.send({ ok: true, exists: true, message: 'Active token already exists', expiresAt: activeToken.expiresAt.toISOString() });
+    }
+
+    const { plaintext, hash } = generateApiToken(body.tenantId);
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
+    await prisma.tenantApiToken.create({
+      data: { tenantId: body.tenantId, tokenHash: hash, expiresAt },
+    });
+
+    app.log.info({ tenantId: body.tenantId }, 'API token provisioned via admin endpoint');
+    return reply.send({ ok: true, token: plaintext, expiresAt: expiresAt.toISOString() });
   });
 
   // Internal-only endpoint for sending emails via pre-defined templates.
