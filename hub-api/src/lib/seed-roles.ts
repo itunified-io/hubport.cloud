@@ -202,9 +202,15 @@ const SYSTEM_ROLES: SeedRole[] = [
   },
   {
     name: "Öffentlicher Vortrag",
-    description: "Public talk speaker",
+    description: "Public talk speaker (local only)",
     scope: "weekend",
-    permissions: [P.PRIVILEGE_PUBLIC_TALK, P.MEETINGS_VIEW],
+    permissions: [P.PRIVILEGE_PUBLIC_TALK, P.PRIVILEGE_PUBLIC_TALK_LOCAL, P.MEETINGS_VIEW],
+  },
+  {
+    name: "Gastredner",
+    description: "Visiting/away speaker — available for partner congregation invitations",
+    scope: "weekend",
+    permissions: [P.PRIVILEGE_PUBLIC_TALK, P.PRIVILEGE_PUBLIC_TALK_VISITING, P.MEETINGS_VIEW],
   },
   {
     name: "WT Leser",

@@ -108,6 +108,7 @@ const WEEKEND_ROLES = [
   { name: "WT Conductor", labelKey: "program.role.wtConductor" },
   { name: "Vorsitzender Wochenende", labelKey: "program.role.chairmanWeekend" },
   { name: "Öffentlicher Vortrag", labelKey: "program.role.publicTalk" },
+  { name: "Gastredner", labelKey: "program.role.gastredner" },
   { name: "WT Leser", labelKey: "program.role.wtReader" },
   { name: "Vortragsplaner", labelKey: "program.role.vortragsplaner" },
   { name: "Assistent Weekend", labelKey: "program.role.assistentWeekend" },

@@ -130,6 +130,7 @@ export const PERMISSIONS = {
   PRIVILEGE_WT_CONDUCTOR: "privilege:wtConductor",
   PRIVILEGE_ZOOM_MODERATOR: "privilege:zoomModerator",
   PRIVILEGE_PUBLIC_TALK_LOCAL: "privilege:publicTalkLocal",
+  PRIVILEGE_PUBLIC_TALK_VISITING: "privilege:publicTalkVisiting",
   PRIVILEGE_SERVICE_MEETING_CONDUCTOR: "privilege:serviceMeetingConductor",
 
   // Student part assistant privileges (householder role)
