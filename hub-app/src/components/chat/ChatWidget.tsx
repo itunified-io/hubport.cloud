@@ -73,9 +73,6 @@ export function ChatWidget() {
   const matrixUrl = config?.chatUrl
     ? config.chatUrl.replace("chat-", "matrix-")
     : null;
-  const userId = config?.rpId
-    ? `@${accessToken ? "user" : "anon"}:${config.rpId}`
-    : null;
 
   // Listen for header toggle event
   useEffect(() => {
@@ -86,29 +83,37 @@ export function ChatWidget() {
     return () => window.removeEventListener("hubport:toggle-chat", handler);
   }, []);
 
-  // Init Matrix client + ensure Matrix user exists
+  // Init Matrix client — get a real Matrix token from hub-api
   useEffect(() => {
     if (!matrixUrl || !accessToken) return;
+    let cancelled = false;
 
-    // Ensure Matrix user is provisioned (lazy — creates account if missing)
-    const config = (window as any).__HUBPORT_CONFIG__;
     const apiUrl = config?.apiUrl || "";
-    if (apiUrl) {
-      fetch(`${apiUrl}/chat/ensure`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => {}); // Non-fatal
-    }
+    if (!apiUrl) return;
 
-    // Matrix SSO: exchange OIDC token for Matrix access token
-    initMatrixClient(matrixUrl, accessToken, userId ?? "")
-      .then(() => setMatrixReady(true))
-      .catch((err) => console.warn("[chat] Matrix init failed:", err));
+    (async () => {
+      try {
+        // /chat/ensure provisions the Matrix user and returns a Matrix access token
+        const res = await fetch(`${apiUrl}/chat/ensure`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as { matrixUserId: string; matrixAccessToken: string };
+        if (cancelled || !data.matrixAccessToken) return;
+
+        await initMatrixClient(matrixUrl, data.matrixAccessToken, data.matrixUserId);
+        if (!cancelled) setMatrixReady(true);
+      } catch (err) {
+        console.warn("[chat] Matrix init failed:", err);
+      }
+    })();
 
     return () => {
+      cancelled = true;
       stopMatrixClient();
     };
-  }, [matrixUrl, accessToken, userId]);
+  }, [matrixUrl, accessToken]);
 
   // Listen for new messages (unread count)
   useEffect(() => {

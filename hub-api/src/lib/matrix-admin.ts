@@ -270,3 +270,23 @@ export async function removeFromRoom(roomId: string, userId: string): Promise<vo
     body: JSON.stringify({ user_id: userId, reason: "Removed by admin" }),
   });
 }
+
+/**
+ * Get a Matrix access token for a specific user via the Synapse admin API.
+ * Uses POST /_synapse/admin/v1/users/{userId}/login to create a token
+ * that the frontend Matrix JS SDK can use to connect.
+ */
+export async function getMatrixUserToken(matrixUserId: string): Promise<string> {
+  const { adminUrl } = await getMatrixConfig();
+  const token = await getAdminToken();
+  const res = await matrixFetch(
+    `${adminUrl}/_synapse/admin/v1/users/${encodeURIComponent(matrixUserId)}/login`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  if (!res.ok) throw new Error(`Synapse user login failed: ${res.status}`);
+  return ((await res.json()) as { access_token: string }).access_token;
+}
