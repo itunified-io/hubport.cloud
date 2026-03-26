@@ -6,7 +6,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import prisma from "../lib/prisma.js";
-import { createRoom, setDirectRoom, ensureMatrixUser } from "../lib/matrix-admin.js";
+import { createRoom, setDirectRoom, ensureMatrixUser, getMatrixUserToken } from "../lib/matrix-admin.js";
 import {
   ensureSpacesProvisioned,
   provisionAllActivePublishers,
@@ -148,7 +148,10 @@ export async function chatRoutes(app: FastifyInstance) {
 
       try {
         await provisionMatrixUserForPublisher(me);
-        return reply.send({ ok: true, matrixUserId: `@${me.id}:${SERVER_NAME}` });
+        const matrixUserId = `@${me.id}:${SERVER_NAME}`;
+        // Get a Matrix access token so the frontend SDK can connect
+        const matrixAccessToken = await getMatrixUserToken(matrixUserId);
+        return reply.send({ ok: true, matrixUserId, matrixAccessToken });
       } catch (err) {
         app.log.error({ err }, "Failed to provision Matrix user");
         return reply.code(500).send({ error: "Matrix provisioning failed" });
