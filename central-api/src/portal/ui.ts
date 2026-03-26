@@ -239,7 +239,7 @@ export function setupCodeSection(tenantStatus: string): string {
           <div class="mb-2">
             <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Linux / macOS</span>
             <div class="flex items-center gap-2 mt-1">
-              <code id="setup-code-curl" class="flex-1 text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | sh</code>
+              <code id="setup-code-curl" class="flex-1 text-sm text-amber-400 select-all">curl -fsSL ${installerUrl()} | bash</code>
               <button onclick="copyCred(document.getElementById('setup-code-curl').textContent, event)" class="p-1 text-zinc-500 hover:text-amber-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
             </div>
           </div>
@@ -271,7 +271,7 @@ export function setupCodeSection(tenantStatus: string): string {
         if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Failed'); }
         var data = await res.json();
         document.getElementById('setup-code-value').textContent = data.code;
-        document.getElementById('setup-code-curl').textContent = 'curl -fsSL ${installerUrl()} | sh -s -- ' + data.code;
+        document.getElementById('setup-code-curl').textContent = 'curl -fsSL ${installerUrl()} | bash -s -- ' + data.code;
         document.getElementById('setup-code-ps').textContent = 'irm ${installerUrl()}/windows | iex; # then enter: ' + data.code;
         var exp = new Date(data.expiresAt);
         document.getElementById('setup-code-generate').classList.add('hidden');
@@ -831,7 +831,7 @@ export function docsPage(): string {
         <ol class="space-y-3 text-sm text-zinc-300 list-decimal list-inside">
           <li><strong class="text-zinc-200">Generate a Setup Code</strong> on your <a href="/portal/dashboard" class="text-amber-500 hover:underline">Dashboard</a></li>
           <li><strong class="text-zinc-200">Run the installer</strong> on your server:
-            <pre class="bg-zinc-800 rounded-lg px-4 py-2 mt-2 text-amber-400 text-xs font-mono overflow-x-auto">curl -fsSL https://get.hubport.cloud | sh</pre>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 mt-2 text-amber-400 text-xs font-mono overflow-x-auto">curl -fsSL https://get.hubport.cloud | bash</pre>
           </li>
           <li><strong class="text-zinc-200">Enter the setup code</strong> when prompted</li>
           <li><strong class="text-zinc-200">Approve the device</strong> in the portal when the device code appears</li>
@@ -896,7 +896,7 @@ docker compose logs -f cloudflared # tunnel</pre>
           </div>
           <div>
             <p class="text-xs text-zinc-500 uppercase tracking-wider mb-1">Full reinstall (destroys data)</p>
-            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-red-400 text-xs font-mono">curl -fsSL https://get.hubport.cloud | sh -s -- &lt;CODE&gt; --force</pre>
+            <pre class="bg-zinc-800 rounded-lg px-4 py-2 text-red-400 text-xs font-mono">curl -fsSL https://get.hubport.cloud | bash -s -- &lt;CODE&gt; --force</pre>
           </div>
         </div>
       </div>

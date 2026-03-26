@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.3
+
+### Dashboard vault unseal guide + matrix-admin vault integration (#233)
+- chore: add collapsible Maintenance section to portal dashboard with Vault unseal instructions after server reboot
+- fix: `matrix-admin.ts` loads Synapse secrets from Vault via `vault-client` (ADR-0083) instead of `process.env`
+- fix: change installer command from `sh` to `bash` in dashboard and email templates
+- Related: itunified-io/cf-hubport-cloud#123 (installer cleanup removal)
+
 ## v2026.03.26.2
 
 ### Fix: Sharing resolve rejects APPROVED tenants + dynamic version display (#227)
