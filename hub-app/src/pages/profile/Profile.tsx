@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
 import { SecuritySection } from "./SecuritySection";
 import { AvailabilitySection } from "./AvailabilitySection";
+import { SpeakerTalksSection } from "./SpeakerTalksSection";
 
 interface PublisherProfile {
   id: string;
@@ -171,6 +172,9 @@ export function Profile() {
 
       {/* Availability — away periods */}
       {profile && <AvailabilitySection publisherId={profile.id} />}
+
+      {/* Speaker talks & sharing prefs (only if user has a speaker profile) */}
+      <SpeakerTalksSection />
 
       {/* Danger zone */}
       <div className="p-4 border border-[var(--red)] border-opacity-30 rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">

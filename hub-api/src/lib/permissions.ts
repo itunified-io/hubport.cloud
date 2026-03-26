@@ -146,6 +146,7 @@ export const PERMISSIONS = {
   // Sharing
   SHARING_VIEW: "app:sharing.view",
   SHARING_EDIT: "app:sharing.edit",
+  SHARING_CONFIGURE: "app:sharing.configure",
 
   // Cleaning module
   CLEANING_VIEW: "app:cleaning.view",

@@ -91,12 +91,37 @@ model TenantPasskey {
   @@index([credentialId])
 }
 
+enum SharingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}
+
 model SharingApproval {
-  id          String   @id @default(uuid())
-  requesterId String
-  approverId  String
-  approved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id                    String        @id @default(uuid())
+  requesterId           String
+  approverId            String
+  status                SharingStatus @default(PENDING)
+
+  // What the requester offers to share (JSON array: ["speakers","territories","talks"])
+  offeredCategories     Json          @default("[\"speakers\",\"territories\",\"talks\"]")
+  // What the approver accepts (subset of offered, set on approval)
+  acceptedCategories    Json?
+
+  // Contact snapshot of the person who initiated the request
+  requesterContactName  String?
+  requesterContactEmail String?
+  message               String?
+
+  // Terms & response
+  termsAcceptedAt       DateTime?
+  termsVersion          String?
+  rejectedReason        String?
+  respondedAt           DateTime?
+
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   requester Tenant @relation("requester", fields: [requesterId], references: [id])
   approver  Tenant @relation("approver", fields: [approverId], references: [id])
