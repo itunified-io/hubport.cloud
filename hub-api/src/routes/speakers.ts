@@ -108,7 +108,7 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
         });
         if (talks.length > 0) {
           await prisma.speakerTalk.createMany({
-            data: talks.map((t) => ({ speakerId: speaker.id, publicTalkId: t.id })),
+            data: talks.map((t: { id: string }) => ({ speakerId: speaker.id, publicTalkId: t.id })),
             skipDuplicates: true,
           });
         }
@@ -153,7 +153,7 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
           });
           if (talks.length > 0) {
             await prisma.speakerTalk.createMany({
-              data: talks.map((t) => ({ speakerId: request.params.id, publicTalkId: t.id })),
+              data: talks.map((t: { id: string }) => ({ speakerId: request.params.id, publicTalkId: t.id })),
               skipDuplicates: true,
             });
           }
@@ -219,7 +219,7 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
         });
         if (talks.length > 0) {
           await prisma.speakerTalk.createMany({
-            data: talks.map((t) => ({ speakerId: speaker.id, publicTalkId: t.id })),
+            data: talks.map((t: { id: string }) => ({ speakerId: speaker.id, publicTalkId: t.id })),
             skipDuplicates: true,
           });
         }
@@ -319,7 +319,7 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
             });
             if (talks.length > 0) {
               await prisma.speakerTalk.createMany({
-                data: talks.map((t) => ({ speakerId: speaker.id, publicTalkId: t.id })),
+                data: talks.map((t: { id: string }) => ({ speakerId: speaker.id, publicTalkId: t.id })),
                 skipDuplicates: true,
               });
             }

@@ -8,7 +8,7 @@
 import type { FastifyInstance } from "fastify";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { prisma } from "../lib/prisma.js";
+import prisma from "../lib/prisma.js";
 
 const CENTRAL_API_URL = process.env.CENTRAL_API_URL || "";
 const TENANT_ID = process.env.HUBPORT_TENANT_ID || "";
@@ -106,8 +106,8 @@ export async function sharingRoutes(app: FastifyInstance) {
 
       const headers = await centralHeaders();
       const categories = body.offeredCategories || ["speakers", "territories", "talks"];
-      const contactName = getUserDisplayName(request as { user?: Record<string, unknown> });
-      const contactEmail = getUserEmail(request as { user?: Record<string, unknown> });
+      const contactName = getUserDisplayName(request as unknown as { user?: Record<string, unknown> });
+      const contactEmail = getUserEmail(request as unknown as { user?: Record<string, unknown> });
 
       // Discover target tenant via central-api
       const lookupRes = await fetch(
@@ -276,7 +276,7 @@ export async function sharingRoutes(app: FastifyInstance) {
       // Fill in defaults for missing categories
       const result: Record<string, string> = {};
       for (const cat of ["speakers", "territories", "talks"]) {
-        const row = rows.find((r) => r.category === cat);
+        const row = rows.find((r: { category: string; minRole: string }) => r.category === cat);
         result[cat] = row?.minRole || DEFAULT_VISIBILITY[cat] || "elder";
       }
 
