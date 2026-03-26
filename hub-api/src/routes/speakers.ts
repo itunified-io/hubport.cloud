@@ -167,6 +167,110 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // ─── Speaker Self-Service ────────────────────────────────────────────
+
+  // GET /speakers/me — get own speaker profile + talks
+  app.get(
+    "/speakers/me",
+    async (request, reply) => {
+      const sub = (request as any).user?.sub;
+      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+
+      const publisher = await prisma.publisher.findFirst({ where: { keycloakSub: sub }, select: { id: true } });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+
+      const speaker = await prisma.speaker.findFirst({
+        where: { publisherId: publisher.id },
+        include: {
+          talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
+        },
+      });
+      if (!speaker) return reply.code(404).send({ error: "No speaker profile linked" });
+
+      return speaker;
+    },
+  );
+
+  // PUT /speakers/me/talks — update own talk list
+  app.put(
+    "/speakers/me/talks",
+    async (request, reply) => {
+      const sub = (request as any).user?.sub;
+      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+
+      const body = request.body as { talkNumbers: number[] };
+      if (!Array.isArray(body.talkNumbers)) {
+        return reply.code(400).send({ error: "talkNumbers array required" });
+      }
+
+      const publisher = await prisma.publisher.findFirst({ where: { keycloakSub: sub }, select: { id: true } });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+
+      const speaker = await prisma.speaker.findFirst({ where: { publisherId: publisher.id }, select: { id: true } });
+      if (!speaker) return reply.code(404).send({ error: "No speaker profile linked" });
+
+      // Sync talks: delete old, create new
+      await prisma.speakerTalk.deleteMany({ where: { speakerId: speaker.id } });
+
+      if (body.talkNumbers.length > 0) {
+        const talks = await prisma.publicTalk.findMany({
+          where: { talkNumber: { in: body.talkNumbers } },
+          select: { id: true },
+        });
+        if (talks.length > 0) {
+          await prisma.speakerTalk.createMany({
+            data: talks.map((t) => ({ speakerId: speaker.id, publicTalkId: t.id })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      return prisma.speaker.findUnique({
+        where: { id: speaker.id },
+        include: { talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } } },
+      });
+    },
+  );
+
+  // PUT /speakers/me/sharing — update own sharing preferences
+  app.put(
+    "/speakers/me/sharing",
+    async (request, reply) => {
+      const sub = (request as any).user?.sub;
+      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+
+      const body = request.body as {
+        sharePhone?: boolean;
+        shareEmail?: boolean;
+        shareAvailability?: boolean;
+        monthlyInviteCap?: number;
+      };
+
+      const publisher = await prisma.publisher.findFirst({ where: { keycloakSub: sub }, select: { id: true } });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+
+      const speaker = await prisma.speaker.findFirst({ where: { publisherId: publisher.id }, select: { id: true } });
+      if (!speaker) return reply.code(404).send({ error: "No speaker profile linked" });
+
+      const data: Record<string, unknown> = {};
+      if (body.sharePhone !== undefined) data.sharePhone = body.sharePhone;
+      if (body.shareEmail !== undefined) data.shareEmail = body.shareEmail;
+      if (body.shareAvailability !== undefined) data.shareAvailability = body.shareAvailability;
+      if (body.monthlyInviteCap !== undefined) {
+        const cap = Math.max(1, Math.min(12, body.monthlyInviteCap));
+        data.monthlyInviteCap = cap;
+      }
+
+      const updated = await prisma.speaker.update({
+        where: { id: speaker.id },
+        data,
+        select: { sharePhone: true, shareEmail: true, shareAvailability: true, monthlyInviteCap: true },
+      });
+
+      return updated;
+    },
+  );
+
   // POST /speakers/import-csv — bulk import manual speakers from CSV text
   app.post(
     "/speakers/import-csv",

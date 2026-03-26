@@ -780,3 +780,18 @@ model CampaignInvite {
   @@unique([campaignId, publisherId])
   @@index([publisherId])
 }
+
+// ─── Sharing Visibility RBAC ──────────────────────────────────────────
+
+/// Controls which roles in THIS congregation can see shared data from each partner.
+/// Defaults: territories/talks → publisher, speakers → elder
+model SharingVisibility {
+  id        String   @id @default(uuid())
+  partnerId String   // The sharing partner's tenantId (from central-api)
+  category  String   // "speakers" | "territories" | "talks"
+  minRole   String   // Minimum role: "publisher" | "elder" | "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([partnerId, category])
+}
