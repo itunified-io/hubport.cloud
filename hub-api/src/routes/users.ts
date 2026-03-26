@@ -627,13 +627,14 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       let relaySecret2: string | undefined;
       try {
         relaySecret2 = await getMailRelaySecret();
-      } catch {
-        // Vault unavailable + no env fallback — skip email
+      } catch (err) {
+        app.log.warn({ err }, "resend-invite: failed to get mail relay secret");
       }
 
+      let emailSent = false;
       if (centralApiUrl2 && relaySecret2) {
         try {
-          await fetch(`${centralApiUrl2}/admin/internal/send-email`, {
+          const emailRes = await fetch(`${centralApiUrl2}/admin/internal/send-email`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -646,13 +647,22 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
               templateData: { firstName: publisher.firstName, inviteCode: newCode, tenantSlug: tenantSlug2 },
             }),
           });
+          if (emailRes.ok) {
+            emailSent = true;
+            app.log.info({ publisherId: publisher.id }, "resend-invite: email sent successfully");
+          } else {
+            const errBody = await emailRes.text().catch(() => "");
+            app.log.error({ status: emailRes.status, body: errBody }, "resend-invite: email relay returned error");
+          }
         } catch (err) {
-          app.log.error(err, "resend invite email relay error");
+          app.log.error(err, "resend-invite: email relay unreachable");
         }
+      } else {
+        app.log.warn({ hasCentralUrl: !!centralApiUrl2, hasRelaySecret: !!relaySecret2 }, "resend-invite: email relay not configured — skipping email");
       }
 
       await audit("user.resend_invite", request.user.sub, "Publisher", publisher.id, null, { inviteCode: newCode });
-      return { ok: true, inviteCode: newCode };
+      return { ok: true, inviteCode: newCode, emailSent };
     },
   );
 }
