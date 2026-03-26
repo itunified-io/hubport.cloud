@@ -1,6 +1,18 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.6
+
+### Chat auth fix, DM picker, Matrix provisioning (#235)
+- fix: add `/chat`, `/jitsi`, `/away-periods` to auth `API_PREFIXES` — fixes 401 on chat routes
+- feat: add `NewDMPicker` component for creating direct messages between publishers
+- feat: add `matrix-provisioning.ts` for space/user provisioning on first boot
+- feat: add chat routes (`/chat/dm`, `/chat/members`, `/chat/spaces/provision`, `/chat/ensure`)
+- feat: resizable chat widget with Matrix OIDC init and unread counts
+- feat: `ConversationList` with SpaceTree, tab filtering (Alle/Spaces/DMs/Ungelesen)
+- feat: add `InviteCode` model to Prisma schema for invite tracking
+- chore: publisher form resend invite improvements
+
 ## v2026.03.26.5
 
 ### Dashboard vault unseal guide + matrix-admin vault integration (#233)
