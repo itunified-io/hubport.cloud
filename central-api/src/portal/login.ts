@@ -32,8 +32,7 @@ async function getOidcConfig(): Promise<client.Configuration> {
     new URL(issuer),
     getClientId(),
     secret || undefined,
-    undefined,
-    secret ? undefined : { token_endpoint_auth_method: 'none' },
+    secret ? undefined : client.None(),
   );
   return oidcConfig;
 }
