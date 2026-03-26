@@ -32,14 +32,13 @@ interface IncomingRequest {
   requester: { id: string; name: string; subdomain: string };
 }
 
-type SharingCategory = "speakers" | "territories" | "talks";
+type SharingCategory = "speakers" | "territories";
 
-const ALL_CATEGORIES: SharingCategory[] = ["speakers", "territories", "talks"];
+const ALL_CATEGORIES: SharingCategory[] = ["speakers", "territories"];
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   speakers: Users,
   territories: Map,
-  talks: Mic,
 };
 
 // ─── Main Component ───────────────────────────────────────────────────
@@ -717,7 +716,6 @@ function ApproveRequestDialog({
 const CATEGORY_ROLES: Record<string, { labelId: string }> = {
   speakers: { labelId: "sharing.visibility.who.speakers" },
   territories: { labelId: "sharing.visibility.who.territories" },
-  talks: { labelId: "sharing.visibility.who.talks" },
 };
 
 function VisibilitySettings({

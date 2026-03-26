@@ -556,6 +556,7 @@ model SpeakerTalk {
   speaker      Speaker    @relation(fields: [speakerId], references: [id], onDelete: Cascade)
   publicTalkId String
   publicTalk   PublicTalk @relation(fields: [publicTalkId], references: [id], onDelete: Cascade)
+  muted        Boolean    @default(false) /// Speaker can temporarily mute a talk (not available for scheduling)
 
   @@unique([speakerId, publicTalkId])
   @@index([speakerId])
@@ -788,8 +789,8 @@ model CampaignInvite {
 model SharingVisibility {
   id        String   @id @default(uuid())
   partnerId String   // The sharing partner's tenantId (from central-api)
-  category  String   // "speakers" | "territories" | "talks"
-  minRole   String   // Minimum role: "publisher" | "elder" | "admin"
+  category  String   // "speakers" | "territories"
+  minRole   String   // "enabled" | "disabled"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

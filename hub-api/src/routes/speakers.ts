@@ -3,11 +3,11 @@
  * Includes talk assignment and CSV import for manual guest speakers.
  */
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { audit } from "../lib/policy-engine.js";
+import { audit, buildContext } from "../lib/policy-engine.js";
 import prisma from "../lib/prisma.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
@@ -169,34 +169,18 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Speaker Self-Service ────────────────────────────────────────────
 
-  // GET /speakers/me — get own speaker profile + talks
+  // GET /speakers/me — get own speaker profile + talks (auto-provisions if user has privilege:publicTalk)
   app.get(
     "/speakers/me",
     async (request, reply) => {
       const sub = (request as any).user?.sub;
       if (!sub) return reply.code(401).send({ error: "Not authenticated" });
 
-      const publisher = await prisma.publisher.findFirst({ where: { keycloakSub: sub }, select: { id: true } });
-      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
-
-      const speaker = await prisma.speaker.findFirst({
-        where: { publisherId: publisher.id },
-        include: {
-          talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
-        },
-      });
-      if (!speaker) return reply.code(404).send({ error: "No speaker profile linked" });
-
-      return speaker;
-    },
-  );
-
-  // POST /speakers/me — self-register as a speaker
-  app.post(
-    "/speakers/me",
-    async (request, reply) => {
-      const sub = (request as any).user?.sub;
-      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+      // Check if user has the publicTalk privilege via policy engine
+      const ctx = await buildContext(request as unknown as FastifyRequest);
+      const hasPublicTalkRole = ctx.effectivePermissions.includes(PERMISSIONS.PRIVILEGE_PUBLIC_TALK)
+        || ctx.effectivePermissions.includes(PERMISSIONS.WILDCARD);
+      if (!hasPublicTalkRole) return reply.code(403).send({ error: "Public Talk role required" });
 
       const publisher = await prisma.publisher.findFirst({
         where: { keycloakSub: sub },
@@ -204,28 +188,30 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
       });
       if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
 
-      // Idempotent: return existing speaker if already registered
-      const existing = await prisma.speaker.findFirst({
+      // Find existing speaker or auto-provision
+      let speaker = await prisma.speaker.findFirst({
         where: { publisherId: publisher.id },
         include: {
           talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
         },
       });
-      if (existing) return existing;
 
-      const speaker = await prisma.speaker.create({
-        data: {
-          firstName: publisher.firstName || "",
-          lastName: publisher.lastName || "",
-          publisherId: publisher.id,
-          isLocal: true,
-          source: "local",
-          status: "active",
-        },
-        include: {
-          talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
-        },
-      });
+      if (!speaker) {
+        // Auto-create Speaker for users with publicTalk privilege
+        speaker = await prisma.speaker.create({
+          data: {
+            firstName: publisher.firstName || "",
+            lastName: publisher.lastName || "",
+            publisherId: publisher.id,
+            isLocal: true,
+            source: "local",
+            status: "active",
+          },
+          include: {
+            talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
+          },
+        });
+      }
 
       return speaker;
     },
@@ -269,6 +255,36 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
         where: { id: speaker.id },
         include: { talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } } },
       });
+    },
+  );
+
+  // PUT /speakers/me/talks/:talkId/mute — toggle muted state for a talk
+  app.put(
+    "/speakers/me/talks/:talkId/mute",
+    async (request, reply) => {
+      const sub = (request as any).user?.sub;
+      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+
+      const { talkId } = request.params as { talkId: string };
+
+      const publisher = await prisma.publisher.findFirst({ where: { keycloakSub: sub }, select: { id: true } });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+
+      const speaker = await prisma.speaker.findFirst({ where: { publisherId: publisher.id }, select: { id: true } });
+      if (!speaker) return reply.code(404).send({ error: "No speaker profile linked" });
+
+      const speakerTalk = await prisma.speakerTalk.findFirst({
+        where: { id: talkId, speakerId: speaker.id },
+      });
+      if (!speakerTalk) return reply.code(404).send({ error: "Talk not found" });
+
+      const updated = await prisma.speakerTalk.update({
+        where: { id: talkId },
+        data: { muted: !speakerTalk.muted },
+        include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } },
+      });
+
+      return updated;
     },
   );
 

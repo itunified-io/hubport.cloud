@@ -104,8 +104,8 @@ model SharingApproval {
   approverId            String
   status                SharingStatus @default(PENDING)
 
-  // What the requester offers to share (JSON array: ["speakers","territories","talks"])
-  offeredCategories     Json          @default("[\"speakers\",\"territories\",\"talks\"]")
+  // What the requester offers to share (JSON array: ["speakers","territories"])
+  offeredCategories     Json          @default("[\"speakers\",\"territories\"]")
   // What the approver accepts (subset of offered, set on approval)
   acceptedCategories    Json?
 

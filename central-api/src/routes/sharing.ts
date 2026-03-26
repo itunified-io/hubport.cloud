@@ -3,7 +3,7 @@ import { Type } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma.js';
 import { apiTokenAuth } from '../middleware/api-token-auth.js';
 
-const VALID_CATEGORIES = ['speakers', 'territories', 'talks'] as const;
+const VALID_CATEGORIES = ['speakers', 'territories'] as const;
 
 const RequestBody = Type.Object({
   partnerSubdomain: Type.String({ minLength: 3, maxLength: 63 }),
@@ -64,7 +64,7 @@ export async function sharingRoutes(app: FastifyInstance) {
 
     const offered = validateCategories(body.offeredCategories);
     if (offered.length === 0) {
-      return reply.status(400).send({ error: 'At least one valid category required (speakers, territories, talks)' });
+      return reply.status(400).send({ error: 'At least one valid category required (speakers, territories)' });
     }
 
     // Look up the partner tenant
@@ -166,15 +166,15 @@ export async function sharingRoutes(app: FastifyInstance) {
       where: { requesterId_approverId: { requesterId, approverId } },
       update: {
         status: 'APPROVED',
-        acceptedCategories: ['speakers', 'territories', 'talks'],
+        acceptedCategories: ['speakers', 'territories'],
         respondedAt: new Date(),
       },
       create: {
         requesterId,
         approverId,
         status: 'APPROVED',
-        offeredCategories: ['speakers', 'territories', 'talks'],
-        acceptedCategories: ['speakers', 'territories', 'talks'],
+        offeredCategories: ['speakers', 'territories'],
+        acceptedCategories: ['speakers', 'territories'],
         respondedAt: new Date(),
       },
     });

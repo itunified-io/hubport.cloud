@@ -16,7 +16,6 @@ const TENANT_ID = process.env.HUBPORT_TENANT_ID || "";
 /** Default: all categories enabled. "disabled" = not shared with partner. */
 const DEFAULT_VISIBILITY: Record<string, string> = {
   territories: "enabled",
-  talks: "enabled",
   speakers: "enabled",
 };
 
@@ -106,7 +105,7 @@ export async function sharingRoutes(app: FastifyInstance) {
       if (!body.subdomain) return reply.code(400).send({ error: "subdomain is required" });
 
       const headers = await centralHeaders();
-      const categories = body.offeredCategories || ["speakers", "territories", "talks"];
+      const categories = body.offeredCategories || ["speakers", "territories"];
       const contactName = getUserDisplayName(request as unknown as { user?: Record<string, unknown> });
       const contactEmail = getUserEmail(request as unknown as { user?: Record<string, unknown> });
 
@@ -267,7 +266,6 @@ export async function sharingRoutes(app: FastifyInstance) {
   // determined by existing AppRole permissions:
   //   territories → users with territories.view (service overseer, territory servant)
   //   speakers    → users with speakers.view (public talk planner)
-  //   talks       → users with public_talks.view (public talk planner)
   //   publishers without these permissions see nothing from partners.
 
   // GET /sharing/partners/:partnerId/visibility — get per-category toggles
@@ -283,7 +281,7 @@ export async function sharingRoutes(app: FastifyInstance) {
 
       // Default: all categories enabled
       const result: Record<string, string> = {};
-      for (const cat of ["speakers", "territories", "talks"]) {
+      for (const cat of ["speakers", "territories"]) {
         const row = rows.find((r: { category: string; minRole: string }) => r.category === cat);
         result[cat] = row?.minRole === "disabled" ? "disabled" : "enabled";
       }
@@ -300,7 +298,7 @@ export async function sharingRoutes(app: FastifyInstance) {
       const { partnerId } = request.params as { partnerId: string };
       const body = request.body as Record<string, string>;
       const validValues = ["enabled", "disabled"];
-      const validCategories = ["speakers", "territories", "talks"];
+      const validCategories = ["speakers", "territories"];
 
       for (const [cat, value] of Object.entries(body)) {
         if (validCategories.includes(cat) && validValues.includes(value)) {

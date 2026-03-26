@@ -1,11 +1,13 @@
 /**
  * Speaker self-service: manage own talks and sharing preferences.
- * Only rendered when the current user has a linked Speaker record.
+ * Only visible to users with the "Public Talk" AppRole (privilege:publicTalk).
+ * Auto-provisions a Speaker record via GET /speakers/me when the role is granted.
  */
 import { useState, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { Mic, Plus, X, Phone, Mail, Calendar, Hash } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
 
 interface PublicTalk {
@@ -15,6 +17,8 @@ interface PublicTalk {
 }
 
 interface SpeakerTalk {
+  id: string;
+  muted: boolean;
   publicTalk: PublicTalk;
 }
 
@@ -31,6 +35,7 @@ interface SpeakerProfile {
 
 export function SpeakerTalksSection() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const intl = useIntl();
   const [speaker, setSpeaker] = useState<SpeakerProfile | null>(null);
   const [allTalks, setAllTalks] = useState<PublicTalk[]>([]);
@@ -38,17 +43,24 @@ export function SpeakerTalksSection() {
   const [saving, setSaving] = useState(false);
   const [showAddTalk, setShowAddTalk] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [monthlyInviteCap, setMonthlyInviteCap] = useState(2);
   const [sharingPrefs, setSharingPrefs] = useState({
     sharePhone: false,
     shareEmail: false,
     shareAvailability: true,
-    monthlyInviteCap: 4,
   });
+
+  // RBAC gate: only show for users with privilege:publicTalk
+  const hasPublicTalkRole = can("privilege:publicTalk");
 
   const apiUrl = getApiUrl();
   const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
 
   useEffect(() => {
+    if (!hasPublicTalkRole) {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const [speakerRes, talksRes] = await Promise.all([
@@ -59,11 +71,11 @@ export function SpeakerTalksSection() {
         if (speakerRes.ok) {
           const data = (await speakerRes.json()) as SpeakerProfile;
           setSpeaker(data);
+          setMonthlyInviteCap(data.monthlyInviteCap);
           setSharingPrefs({
             sharePhone: data.sharePhone,
             shareEmail: data.shareEmail,
             shareAvailability: data.shareAvailability,
-            monthlyInviteCap: data.monthlyInviteCap,
           });
         }
 
@@ -75,52 +87,10 @@ export function SpeakerTalksSection() {
       }
     };
     load();
-  }, [user?.access_token]);
+  }, [user?.access_token, hasPublicTalkRole]);
 
-  const registerAsSpeaker = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${apiUrl}/speakers/me`, {
-        method: "POST",
-        headers,
-      });
-      if (res.ok) {
-        const data = (await res.json()) as SpeakerProfile;
-        setSpeaker(data);
-        setSharingPrefs({
-          sharePhone: data.sharePhone,
-          shareEmail: data.shareEmail,
-          shareAvailability: data.shareAvailability,
-          monthlyInviteCap: data.monthlyInviteCap,
-        });
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return null;
-
-  if (!speaker) {
-    return (
-      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
-        <h2 className="text-sm font-medium text-[var(--text)] flex items-center gap-2">
-          <Mic size={14} />
-          <FormattedMessage id="speaker.register" />
-        </h2>
-        <p className="text-sm text-[var(--text-muted)]">
-          <FormattedMessage id="speaker.register.hint" />
-        </p>
-        <button
-          onClick={registerAsSpeaker}
-          disabled={saving}
-          className="px-4 py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
-        >
-          {saving ? "..." : <FormattedMessage id="speaker.register.button" />}
-        </button>
-      </div>
-    );
-  }
+  // Not a public speaker — hide section entirely
+  if (!hasPublicTalkRole || loading || !speaker) return null;
 
   const myTalkNumbers = new Set(speaker.talks.map((t) => t.publicTalk.talkNumber));
 
@@ -169,17 +139,42 @@ export function SpeakerTalksSection() {
     }
   };
 
-  const saveSharingPrefs = async () => {
+  const toggleMute = async (speakerTalkId: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiUrl}/speakers/me/talks/${speakerTalkId}/mute`, {
+        method: "PUT",
+        headers,
+      });
+      if (res.ok) {
+        const updated = (await res.json()) as SpeakerTalk;
+        setSpeaker((prev) =>
+          prev
+            ? { ...prev, talks: prev.talks.map((t) => (t.id === updated.id ? updated : t)) }
+            : prev,
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveSettings = async () => {
     setSaving(true);
     try {
       const res = await fetch(`${apiUrl}/speakers/me/sharing`, {
         method: "PUT",
         headers,
-        body: JSON.stringify(sharingPrefs),
+        body: JSON.stringify({ ...sharingPrefs, monthlyInviteCap }),
       });
       if (res.ok) {
-        const updated = (await res.json()) as typeof sharingPrefs;
-        setSharingPrefs(updated);
+        const updated = (await res.json()) as SpeakerProfile;
+        setMonthlyInviteCap(updated.monthlyInviteCap);
+        setSharingPrefs({
+          sharePhone: updated.sharePhone,
+          shareEmail: updated.shareEmail,
+          shareAvailability: updated.shareAvailability,
+        });
       }
     } finally {
       setSaving(false);
@@ -188,7 +183,7 @@ export function SpeakerTalksSection() {
 
   return (
     <>
-      {/* My Talks */}
+      {/* Speaker Section: Availability + Talks */}
       <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-[var(--text)] flex items-center gap-2">
@@ -204,6 +199,29 @@ export function SpeakerTalksSection() {
           </button>
         </div>
 
+        {/* Monthly availability */}
+        <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-2)] rounded-[var(--radius-sm)]">
+          <span className="text-sm text-[var(--text-muted)]">
+            <FormattedMessage id="speaker.monthlyAvailability" />
+          </span>
+          <div className="flex items-center gap-2">
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                onClick={() => setMonthlyInviteCap(n)}
+                className={`w-8 h-8 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  monthlyInviteCap === n
+                    ? "bg-[var(--amber)] text-black"
+                    : "bg-[var(--glass-1)] text-[var(--text-muted)] hover:bg-[var(--glass-2)]"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Talk list with mute toggles */}
         {speaker.talks.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">
             <FormattedMessage id="speaker.noTalks" />
@@ -214,22 +232,47 @@ export function SpeakerTalksSection() {
               .sort((a, b) => a.publicTalk.talkNumber - b.publicTalk.talkNumber)
               .map((t) => (
                 <div
-                  key={t.publicTalk.id}
-                  className="flex items-center justify-between px-3 py-2 bg-[var(--bg-2)] rounded-[var(--radius-sm)]"
+                  key={t.id}
+                  className={`flex items-center justify-between px-3 py-2 bg-[var(--bg-2)] rounded-[var(--radius-sm)] transition-opacity ${
+                    t.muted ? "opacity-50" : ""
+                  }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="shrink-0 w-8 text-xs font-mono text-[var(--amber)]">
                       #{t.publicTalk.talkNumber}
                     </span>
-                    <span className="text-sm text-[var(--text)] truncate">{t.publicTalk.title}</span>
+                    <span className={`text-sm truncate ${t.muted ? "text-[var(--text-muted)] line-through" : "text-[var(--text)]"}`}>
+                      {t.publicTalk.title}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => removeTalk(t.publicTalk.talkNumber)}
-                    disabled={saving}
-                    className="shrink-0 p-1 text-[var(--text-muted)] hover:text-[var(--red)] transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    <X size={14} />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Mute toggle */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!t.muted}
+                      disabled={saving}
+                      onClick={() => toggleMute(t.id)}
+                      title={intl.formatMessage({ id: t.muted ? "speaker.unmuteTalk" : "speaker.muteTalk" })}
+                      className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+                        !t.muted ? "bg-[var(--amber)]" : "bg-[var(--glass-2)]"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          !t.muted ? "translate-x-4" : ""
+                        }`}
+                      />
+                    </button>
+                    {/* Remove */}
+                    <button
+                      onClick={() => removeTalk(t.publicTalk.talkNumber)}
+                      disabled={saving}
+                      className="p-1 text-[var(--text-muted)] hover:text-[var(--red)] transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 </div>
               ))}
           </div>
@@ -293,7 +336,7 @@ export function SpeakerTalksSection() {
                 role="switch"
                 aria-checked={sharingPrefs[key]}
                 onClick={() => setSharingPrefs((p) => ({ ...p, [key]: !p[key] }))}
-                className={`relative w-9 h-5 rounded-full transition-colors ${
+                className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${
                   sharingPrefs[key] ? "bg-[var(--amber)]" : "bg-[var(--glass-2)]"
                 }`}
               >
@@ -305,26 +348,10 @@ export function SpeakerTalksSection() {
               </button>
             </label>
           ))}
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-muted)]">
-              <FormattedMessage id="speaker.monthlyInviteCap" />
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={sharingPrefs.monthlyInviteCap}
-              onChange={(e) =>
-                setSharingPrefs((p) => ({ ...p, monthlyInviteCap: parseInt(e.target.value) || 4 }))
-              }
-              className="w-16 px-2 py-1 text-sm text-center bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-            />
-          </div>
         </div>
 
         <button
-          onClick={saveSharingPrefs}
+          onClick={saveSettings}
           disabled={saving}
           className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
         >
