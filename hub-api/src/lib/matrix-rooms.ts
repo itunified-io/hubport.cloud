@@ -96,6 +96,7 @@ export interface ProvisionedSpace {
  */
 export async function provisionDefaultSpaces(): Promise<ProvisionedSpace[]> {
   const result: ProvisionedSpace[] = [];
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   for (const spaceDef of DEFAULT_SPACES) {
     const spaceId = await createRoom({
@@ -103,6 +104,7 @@ export async function provisionDefaultSpaces(): Promise<ProvisionedSpace[]> {
       topic: spaceDef.topic,
       isSpace: true,
     });
+    await delay(500); // Avoid Synapse 429 rate limits
 
     const rooms: ProvisionedSpace["rooms"] = [];
 
@@ -114,6 +116,7 @@ export async function provisionDefaultSpaces(): Promise<ProvisionedSpace[]> {
       });
 
       await addRoomToSpace(spaceId, roomId);
+      await delay(500); // Avoid Synapse 429 rate limits
 
       rooms.push({
         roomId,
@@ -138,13 +141,16 @@ export async function joinPublisherToRooms(
   congregationRole: string,
   provisionedSpaces: ProvisionedSpace[],
 ): Promise<void> {
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
   for (const space of provisionedSpaces) {
     // Join the space itself
     await joinUserToRoom(space.spaceId, matrixUserId).catch(() => {});
+    await delay(300);
 
     for (const room of space.rooms) {
       if (shouldJoinRoom(room.requiredRole, publisherRoles, congregationRole)) {
         await joinUserToRoom(room.roomId, matrixUserId).catch(() => {});
+        await delay(300);
       }
     }
   }
