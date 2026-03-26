@@ -22,7 +22,7 @@ export async function sharingRoutes(app: FastifyInstance) {
       select: { id: true, name: true, subdomain: true, status: true },
     });
 
-    if (!tenant || tenant.status !== 'ACTIVE') {
+    if (!tenant || !['APPROVED', 'ACTIVE'].includes(tenant.status)) {
       return reply.status(404).send({ error: 'Tenant not found or not active' });
     }
 
@@ -40,7 +40,7 @@ export async function sharingRoutes(app: FastifyInstance) {
       select: { id: true, name: true, subdomain: true, status: true },
     });
 
-    if (!partner || partner.status !== 'ACTIVE') {
+    if (!partner || !['APPROVED', 'ACTIVE'].includes(partner.status)) {
       return reply.status(404).send({ error: 'Partner tenant not found or not active' });
     }
 

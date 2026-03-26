@@ -21,6 +21,7 @@ if [ -d "/app/hub-app/dist" ]; then
     CHAT_URL="https://chat-${WEBAUTHN_RP_ID}"
     JITSI_URL="${JITSI_URL:-https://meet-${WEBAUTHN_RP_ID}}"
   fi
+  VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "dev")
   cat > /app/hub-app/dist/runtime-config.js << EOF
 window.__HUBPORT_CONFIG__ = {
   keycloakUrl: "${KC_BROWSER_URL}",
@@ -29,7 +30,8 @@ window.__HUBPORT_CONFIG__ = {
   apiUrl: "${HUB_API_URL:-http://localhost:3001}",
   rpId: "${WEBAUTHN_RP_ID:-}",
   chatUrl: "${CHAT_URL}",
-  jitsiUrl: "${JITSI_URL}"
+  jitsiUrl: "${JITSI_URL}",
+  version: "${VERSION}"
 };
 EOF
   # Inject runtime-config.js script tag if Vite stripped it during build

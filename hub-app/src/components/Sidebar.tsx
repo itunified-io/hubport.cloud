@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
+import { getAppVersion } from "@/lib/config";
 
 interface NavItem {
   to: string;
@@ -46,7 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/settings", labelId: "nav.settings", icon: SettingsIcon, requiredPermission: "app:settings.view" },
 ];
 
-const APP_VERSION = "2026.03.24.23";
+const APP_VERSION = getAppVersion();
 
 interface SidebarProps {
   onNavigate?: () => void;

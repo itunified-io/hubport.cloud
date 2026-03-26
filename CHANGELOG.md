@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.2
+
+### Fix: Sharing resolve rejects APPROVED tenants + dynamic version display (#227)
+- fix: sharing resolve/request endpoints now accept both `APPROVED` and `ACTIVE` tenant statuses (was `ACTIVE` only — UAT tenants are `APPROVED`)
+- feat: dynamic version display via `runtime-config.js` — sidebar reads version from `window.__HUBPORT_CONFIG__` at container startup instead of hardcoded constant
+- chore: `docker-entrypoint.sh` injects `version` from `package.json` into runtime config
+- chore: add `getAppVersion()` to `hub-app/src/lib/config.ts`
+
 ## v2026.03.26.1
 
 ### Fix: Sharing routes return 401 — missing from API_PREFIXES + API token provisioning (#227)
