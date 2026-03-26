@@ -9,12 +9,12 @@
 import { getSynapseAdminPassword, getSynapseRegistrationSecret } from './vault-client.js';
 
 /** Retry-aware fetch — backs off on 429 rate limits from Synapse. */
-async function matrixFetch(url: string, init: RequestInit, maxRetries = 3): Promise<Response> {
+async function matrixFetch(url: string, init: RequestInit, maxRetries = 6): Promise<Response> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await fetch(url, init);
     if (res.status !== 429 || attempt === maxRetries) return res;
     const body = await res.json().catch(() => ({} as Record<string, unknown>)) as { retry_after_ms?: number };
-    const waitMs = body.retry_after_ms ?? (1000 * (attempt + 1));
+    const waitMs = body.retry_after_ms ?? (2000 * (attempt + 1));
     await new Promise((r) => setTimeout(r, waitMs));
   }
   // unreachable, but TypeScript needs it
