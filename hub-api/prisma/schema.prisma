@@ -175,6 +175,7 @@ model Publisher {
   assistedParts      MeetingAssignment[] @relation("AssistedParts")
   awayPeriods        AwayPeriod[]
   speaker            Speaker?            @relation("PublisherSpeaker")
+  notifications      Notification[]
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -590,6 +591,7 @@ model PublicTalkSchedule {
   declinedAt    DateTime?
   cancelledAt   DateTime?
   notes         String?
+  centralInvitationId String?   /// Links to central-api TalkInvitation for cross-tenant invites
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -741,6 +743,33 @@ model ChatSettings {
   dmsEnabled   Boolean  @default(true)
   callsEnabled Boolean  @default(true)
   updatedAt    DateTime @updatedAt
+}
+
+/// Persists provisioned Matrix space/room IDs for the tenant.
+/// Used by matrix-provisioning.ts to ensure idempotent space creation.
+model MatrixSpaceConfig {
+  id        String   @id @default(uuid())
+  spaceId   String   /// Matrix room ID of the space
+  spaceName String   @unique /// "Versammlung" or "Dienste"
+  rooms     Json     /// [{ roomId, name, requiredRole }]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// In-app notifications (invitation status changes, etc.)
+model Notification {
+  id          String    @id @default(uuid())
+  publisherId String
+  type        String    /// "invitation_received", "invitation_approved", etc.
+  title       String
+  body        String
+  data        Json?     /// { invitationId, partnerId, ... }
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+
+  @@index([publisherId, readAt])
 }
 
 enum CampaignTemplate {

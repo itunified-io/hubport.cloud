@@ -188,6 +188,13 @@ export function sendTypingNotification(
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
+/** Cached set of DM room IDs from m.direct account data */
+function getDmRoomIds(): Set<string> {
+  if (!client) return new Set();
+  const directRooms = (client.getAccountData("m.direct" as any) as any)?.getContent() ?? {};
+  return new Set(Object.values(directRooms).flat() as string[]);
+}
+
 function roomToChatRoom(room: Room): ChatRoom {
   const timeline = room.timeline.filter((e) => e.getType() === "m.room.message");
   const lastEvent = timeline[timeline.length - 1];
@@ -200,7 +207,7 @@ function roomToChatRoom(room: Room): ChatRoom {
       .getStateEvents("m.room.topic", "")
       ?.getContent()?.topic,
     isSpace: room.isSpaceRoom(),
-    isDirect: false, // Caller determines this
+    isDirect: getDmRoomIds().has(room.roomId),
     unreadCount: (room as any).getUnreadNotificationCount?.("total") ?? 0,
     lastMessage: lastEvent ? eventToMessage(lastEvent) : undefined,
     memberCount: room.getJoinedMemberCount(),

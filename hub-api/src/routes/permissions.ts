@@ -5,6 +5,7 @@ import { requirePermission } from "../lib/rbac.js";
 import { getPageVisibility, audit } from "../lib/policy-engine.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { seedSystemRoles } from "../lib/seed-roles.js";
+import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
 
 const IdParams = Type.Object({ id: Type.String({ format: "uuid" }) });
 type IdParamsType = Static<typeof IdParams>;
@@ -206,6 +207,9 @@ export async function permissionRoutes(app: FastifyInstance): Promise<void> {
         { roleId: role.id, roleName: role.name, publisherId: request.body.publisherId },
       );
 
+      // Sync Matrix room memberships after role change (non-fatal)
+      syncPublisherRoomMemberships(request.body.publisherId).catch(() => {});
+
       return reply.code(201).send(member);
     },
   );
@@ -237,6 +241,9 @@ export async function permissionRoutes(app: FastifyInstance): Promise<void> {
         undefined,
         { roleId: request.params.id, publisherId: request.params.publisherId },
       );
+
+      // Sync Matrix room memberships after role removal (non-fatal)
+      syncPublisherRoomMemberships(request.params.publisherId).catch(() => {});
 
       return reply.code(204).send();
     },

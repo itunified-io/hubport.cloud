@@ -26,6 +26,7 @@ import { speakerRoutes } from "./routes/speakers.js";
 import { publicTalkRoutes } from "./routes/public-talks.js";
 import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
 import { awayPeriodRoutes } from "./routes/away-periods.js";
+import { chatRoutes } from "./routes/chat.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
@@ -90,6 +91,7 @@ async function start(): Promise<void> {
   await app.register(publicTalkRoutes);
   await app.register(congregationSettingsRoutes);
   await app.register(awayPeriodRoutes);
+  await app.register(chatRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {

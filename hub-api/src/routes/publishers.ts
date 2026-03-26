@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { maskFields, audit } from "../lib/policy-engine.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
 
 const PublisherBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
@@ -167,6 +168,11 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
         existing,
         publisher,
       );
+
+      // If congregationRole changed, sync Matrix room memberships
+      if (existing.congregationRole !== publisher.congregationRole) {
+        syncPublisherRoomMemberships(publisher.id).catch(() => {});
+      }
 
       return publisher;
     },

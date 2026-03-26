@@ -356,15 +356,24 @@ export function PublisherForm() {
   };
 
   // ─── Resend invite ────────────────────────────────────────────
+  const [resendError, setResendError] = useState<string | null>(null);
   const resendInvite = async () => {
     if (!id || !email) return;
     setResending(true);
     setResendSuccess(false);
+    setResendError(null);
     try {
       const res = await fetch(`${apiUrl}/users/${id}/resend-invite`, {
         method: "POST", headers,
       });
-      if (res.ok) setResendSuccess(true);
+      if (res.ok) {
+        setResendSuccess(true);
+      } else {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        setResendError(data.error || `Fehler: ${res.status}`);
+      }
+    } catch (err) {
+      setResendError("Netzwerkfehler — bitte erneut versuchen");
     } finally {
       setResending(false);
     }
@@ -491,6 +500,9 @@ export function PublisherForm() {
                       : <FormattedMessage id="publishers.resendInvite" />
                     }
                   </button>
+                )}
+                {resendError && (
+                  <span className="text-xs text-[var(--red)]">{resendError}</span>
                 )}
               </>
             )}

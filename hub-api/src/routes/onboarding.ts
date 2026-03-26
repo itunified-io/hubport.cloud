@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { createHash } from "node:crypto";
 import prisma from "../lib/prisma.js";
 import { audit } from "../lib/policy-engine.js";
+import { provisionMatrixUserForPublisher } from "../lib/matrix-provisioning.js";
 import { createInvitedKeycloakUser, deleteKeycloakUser } from "../lib/keycloak-admin.js";
 import {
   generateOnboardingToken,
@@ -317,6 +318,13 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       addressVisibility: body.addressVisibility,
       notesVisibility: body.notesVisibility,
     });
+
+    // Provision Matrix user + join to spaces (non-fatal — chat failure must not block onboarding)
+    try {
+      await provisionMatrixUserForPublisher(publisher);
+    } catch (err) {
+      app.log.warn({ err }, "Matrix provisioning failed during onboarding — will retry on next chat access");
+    }
 
     return reply.send({ ok: true, redirectUrl: "/" });
   });

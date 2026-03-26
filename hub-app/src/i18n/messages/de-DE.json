@@ -276,6 +276,11 @@
   "nav.chat": "Chat",
   "chat.notConfigured": "Chat ist für diesen Hub nicht konfiguriert.",
   "chat.openExternal": "In neuem Tab öffnen",
+  "chat.dm.new": "Neue Nachricht",
+  "chat.dm.picker.title": "Neue Nachricht",
+  "chat.dm.picker.search": "Suchen...",
+  "chat.dm.picker.empty": "Keine Personen gefunden",
+  "chat.spaces.private": "Privater Raum",
 
   "cleaning.title": "Reinigungsdienst",
   "cleaning.empty": "Noch keine Reinigungs- oder Gartenpflege konfiguriert.",

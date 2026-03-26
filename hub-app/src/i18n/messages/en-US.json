@@ -274,6 +274,11 @@
   "nav.chat": "Chat",
   "chat.notConfigured": "Chat is not configured for this hub.",
   "chat.openExternal": "Open in new tab",
+  "chat.dm.new": "New message",
+  "chat.dm.picker.title": "New message",
+  "chat.dm.picker.search": "Search...",
+  "chat.dm.picker.empty": "No people found",
+  "chat.spaces.private": "Private room",
 
   "cleaning.title": "Cleaning Duties",
   "cleaning.empty": "No cleaning or garden duties configured yet.",

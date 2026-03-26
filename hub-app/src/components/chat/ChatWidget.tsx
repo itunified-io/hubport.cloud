@@ -3,8 +3,8 @@
  * States: collapsed (bubble), expanded (conversation list), thread (messages).
  * Full-screen overlay on mobile (< 768px).
  */
-import { useState, useEffect, useCallback } from "react";
-import { MessageCircle, X, Minimize2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { MessageCircle, X, Minimize2, GripVertical } from "lucide-react";
 import { ConversationList } from "./ConversationList";
 import { MessageThread } from "./MessageThread";
 import {
@@ -27,6 +27,47 @@ export function ChatWidget() {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [matrixReady, setMatrixReady] = useState(false);
 
+  // Resizable dimensions — persisted in localStorage
+  const [size, setSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem("hubport:chat-size");
+      if (saved) return JSON.parse(saved) as { w: number; h: number };
+    } catch { /* ignore */ }
+    return { w: 420, h: 520 };
+  });
+  const resizing = useRef(false);
+  const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+    resizeStart.current = { x: e.clientX, y: e.clientY, w: size.w, h: size.h };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      // Dragging top-left corner: moving left increases width, moving up increases height
+      const dw = resizeStart.current.x - ev.clientX;
+      const dh = resizeStart.current.y - ev.clientY;
+      const newW = Math.max(340, Math.min(800, resizeStart.current.w + dw));
+      const newH = Math.max(400, Math.min(900, resizeStart.current.h + dh));
+      setSize({ w: newW, h: newH });
+    };
+
+    const onUp = () => {
+      resizing.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      // Persist
+      setSize((s) => {
+        localStorage.setItem("hubport:chat-size", JSON.stringify(s));
+        return s;
+      });
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [size]);
+
   // Get Matrix homeserver URL from runtime config
   const config = (window as any).__HUBPORT_CONFIG__;
   const matrixUrl = config?.chatUrl
@@ -45,12 +86,21 @@ export function ChatWidget() {
     return () => window.removeEventListener("hubport:toggle-chat", handler);
   }, []);
 
-  // Init Matrix client
+  // Init Matrix client + ensure Matrix user exists
   useEffect(() => {
     if (!matrixUrl || !accessToken) return;
 
+    // Ensure Matrix user is provisioned (lazy — creates account if missing)
+    const config = (window as any).__HUBPORT_CONFIG__;
+    const apiUrl = config?.apiUrl || "";
+    if (apiUrl) {
+      fetch(`${apiUrl}/chat/ensure`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {}); // Non-fatal
+    }
+
     // Matrix SSO: exchange OIDC token for Matrix access token
-    // For now, use the Keycloak access token directly (Synapse OIDC handles this)
     initMatrixClient(matrixUrl, accessToken, userId ?? "")
       .then(() => setMatrixReady(true))
       .catch((err) => console.warn("[chat] Matrix init failed:", err));
@@ -121,11 +171,10 @@ export function ChatWidget() {
   return (
     <div
       className={`fixed z-50 flex flex-col ${
-        isMobile
-          ? "inset-0"
-          : "bottom-0 right-6 w-[400px] max-h-[600px]"
+        isMobile ? "inset-0" : "bottom-0 right-6"
       }`}
       style={{
+        ...(!isMobile && { width: size.w, height: size.h }),
         borderRadius: isMobile ? 0 : "16px 16px 0 0",
         border: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
         background: "rgba(10, 10, 12, 0.97)",
@@ -135,6 +184,16 @@ export function ChatWidget() {
           : "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)",
       }}
     >
+      {/* Resize handle — top-left corner (desktop only) */}
+      {!isMobile && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute -top-1 -left-1 w-5 h-5 cursor-nw-resize z-10 flex items-center justify-center opacity-30 hover:opacity-70 transition-opacity"
+          title="Größe ändern"
+        >
+          <GripVertical size={10} className="text-[var(--text-muted)] rotate-[-45deg]" />
+        </div>
+      )}
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b shrink-0"

@@ -18,17 +18,20 @@ COPY setup-wizard/package*.json ./setup-wizard/
 COPY central-api/package*.json ./central-api/
 RUN npm ci --include=optional \
  && case "$TARGETARCH" in \
-      amd64) ROLLUP_ARCH="x64" ;; \
-      arm64) ROLLUP_ARCH="arm64" ;; \
-      *) echo "Unsupported TARGETARCH for Rollup native package: $TARGETARCH" >&2; exit 1 ;; \
+      amd64) BUILD_ARCH="x64" ;; \
+      arm64) BUILD_ARCH="arm64" ;; \
+      *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
     esac \
- && ROLLUP_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/rollup'].version")" \
  && LIGHTNINGCSS_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/lightningcss'].version")" \
  && TAILWIND_OXIDE_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/@tailwindcss/oxide'].version")" \
- && npm install --no-save \
-      "@rollup/rollup-linux-${ROLLUP_ARCH}-musl@${ROLLUP_VERSION}" \
-      "lightningcss-linux-${ROLLUP_ARCH}-musl@${LIGHTNINGCSS_VERSION}" \
-      "@tailwindcss/oxide-linux-${ROLLUP_ARCH}-musl@${TAILWIND_OXIDE_VERSION}"
+ && ROLLDOWN_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/rolldown']?.version || ''")" \
+ && NATIVE_PKGS="" \
+ && NATIVE_PKGS="$NATIVE_PKGS lightningcss-linux-${BUILD_ARCH}-musl@${LIGHTNINGCSS_VERSION}" \
+ && NATIVE_PKGS="$NATIVE_PKGS @tailwindcss/oxide-linux-${BUILD_ARCH}-musl@${TAILWIND_OXIDE_VERSION}" \
+ && if [ -n "$ROLLDOWN_VERSION" ]; then NATIVE_PKGS="$NATIVE_PKGS @rolldown/binding-linux-${BUILD_ARCH}-musl@${ROLLDOWN_VERSION}"; fi \
+ && ROLLUP_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/rollup']?.version || ''")" \
+ && if [ -n "$ROLLUP_VERSION" ]; then NATIVE_PKGS="$NATIVE_PKGS @rollup/rollup-linux-${BUILD_ARCH}-musl@${ROLLUP_VERSION}"; fi \
+ && npm install --no-save $NATIVE_PKGS
 
 # Copy source and build hub-api (Prisma + TypeScript)
 COPY hub-api/ ./hub-api/

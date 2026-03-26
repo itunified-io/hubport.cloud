@@ -1,6 +1,12 @@
 /**
  * Pre-seeded Matrix spaces and rooms for hubport.cloud tenants.
  * Auto-provisioned on first boot or when a new publisher is approved.
+ *
+ * Space membership is RBAC-controlled:
+ * - Open rooms (requiredRole=null) → all publishers
+ * - "elder" rooms → congregationRole === "elder"
+ * - "elder_or_ms" rooms → elder OR ministerialServant
+ * - AppRole-gated rooms → publisher has the named AppRole (or alias)
  */
 import { createRoom, addRoomToSpace, joinUserToRoom } from "./matrix-admin.js";
 
@@ -16,7 +22,7 @@ interface RoomDefinition {
   name: string;
   topic: string;
   isPrivate: boolean;
-  /** AppRole name required to access. null = all publishers */
+  /** Role key for access control. null = all publishers */
   requiredRole: string | null;
 }
 
@@ -27,6 +33,7 @@ export const DEFAULT_SPACES: SpaceDefinition[] = [
     rooms: [
       { name: "Allgemein", topic: "Allgemeine Ankündigungen und Austausch", isPrivate: false, requiredRole: null },
       { name: "Älteste", topic: "Ältestenschaft — vertraulich", isPrivate: true, requiredRole: "elder" },
+      { name: "Älteste + Dienstamtgehilfen", topic: "Älteste und Dienstamtgehilfen — vertraulich", isPrivate: true, requiredRole: "elder_or_ms" },
       { name: "Predigtdienst", topic: "Predigtdienst-Koordination", isPrivate: false, requiredRole: null },
     ],
   },
@@ -42,9 +49,42 @@ export const DEFAULT_SPACES: SpaceDefinition[] = [
   },
 ];
 
+/**
+ * Maps a room's requiredRole to all AppRole names that grant access.
+ * Allows e.g. "Cleaning Responsible" room to include all cleaning sub-roles.
+ */
+export const ROOM_ROLE_ALIASES: Record<string, string[]> = {
+  "Technik": ["Technik", "Technik Responsible"],
+  "Ordnungsdienst": ["Ordnungsdienst"],
+  "Cleaning Responsible": ["Cleaning Responsible", "Grundreinigung", "Sichtreinigung"],
+};
+
+// ─── Access Check ───────────────────────────────────────────────────
+
+/**
+ * Check if a publisher should be in a room based on the room's requiredRole.
+ */
+export function shouldJoinRoom(
+  requiredRole: string | null,
+  publisherRoles: string[],
+  congregationRole: string,
+): boolean {
+  if (requiredRole === null) return true;
+  if (requiredRole === "elder") return congregationRole === "elder";
+  if (requiredRole === "elder_or_ms") {
+    return congregationRole === "elder" || congregationRole === "ministerialServant";
+  }
+  // Check AppRole name match (including aliases)
+  const aliases = ROOM_ROLE_ALIASES[requiredRole];
+  if (aliases) {
+    return aliases.some((r) => publisherRoles.includes(r));
+  }
+  return publisherRoles.includes(requiredRole);
+}
+
 // ─── Provisioning ────────────────────────────────────────────────────
 
-interface ProvisionedSpace {
+export interface ProvisionedSpace {
   spaceId: string;
   name: string;
   rooms: Array<{ roomId: string; name: string; requiredRole: string | null }>;
@@ -53,13 +93,11 @@ interface ProvisionedSpace {
 /**
  * Create all default spaces and rooms.
  * Returns the provisioned structure for storage.
- * Idempotent — skips if rooms already exist (check by name).
  */
 export async function provisionDefaultSpaces(): Promise<ProvisionedSpace[]> {
   const result: ProvisionedSpace[] = [];
 
   for (const spaceDef of DEFAULT_SPACES) {
-    // Create the space
     const spaceId = await createRoom({
       name: spaceDef.name,
       topic: spaceDef.topic,
@@ -75,7 +113,6 @@ export async function provisionDefaultSpaces(): Promise<ProvisionedSpace[]> {
         isPrivate: roomDef.isPrivate,
       });
 
-      // Add room as child of space
       await addRoomToSpace(spaceId, roomId);
 
       rooms.push({
@@ -106,16 +143,9 @@ export async function joinPublisherToRooms(
     await joinUserToRoom(space.spaceId, matrixUserId).catch(() => {});
 
     for (const room of space.rooms) {
-      // Check access
-      if (room.requiredRole === null) {
-        // Open to all publishers
-        await joinUserToRoom(room.roomId, matrixUserId).catch(() => {});
-      } else if (room.requiredRole === "elder" && congregationRole === "elder") {
-        await joinUserToRoom(room.roomId, matrixUserId).catch(() => {});
-      } else if (publisherRoles.includes(room.requiredRole)) {
+      if (shouldJoinRoom(room.requiredRole, publisherRoles, congregationRole)) {
         await joinUserToRoom(room.roomId, matrixUserId).catch(() => {});
       }
-      // Otherwise: not joined (no access)
     }
   }
 }
