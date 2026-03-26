@@ -1,7 +1,7 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
-## v2026.03.26.7
+## v2026.03.26.8
 
 ### Fix Matrix client auth — use Synapse admin login (#238)
 - fix: frontend was using Keycloak OIDC token as Matrix access token — Synapse rejects it
