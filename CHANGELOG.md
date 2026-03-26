@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.7
+
+### Fix Matrix client auth — use Synapse admin login (#238)
+- fix: frontend was using Keycloak OIDC token as Matrix access token — Synapse rejects it
+- feat: add `getMatrixUserToken()` using Synapse Admin API `POST /users/{userId}/login`
+- fix: `POST /chat/ensure` now returns `matrixAccessToken` + `matrixUserId`
+- fix: ChatWidget awaits `/chat/ensure` response and uses real Matrix token for SDK init
+
 ## v2026.03.26.6
 
 ### Chat auth fix, DM picker, Matrix provisioning (#235)
