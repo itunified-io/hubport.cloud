@@ -448,6 +448,65 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
     </div>
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
+      <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        Maintenance
+      </h3>
+
+      <div id="maintenance-collapsed">
+        <p class="text-sm text-zinc-400 mb-3">After a server reboot, Vault needs to be unsealed before services can access secrets (encryption keys, passwords, tokens).</p>
+        <button onclick="document.getElementById('maintenance-collapsed').classList.add('hidden'); document.getElementById('maintenance-expanded').classList.remove('hidden');" class="text-sm text-amber-400 hover:text-amber-300 px-4 py-2 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">
+          Show Vault Unseal Guide
+        </button>
+      </div>
+
+      <div id="maintenance-expanded" class="hidden">
+        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-4">
+          <div class="flex items-start gap-3 mb-4">
+            <svg class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="text-sm">
+              <p class="text-amber-400 font-semibold mb-1">After Server Reboot</p>
+              <p class="text-zinc-400 text-xs mb-2">When your server restarts, Vault becomes sealed. All services that depend on secrets (chat, encryption, authentication) will stop working until Vault is unsealed.</p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 1: Check Vault status</span>
+              <div class="flex items-center gap-2 mt-1">
+                <code id="vault-cmd-1" class="flex-1 text-sm text-amber-400 font-mono select-all bg-zinc-900/50 rounded px-2 py-1.5">docker exec ${escapeHtml(tenant.subdomain)}-vault-1 vault status</code>
+                <button onclick="copyCred(document.getElementById('vault-cmd-1').textContent, event)" class="p-1 text-zinc-500 hover:text-amber-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              </div>
+              <p class="text-[11px] text-zinc-600 mt-1">If <span class="text-red-400">Sealed: true</span>, proceed to Step 2.</p>
+            </div>
+
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 2: Unseal Vault</span>
+              <div class="flex items-center gap-2 mt-1">
+                <code id="vault-cmd-2" class="flex-1 text-sm text-amber-400 font-mono select-all bg-zinc-900/50 rounded px-2 py-1.5">docker exec -it ${escapeHtml(tenant.subdomain)}-vault-1 vault operator unseal</code>
+                <button onclick="copyCred(document.getElementById('vault-cmd-2').textContent, event)" class="p-1 text-zinc-500 hover:text-amber-400 transition flex-shrink-0" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+              </div>
+              <p class="text-[11px] text-zinc-600 mt-1">Paste your unseal key from <span class="font-mono text-zinc-400">.secrets/.vault-keys</span> when prompted.</p>
+            </div>
+
+            <div>
+              <span class="text-[10px] text-zinc-600 uppercase tracking-wider">Step 3: Verify</span>
+              <p class="text-xs text-zinc-500 mt-1">Run Step 1 again &mdash; <span class="text-green-400">Sealed: false</span> means Vault is operational. Services recover automatically.</p>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-amber-950/20 border border-amber-900/30 rounded-lg">
+            <p class="text-xs text-amber-400/80"><strong>Keep your .vault-keys file safe.</strong> It contains the unseal key generated during installation. Without it, Vault cannot be unsealed and all encrypted data becomes inaccessible.</p>
+          </div>
+        </div>
+
+        <button onclick="document.getElementById('maintenance-expanded').classList.add('hidden'); document.getElementById('maintenance-collapsed').classList.remove('hidden');" class="text-xs text-zinc-600 hover:text-zinc-400 transition">
+          Hide
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
       <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4">Authorized Devices</h3>
       <div id="device-list" class="space-y-2"></div>
       <p id="device-empty" class="text-sm text-zinc-600 hidden">No devices authorized yet.</p>
