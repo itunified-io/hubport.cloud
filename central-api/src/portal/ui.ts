@@ -319,7 +319,7 @@ export function setupPage(tenantName: string, token: string): string {
   `;
 }
 
-export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: { totpEnabled: boolean } | null }, apiToken?: string | null): string {
+export function dashboardPage(tenant: { id: string; name: string; subdomain: string; status: string; tunnelId: string | null; activatedAt: Date | null; createdAt: Date; auth?: Record<string, unknown> | null }, apiToken?: string | null): string {
   const statusColor = tenant.status === 'ACTIVE' ? 'text-green-400' : tenant.status === 'APPROVED' ? 'text-amber-400' : 'text-zinc-400';
   return `
     <h2 class="text-2xl text-amber-500 mb-6">Dashboard</h2>
@@ -375,7 +375,7 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <button onclick="revealToken()" id="token-eye" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Reveal (requires password)"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button onclick="revealToken()" id="token-eye" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition" title="Reveal"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
             <button id="token-copy" onclick="copyTokenValue(event)" class="p-1.5 text-zinc-500 hover:text-amber-400 rounded-md hover:bg-zinc-800 transition hidden" title="Copy"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
           </div>
         </div>
@@ -410,39 +410,13 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
 
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
       <h3 class="text-sm text-zinc-500 uppercase tracking-wider mb-4">Security</h3>
-
-      <div class="space-y-4">
-        <div class="flex items-center justify-between py-3 border-b border-zinc-800/50">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg ${tenant.auth?.totpEnabled ? 'bg-green-900/30' : 'bg-zinc-800'} flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 ${tenant.auth?.totpEnabled ? 'text-green-400' : 'text-zinc-400'}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            </div>
-            <div>
-              <p class="text-sm text-zinc-200 font-medium">Authenticator App (TOTP)</p>
-              <p class="text-xs ${tenant.auth?.totpEnabled ? 'text-green-400' : 'text-zinc-500'}">${tenant.auth?.totpEnabled ? 'Enabled' : 'Not configured'}</p>
-            </div>
-          </div>
-          ${tenant.auth?.totpEnabled
-            ? '<a href="/portal/totp/enroll" class="text-xs text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition">Change</a>'
-            : '<a href="/portal/totp/enroll" class="text-xs text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">Enable</a>'
-          }
+      <div class="flex items-center gap-3 py-3">
+        <div class="w-8 h-8 rounded-lg bg-green-900/30 flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         </div>
-
-        <div class="py-3">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg>
-              </div>
-              <div>
-                <p class="text-sm text-zinc-200 font-medium">Passkeys</p>
-                <p class="text-xs text-zinc-500" id="passkey-count">Loading...</p>
-              </div>
-            </div>
-            <button onclick="registerPasskey()" class="text-xs text-amber-400 hover:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/20 transition">Add Passkey</button>
-          </div>
-          <div id="passkey-list" class="space-y-2 ml-11"></div>
-          <div id="passkey-error" class="text-xs text-red-400 ml-11 mt-2 hidden"></div>
+        <div>
+          <p class="text-sm text-zinc-200 font-medium">Authentication</p>
+          <p class="text-xs text-green-400">Managed by Keycloak (SSO, MFA, Passkeys)</p>
         </div>
       </div>
     </div>
@@ -543,90 +517,6 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
           btn.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
           setTimeout(function() { btn.innerHTML = orig; }, 1500);
         });
-      }
-    }
-
-    // --- Passkey management ---
-    async function loadPasskeys() {
-      try {
-        var res = await fetch('/portal/passkey/list', { credentials: 'same-origin' });
-        if (!res.ok) return;
-        var data = await res.json();
-        var list = document.getElementById('passkey-list');
-        var count = document.getElementById('passkey-count');
-        count.textContent = data.passkeys.length + ' registered';
-        list.innerHTML = '';
-        data.passkeys.forEach(function(pk) {
-          var created = new Date(pk.createdAt).toLocaleDateString();
-          var div = document.createElement('div');
-          div.className = 'flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2 border border-zinc-700/50';
-          div.innerHTML = '<div class="flex items-center gap-2">' +
-            '<svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 7h2a5 5 0 010 10h-2m-6 0H7A5 5 0 017 7h2"/><path d="M8 12h8"/></svg>' +
-            '<span class="text-xs text-zinc-300">' + (pk.name || 'Passkey') + '</span>' +
-            '<span class="text-[10px] text-zinc-600 ml-1">added ' + created + '</span>' +
-            '</div>' +
-            '<button onclick="deletePasskey(\\'' + pk.id + '\\')" class="p-1 text-zinc-600 hover:text-red-400 transition" title="Remove passkey">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' +
-            '</button>';
-          list.appendChild(div);
-        });
-      } catch {}
-    }
-    loadPasskeys();
-
-    async function registerPasskey() {
-      var errEl = document.getElementById('passkey-error');
-      errEl.classList.add('hidden');
-      try {
-        var optRes = await fetch('/portal/passkey/register-options', { credentials: 'same-origin' });
-        if (!optRes.ok) throw new Error('Failed to get options');
-        var options = await optRes.json();
-        options.challenge = _b64ToBuf(options.challenge);
-        options.user.id = _b64ToBuf(options.user.id);
-        if (options.excludeCredentials) {
-          options.excludeCredentials = options.excludeCredentials.map(function(c) {
-            return Object.assign({}, c, { id: _b64ToBuf(c.id) });
-          });
-        }
-        var cred = await navigator.credentials.create({ publicKey: options });
-        if (!cred) throw new Error('No credential returned');
-        var verifyRes = await fetch('/portal/passkey/register-verify', {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: cred.id, rawId: _bufToB64(cred.rawId), type: cred.type,
-            response: {
-              clientDataJSON: _bufToB64(cred.response.clientDataJSON),
-              attestationObject: _bufToB64(cred.response.attestationObject),
-            },
-            clientExtensionResults: cred.getClientExtensionResults(),
-          }),
-        });
-        if (!verifyRes.ok) { var e = await verifyRes.json(); throw new Error(e.error || 'Registration failed'); }
-        loadPasskeys();
-      } catch (e) {
-        errEl.textContent = e.message || 'Passkey registration failed';
-        errEl.classList.remove('hidden');
-      }
-    }
-
-    async function deletePasskey(id) {
-      if (!confirm('Remove this passkey?')) return;
-      var pw = prompt('Enter your password to confirm:');
-      if (!pw) return;
-      var errEl = document.getElementById('passkey-error');
-      errEl.classList.add('hidden');
-      try {
-        var res = await fetch('/portal/passkey/delete', {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credentialId: id, password: pw }),
-        });
-        if (!res.ok) { var e = await res.json(); throw new Error(e.error || 'Delete failed'); }
-        loadPasskeys();
-      } catch (e) {
-        errEl.textContent = e.message || 'Failed to delete passkey';
-        errEl.classList.remove('hidden');
       }
     }
 
@@ -758,44 +648,16 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
       </form>
     </div>
 
-    <!-- Reveal token modal -->
-    <div id="reveal-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
-      <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg text-amber-500 mb-4">Confirm Identity</h3>
-        <p class="text-sm text-zinc-400 mb-4">Enter your password to reveal the tunnel token.</p>
-        <input type="password" id="reveal-password" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:border-amber-500 focus:outline-none mb-4" placeholder="Password">
-        <div id="reveal-error" class="text-sm text-red-400 mb-3 hidden"></div>
-        <div class="flex gap-3">
-          <button onclick="closeRevealModal()" class="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 py-2 rounded-lg transition">Cancel</button>
-          <button onclick="submitReveal()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2 rounded-lg transition">Reveal</button>
-        </div>
-      </div>
-    </div>
-
     <script>
-    function revealToken() {
-      document.getElementById('reveal-modal').classList.remove('hidden');
-      document.getElementById('reveal-modal').classList.add('flex');
-      document.getElementById('reveal-password').focus();
-    }
-    function closeRevealModal() {
-      document.getElementById('reveal-modal').classList.add('hidden');
-      document.getElementById('reveal-modal').classList.remove('flex');
-      document.getElementById('reveal-password').value = '';
-      document.getElementById('reveal-error').classList.add('hidden');
-    }
-    async function submitReveal() {
-      const password = document.getElementById('reveal-password').value;
-      if (!password) return;
+    async function revealToken() {
       try {
         const res = await fetch('/portal/reveal-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password }),
+          credentials: 'same-origin',
         });
         if (!res.ok) {
-          document.getElementById('reveal-error').textContent = 'Invalid password';
-          document.getElementById('reveal-error').classList.remove('hidden');
+          alert('Failed to reveal token. Please try logging in again.');
           return;
         }
         const data = await res.json();
@@ -807,10 +669,8 @@ export function dashboardPage(tenant: { id: string; name: string; subdomain: str
         // Update masked to show first4••••last4 pattern
         document.getElementById('token-masked').innerHTML = '<span class="text-zinc-300">' + token.slice(0,4) + '<span class="text-zinc-600">' + '\u2022'.repeat(Math.min(16, token.length - 8)) + '</span>' + token.slice(-4) + '</span>';
         document.getElementById('token-copy').classList.remove('hidden');
-        closeRevealModal();
       } catch {
-        document.getElementById('reveal-error').textContent = 'Request failed';
-        document.getElementById('reveal-error').classList.remove('hidden');
+        alert('Failed to reveal token.');
       }
     }
     </script>

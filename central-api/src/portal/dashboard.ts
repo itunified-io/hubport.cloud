@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
-import { verifyPassword } from '../lib/crypto.js';
 import { portalAuth } from './auth.js';
 import { portalShell, dashboardPage } from './ui.js';
 import { readApiTokenCookie, setApiTokenCookie } from '../lib/encrypted-cookie.js';
@@ -17,11 +16,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
     if (!tenant) {
       return reply.status(404).type('text/html').send(portalShell('Not Found', '<p>Tenant not found.</p>'));
-    }
-
-    // Enforce MFA gate — redirect if setup not completed
-    if (tenant.auth && !tenant.auth.mfaCompleted) {
-      return reply.redirect('/portal/mfa-setup');
     }
 
     // Check for existing API token in cookie first
@@ -52,14 +46,9 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     reply.type('text/html').send(portalShell(`Dashboard - ${tenant.name}`, dashboardPage(tenant, apiToken)));
   });
 
-  // POST /portal/reveal-token — requires password re-entry
+  // POST /portal/reveal-token — requires valid OIDC session (user is already authenticated)
   app.post('/reveal-token', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const tenantId = (req as unknown as Record<string, unknown>).tenantId as string;
-    const body = req.body as { password?: string } | null;
-
-    if (!body?.password) {
-      return reply.status(400).send({ error: 'Password required to reveal token' });
-    }
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -70,14 +59,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'Account not found' });
     }
 
-    if (!tenant.auth.passwordHash) {
-      return reply.status(401).send({ error: 'Account setup not completed' });
-    }
-    const valid = await verifyPassword(tenant.auth.passwordHash, body.password);
-    if (!valid) {
-      return reply.status(401).send({ error: 'Invalid password' });
-    }
-
+    // User is authenticated via Keycloak OIDC session (portalAuth middleware).
+    // No additional password verification needed.
     return reply.send({
       tunnelToken: tenant.tunnelToken,
       tenantId: tenant.id,

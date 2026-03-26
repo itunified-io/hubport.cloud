@@ -13,11 +13,10 @@ import { useIntl, FormattedMessage } from "react-intl";
 import { getApiUrl } from "../../lib/config";
 import { CodeValidation } from "./CodeValidation";
 import { UserInfoStep } from "./UserInfoStep";
-import { SecurityStep } from "./SecurityStep";
 import { PrivacyStep } from "./PrivacyStep";
 import { CompletionStep } from "./CompletionStep";
 
-type WizardPhase = "validating" | "code_entry" | "user_info" | "security" | "privacy" | "complete";
+type WizardPhase = "validating" | "code_entry" | "user_info" | "privacy" | "complete";
 
 interface PublisherData {
   email: string;
@@ -28,20 +27,18 @@ interface PublisherData {
 
 const STEP_LABELS = [
   { id: "user_info", labelId: "invite.step.userInfo" },
-  { id: "security", labelId: "invite.step.security" },
   { id: "privacy", labelId: "invite.step.privacy" },
 ] as const;
 
 function phaseToStepIndex(phase: WizardPhase): number {
   if (phase === "user_info") return 0;
-  if (phase === "security") return 1;
-  if (phase === "privacy") return 2;
+  if (phase === "privacy") return 1;
   return -1;
 }
 
 function onboardingStepToPhase(step: string): WizardPhase {
   if (step === "code_redeemed") return "user_info";
-  if (step === "user_info") return "security";
+  if (step === "user_info") return "privacy";
   if (step === "security") return "privacy";
   if (step === "complete") return "complete";
   return "user_info";
@@ -130,7 +127,7 @@ export function InviteWizard(): ReactNode {
         <h1 className="text-2xl font-bold text-[var(--amber)] mb-1">Hubport</h1>
         {phase !== "complete" && phase !== "validating" && phase !== "code_entry" && (
           <p className="text-[var(--text-muted)] text-sm">
-            <FormattedMessage id="invite.security.subtitle" />
+            <FormattedMessage id="invite.wizard.subtitle" />
           </p>
         )}
       </div>
@@ -183,7 +180,7 @@ export function InviteWizard(): ReactNode {
       )}
 
       {/* Wizard card */}
-      {(phase === "user_info" || phase === "security" || phase === "privacy" || phase === "complete") && (
+      {(phase === "user_info" || phase === "privacy" || phase === "complete") && (
         <div className="w-full max-w-md bg-[var(--card,var(--bg-2))] border border-[var(--border)] rounded-[var(--radius)] p-6">
           {phase === "user_info" && publisher && (
             <UserInfoStep
@@ -191,17 +188,6 @@ export function InviteWizard(): ReactNode {
               email={publisher.email || ""}
               initialFirstName={publisher.firstName}
               initialLastName={publisher.lastName}
-              onComplete={(newToken) => {
-                setToken(newToken);
-                setPhase("security");
-              }}
-              onSessionExpired={handleSessionExpired}
-            />
-          )}
-
-          {phase === "security" && (
-            <SecurityStep
-              token={token}
               onComplete={(newToken) => {
                 setToken(newToken);
                 setPhase("privacy");

@@ -128,15 +128,15 @@ export async function adminRoutes(app: FastifyInstance) {
     reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant, devices)));
   });
 
-  // Internal-only endpoint for MCP skill to provision auth (setup token)
-  // Called during tenant approval — creates or resets TenantAuth with a fresh setup token.
+  // Internal-only endpoint for MCP skill to provision auth (Keycloak user link)
+  // Called during tenant approval — creates or resets TenantAuth record.
   // Auth: ADMIN_SECRET — operator-only, NOT shared with tenants (SEC-003 privilege boundary fix)
   app.post('/internal/provision-auth', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!validateAdminAuth(req.headers.authorization)) {
       return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing admin secret' });
     }
 
-    const body = req.body as { tenantId: string } | null;
+    const body = req.body as { tenantId: string; keycloakUserId?: string } | null;
     if (!body?.tenantId) {
       return reply.status(400).send({ error: 'Missing tenantId' });
     }
@@ -144,34 +144,21 @@ export async function adminRoutes(app: FastifyInstance) {
     const tenant = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
 
-    const { randomBytes } = await import('node:crypto');
-    const setupToken = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
     // Upsert: create if missing, reset if exists (for re-approve cycles)
     await prisma.tenantAuth.upsert({
       where: { tenantId: body.tenantId },
       create: {
         tenantId: body.tenantId,
-        setupToken,
-        setupTokenExpiresAt: expiresAt,
+        keycloakUserId: body.keycloakUserId ?? null,
       },
       update: {
-        passwordHash: null,
-        totpSecret: null,
-        totpEnabled: false,
-        mfaCompleted: false,
-        setupToken,
-        setupTokenExpiresAt: expiresAt,
+        keycloakUserId: body.keycloakUserId ?? undefined,
         failedAttempts: 0,
         lockedUntil: null,
       },
     });
 
-    const portalBase = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
-    const setupUrl = `${portalBase}/portal/setup?token=${setupToken}`;
-
-    return reply.send({ ok: true, setupToken, setupUrl });
+    return reply.send({ ok: true });
   });
 
   // Internal-only endpoint for MCP skill to provision an M2M API token.
@@ -246,7 +233,6 @@ export async function adminRoutes(app: FastifyInstance) {
           name: string;
           subdomain: string;
           id: string;
-          setupUrl?: string;
         });
       } else if (body.templateName === 'rejection') {
         html = rejectionEmailHtml(

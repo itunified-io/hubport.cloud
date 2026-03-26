@@ -10,13 +10,11 @@ import {
   Smartphone,
   Monitor,
   Trash2,
-  Plus,
   Clock,
   Globe,
 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
-import { startRegistration } from "@simplewebauthn/browser";
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface Passkey {
@@ -200,7 +198,6 @@ function PasskeyManager({
 }) {
   const intl = useIntl();
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPasskeys = async () => {
@@ -217,46 +214,6 @@ function PasskeyManager({
   useEffect(() => {
     fetchPasskeys();
   }, [token]);
-
-  const handleRegister = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const challengeRes = await fetch(`${apiUrl}/security/passkeys/challenge`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!challengeRes.ok) throw new Error("Failed to get challenge");
-      const options = await challengeRes.json();
-
-      const credential = await startRegistration({ optionsJSON: options });
-
-      const registerRes = await fetch(`${apiUrl}/security/passkeys/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          credential,
-          label: `Passkey ${passkeys.length + 1}`,
-        }),
-      });
-      if (!registerRes.ok) {
-        const data = await registerRes.json();
-        throw new Error(data.error || "Registration failed");
-      }
-      await fetchPasskeys();
-    } catch (err) {
-      if ((err as Error).name === "NotAllowedError") {
-        setError(intl.formatMessage({ id: "security.wizard.passkey.cancelled" }));
-      } else {
-        setError((err as Error).message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRemove = async (id: string) => {
     if (passkeys.length === 1 && !hasTotpConfigured) {
@@ -288,14 +245,6 @@ function PasskeyManager({
             <FormattedMessage id="security.profile.passkeys.title" />
           </h3>
         </div>
-        <button
-          onClick={handleRegister}
-          disabled={loading}
-          className="flex items-center gap-1 text-xs text-[var(--amber)] hover:text-[var(--amber-light)] cursor-pointer"
-        >
-          <Plus size={12} />
-          <FormattedMessage id="security.profile.passkeys.add" />
-        </button>
       </div>
 
       {error && <p className="text-xs text-[var(--red)]">{error}</p>}
@@ -327,6 +276,10 @@ function PasskeyManager({
           ))}
         </div>
       )}
+
+      <p className="text-xs text-[var(--text-muted)] pl-6">
+        <FormattedMessage id="security.profile.passkeys.addHint" />
+      </p>
     </div>
   );
 }
@@ -346,55 +299,8 @@ function TotpManager({
   hasPasskeys: boolean;
 }) {
   const intl = useIntl();
-  const [setting, setSetting] = useState(false);
-  const [totpData, setTotpData] = useState<{ secret: string; qrCode: string } | null>(null);
-  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleSetup = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${apiUrl}/security/totp/setup`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to get TOTP setup");
-      setTotpData(await res.json());
-      setSetting(true);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${apiUrl}/security/totp/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ code }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Verification failed");
-      }
-      setSetting(false);
-      setTotpData(null);
-      setCode("");
-      onToggle();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRemove = async () => {
     if (!hasPasskeys) {
@@ -442,15 +348,6 @@ function TotpManager({
             )}
           </span>
         </div>
-        {!totpConfigured && !setting && (
-          <button
-            onClick={handleSetup}
-            disabled={loading}
-            className="text-xs text-[var(--amber)] hover:text-[var(--amber-light)] cursor-pointer"
-          >
-            <FormattedMessage id="security.profile.totp.setup" />
-          </button>
-        )}
         {totpConfigured && (
           <button
             onClick={handleRemove}
@@ -464,53 +361,10 @@ function TotpManager({
 
       {error && <p className="text-xs text-[var(--red)]">{error}</p>}
 
-      {setting && totpData && (
-        <div className="space-y-3 pl-6">
-          <div className="flex justify-center">
-            <img
-              src={totpData.qrCode}
-              alt="TOTP QR Code"
-              className="w-36 h-36 rounded-[var(--radius-sm)]"
-            />
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-[var(--text-muted)] mb-1">
-              <FormattedMessage id="security.wizard.totp.manual" />
-            </p>
-            <code className="text-[10px] text-[var(--text)] bg-[var(--input)] px-2 py-0.5 rounded break-all">
-              {totpData.secret}
-            </code>
-          </div>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
-            placeholder="000000"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="w-full px-3 py-1.5 text-sm bg-[var(--input)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)] text-center tracking-widest"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleVerify}
-              disabled={code.length !== 6 || loading}
-              className="px-3 py-1.5 text-xs font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {loading ? "..." : intl.formatMessage({ id: "security.wizard.totp.verify" })}
-            </button>
-            <button
-              onClick={() => {
-                setSetting(false);
-                setTotpData(null);
-                setCode("");
-              }}
-              className="px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
-            >
-              <FormattedMessage id="common.cancel" />
-            </button>
-          </div>
-        </div>
+      {!totpConfigured && (
+        <p className="text-xs text-[var(--text-muted)] pl-6">
+          <FormattedMessage id="security.profile.totp.setupHint" />
+        </p>
       )}
     </div>
   );

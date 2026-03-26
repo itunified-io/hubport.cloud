@@ -11,7 +11,6 @@ import { encryptToken, decryptToken } from './crypto.js';
 /** Model → fields requiring encryption. */
 const ENCRYPTION_MAP: Record<string, readonly string[]> = {
   Tenant: ['email', 'ownerFirstName', 'ownerLastName', 'tunnelToken'],
-  TenantAuth: ['totpSecret'],
 } as const;
 
 function getEncryptedFields(model: string | undefined): readonly string[] | null {

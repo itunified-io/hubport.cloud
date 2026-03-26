@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { buildContext, can, type PolicyContext } from "./policy-engine.js";
-import prisma from "./prisma.js";
+import { getKeycloakUser } from "./keycloak-admin.js";
 
 // ─── Augment FastifyRequest with policyCtx ───────────────────────────
 
@@ -125,15 +125,30 @@ export function requireAnyPermission(...permissions: string[]): preHandlerHookHa
   };
 }
 
-// ─── Security Setup Enforcement (ADR-0081) ──────────────────────────
+// ─── Security Setup Enforcement (ADR-0081 + ADR-0086) ───────────────
 
 /** Routes exempt from the security-complete check. */
 const SECURITY_EXEMPT_ROUTES = ["/health", "/onboarding", "/security", "/publishers/me/privacy", "/internal"];
 
+/** Cache: keycloakSub → { complete: boolean, cachedAt: number } */
+const securityStatusCache = new Map<string, { complete: boolean; cachedAt: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Invalidate the security status cache for a user.
+ * Called from /security/* mutation endpoints.
+ */
+export function invalidateSecurityCache(userId: string): void {
+  securityStatusCache.delete(userId);
+}
+
 /**
  * Server-side enforcement: blocks API access unless the user has
- * passwordChanged + (passkey OR TOTP).
+ * completed all required actions in Keycloak (empty requiredActions array).
  * ADR-0081: backend MUST verify credential setup, not rely on frontend alone.
+ * ADR-0086: Keycloak is the sole credential authority — no local DB checks.
+ *
+ * Fail-closed: if Keycloak is unreachable, returns 403 SECURITY_VERIFICATION_UNAVAILABLE.
  */
 export function requireSecurityComplete(): preHandlerHookHandler {
   return async (request: FastifyRequest, reply: FastifyReply) => {
@@ -144,28 +159,40 @@ export function requireSecurityComplete(): preHandlerHookHandler {
     const sub = (request.user as { sub?: string } | undefined)?.sub;
     if (!sub) return; // No user = auth middleware handles it
 
-    const setup = await prisma.securitySetup.findUnique({
-      where: { keycloakSub: sub },
-    });
-
-    if (!setup?.passwordChanged) {
-      return reply.code(403).send({
-        error: "Forbidden",
-        code: "SECURITY_SETUP_INCOMPLETE",
-        message: "Password must be changed before accessing this resource",
-      });
+    // Check cache first
+    const cached = securityStatusCache.get(sub);
+    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+      if (!cached.complete) {
+        return reply.code(403).send({
+          error: "Forbidden",
+          code: "SECURITY_SETUP_INCOMPLETE",
+          message: "Security setup must be completed before accessing this resource",
+        });
+      }
+      return; // Cache hit: setup complete
     }
 
-    const [passkeyCount, hasTOTP] = await Promise.all([
-      prisma.webAuthnCredential.count({ where: { keycloakSub: sub } }),
-      Promise.resolve(!!setup.totpSecret && !!setup.totpEnabledAt),
-    ]);
+    // Query Keycloak for user requiredActions
+    try {
+      const user = await getKeycloakUser(sub);
+      const complete = user.requiredActions.length === 0;
 
-    if (passkeyCount === 0 && !hasTOTP) {
+      // Update cache
+      securityStatusCache.set(sub, { complete, cachedAt: Date.now() });
+
+      if (!complete) {
+        return reply.code(403).send({
+          error: "Forbidden",
+          code: "SECURITY_SETUP_INCOMPLETE",
+          message: "Security setup must be completed before accessing this resource",
+        });
+      }
+    } catch {
+      // Fail-closed: Keycloak unreachable → deny access (ADR-0081)
       return reply.code(403).send({
         error: "Forbidden",
-        code: "SECURITY_SETUP_INCOMPLETE",
-        message: "At least one second factor (passkey or TOTP) is required",
+        code: "SECURITY_VERIFICATION_UNAVAILABLE",
+        message: "Unable to verify security setup status. Please try again later.",
       });
     }
   };

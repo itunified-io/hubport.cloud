@@ -1,6 +1,22 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.26.9
+
+### Mandatory Keycloak auth — remove custom WebAuthn/TOTP (#241)
+- feat: remove `@simplewebauthn/server`, `otpauth`, `qrcode` from hub-api (ADR-0086)
+- feat: remove `@simplewebauthn/browser` from hub-app
+- feat: remove `@simplewebauthn/server`, `argon2`, `otpauth`, `qrcode` from central-api; add `openid-client`
+- feat: delete SecurityGate, SecurityWizard, SecurityStep (hub-app)
+- feat: delete custom security routes — passkey, TOTP, password policy (hub-api)
+- feat: delete custom auth files — passkey.ts, totp.ts, setup.ts, mfa-setup.ts (central-api)
+- feat: rewrite `requireSecurityComplete()` to check Keycloak `requiredActions` via Admin API (fail-closed)
+- feat: rewire profile security endpoints to Keycloak Admin API (hub-api)
+- feat: rewrite central-api login/auth for Keycloak OIDC (openid-client)
+- feat: remove WebAuthnCredential, SecuritySetup Prisma models (hub-api)
+- feat: remove TenantPasskey, clean TenantAuth, add keycloakUserId (central-api)
+- feat: clean up 35+ unused i18n security keys (hub-app)
+
 ## v2026.03.26.8
 
 ### Fix Matrix client auth — use Synapse admin login (#238)
