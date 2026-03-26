@@ -13,10 +13,11 @@ import prisma from "../lib/prisma.js";
 const CENTRAL_API_URL = process.env.CENTRAL_API_URL || "";
 const TENANT_ID = process.env.HUBPORT_TENANT_ID || "";
 
+/** Default: all categories enabled. "disabled" = not shared with partner. */
 const DEFAULT_VISIBILITY: Record<string, string> = {
-  territories: "publisher",
-  talks: "publisher",
-  speakers: "elder",
+  territories: "enabled",
+  talks: "enabled",
+  speakers: "enabled",
 };
 
 async function getApiToken(): Promise<string | null> {
@@ -260,9 +261,16 @@ export async function sharingRoutes(app: FastifyInstance) {
     },
   );
 
-  // ─── Visibility RBAC ────────────────────────────────────────────────
+  // ─── Visibility Toggles ─────────────────────────────────────────────
+  //
+  // Per-partner toggles control WHAT is shared. WHO sees shared data is
+  // determined by existing AppRole permissions:
+  //   territories → users with territories.view (service overseer, territory servant)
+  //   speakers    → users with speakers.view (public talk planner)
+  //   talks       → users with public_talks.view (public talk planner)
+  //   publishers without these permissions see nothing from partners.
 
-  // GET /sharing/partners/:partnerId/visibility — get visibility settings
+  // GET /sharing/partners/:partnerId/visibility — get per-category toggles
   app.get(
     "/sharing/partners/:partnerId/visibility",
     { preHandler: [requirePermission(PERMISSIONS.SHARING_VIEW)] },
@@ -273,40 +281,35 @@ export async function sharingRoutes(app: FastifyInstance) {
         where: { partnerId },
       });
 
-      // Fill in defaults for missing categories
+      // Default: all categories enabled
       const result: Record<string, string> = {};
       for (const cat of ["speakers", "territories", "talks"]) {
         const row = rows.find((r: { category: string; minRole: string }) => r.category === cat);
-        result[cat] = row?.minRole || DEFAULT_VISIBILITY[cat] || "elder";
+        result[cat] = row?.minRole === "disabled" ? "disabled" : "enabled";
       }
 
       return reply.send(result);
     },
   );
 
-  // PUT /sharing/partners/:partnerId/visibility — update visibility settings
+  // PUT /sharing/partners/:partnerId/visibility — toggle categories on/off
   app.put(
     "/sharing/partners/:partnerId/visibility",
     { preHandler: [requirePermission(PERMISSIONS.SHARING_CONFIGURE)] },
     async (request, reply) => {
       const { partnerId } = request.params as { partnerId: string };
       const body = request.body as Record<string, string>;
-      const validRoles = ["publisher", "elder", "admin"];
+      const validValues = ["enabled", "disabled"];
       const validCategories = ["speakers", "territories", "talks"];
 
-      const updates: Array<{ category: string; minRole: string }> = [];
-      for (const [cat, role] of Object.entries(body)) {
-        if (validCategories.includes(cat) && validRoles.includes(role)) {
-          updates.push({ category: cat, minRole: role });
+      for (const [cat, value] of Object.entries(body)) {
+        if (validCategories.includes(cat) && validValues.includes(value)) {
+          await prisma.sharingVisibility.upsert({
+            where: { partnerId_category: { partnerId, category: cat } },
+            update: { minRole: value },
+            create: { partnerId, category: cat, minRole: value },
+          });
         }
-      }
-
-      for (const { category, minRole } of updates) {
-        await prisma.sharingVisibility.upsert({
-          where: { partnerId_category: { partnerId, category } },
-          update: { minRole },
-          create: { partnerId, category, minRole },
-        });
       }
 
       return reply.send({ ok: true });

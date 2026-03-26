@@ -191,6 +191,46 @@ export async function speakerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // POST /speakers/me — self-register as a speaker
+  app.post(
+    "/speakers/me",
+    async (request, reply) => {
+      const sub = (request as any).user?.sub;
+      if (!sub) return reply.code(401).send({ error: "Not authenticated" });
+
+      const publisher = await prisma.publisher.findFirst({
+        where: { keycloakSub: sub },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      if (!publisher) return reply.code(404).send({ error: "Publisher not found" });
+
+      // Idempotent: return existing speaker if already registered
+      const existing = await prisma.speaker.findFirst({
+        where: { publisherId: publisher.id },
+        include: {
+          talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
+        },
+      });
+      if (existing) return existing;
+
+      const speaker = await prisma.speaker.create({
+        data: {
+          firstName: publisher.firstName || "",
+          lastName: publisher.lastName || "",
+          publisherId: publisher.id,
+          isLocal: true,
+          source: "local",
+          status: "active",
+        },
+        include: {
+          talks: { include: { publicTalk: { select: { id: true, talkNumber: true, title: true } } } },
+        },
+      });
+
+      return speaker;
+    },
+  );
+
   // PUT /speakers/me/talks — update own talk list
   app.put(
     "/speakers/me/talks",

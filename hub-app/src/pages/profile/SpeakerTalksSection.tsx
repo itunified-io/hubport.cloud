@@ -77,7 +77,50 @@ export function SpeakerTalksSection() {
     load();
   }, [user?.access_token]);
 
-  if (loading || !speaker) return null;
+  const registerAsSpeaker = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${apiUrl}/speakers/me`, {
+        method: "POST",
+        headers,
+      });
+      if (res.ok) {
+        const data = (await res.json()) as SpeakerProfile;
+        setSpeaker(data);
+        setSharingPrefs({
+          sharePhone: data.sharePhone,
+          shareEmail: data.shareEmail,
+          shareAvailability: data.shareAvailability,
+          monthlyInviteCap: data.monthlyInviteCap,
+        });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  if (!speaker) {
+    return (
+      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
+        <h2 className="text-sm font-medium text-[var(--text)] flex items-center gap-2">
+          <Mic size={14} />
+          <FormattedMessage id="speaker.register" />
+        </h2>
+        <p className="text-sm text-[var(--text-muted)]">
+          <FormattedMessage id="speaker.register.hint" />
+        </p>
+        <button
+          onClick={registerAsSpeaker}
+          disabled={saving}
+          className="px-4 py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {saving ? "..." : <FormattedMessage id="speaker.register.button" />}
+        </button>
+      </div>
+    );
+  }
 
   const myTalkNumbers = new Set(speaker.talks.map((t) => t.publicTalk.talkNumber));
 

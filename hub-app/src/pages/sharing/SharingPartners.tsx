@@ -308,7 +308,6 @@ function PartnerList({
               acceptedCategories={p.acceptedCategories || []}
               apiUrl={apiUrl}
               headers={headers}
-              intl={intl}
             />
           )}
         </div>
@@ -714,14 +713,20 @@ function ApproveRequestDialog({
 
 // ─── Visibility Settings ──────────────────────────────────────────────
 
+/** Category → which permissions/roles see this data */
+const CATEGORY_ROLES: Record<string, { labelId: string }> = {
+  speakers: { labelId: "sharing.visibility.who.speakers" },
+  territories: { labelId: "sharing.visibility.who.territories" },
+  talks: { labelId: "sharing.visibility.who.talks" },
+};
+
 function VisibilitySettings({
-  partnerId, acceptedCategories, apiUrl, headers, intl,
+  partnerId, acceptedCategories, apiUrl, headers,
 }: {
   partnerId: string;
   acceptedCategories: string[];
   apiUrl: string;
   headers: Record<string, string>;
-  intl: ReturnType<typeof useIntl>;
 }) {
   const [visibility, setVisibility] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
@@ -735,19 +740,21 @@ function VisibilitySettings({
     })();
   }, [partnerId]);
 
-  const handleSave = async () => {
+  const toggleCategory = async (cat: string) => {
+    const current = visibility[cat] || "enabled";
+    const next = current === "disabled" ? "enabled" : "disabled";
+    const updated = { ...visibility, [cat]: next };
+    setVisibility(updated);
     setSaving(true);
     await fetch(`${apiUrl}/sharing/partners/${partnerId}/visibility`, {
       method: "PUT",
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify(visibility),
+      body: JSON.stringify(updated),
     });
     setSaving(false);
   };
 
   if (!loaded) return null;
-
-  const roles = ["publisher", "elder", "admin"];
 
   return (
     <div className="mt-1 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-4 space-y-3">
@@ -759,33 +766,40 @@ function VisibilitySettings({
       </p>
       {acceptedCategories.map((cat) => {
         const Icon = CATEGORY_ICONS[cat] || Mic;
+        const enabled = (visibility[cat] || "enabled") !== "disabled";
+        const roleInfo = CATEGORY_ROLES[cat];
         return (
-          <div key={cat} className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs text-[var(--text)]">
-              <Icon size={12} />
-              <FormattedMessage id={`sharing.category.${cat}`} />
-            </span>
-            <select
-              value={visibility[cat] || "elder"}
-              onChange={(e) => setVisibility({ ...visibility, [cat]: e.target.value })}
-              className="px-2 py-1 text-xs bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)] focus:outline-none focus:border-[var(--amber)]"
+          <div key={cat} className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text)]">
+                <Icon size={12} />
+                <FormattedMessage id={`sharing.category.${cat}`} />
+              </div>
+              {roleInfo && (
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5 ml-[18px]">
+                  <FormattedMessage id={roleInfo.labelId} />
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              disabled={saving}
+              onClick={() => toggleCategory(cat)}
+              className={`relative shrink-0 w-9 h-5 rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+                enabled ? "bg-[var(--amber)]" : "bg-[var(--glass-2)]"
+              }`}
             >
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  {intl.formatMessage({ id: `sharing.visibility.role.${r}` })}
-                </option>
-              ))}
-            </select>
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                  enabled ? "translate-x-4" : ""
+                }`}
+              />
+            </button>
           </div>
         );
       })}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="px-3 py-1.5 bg-[var(--amber)] text-black text-xs font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] disabled:opacity-50 cursor-pointer"
-      >
-        {saving ? "..." : <FormattedMessage id="common.save" />}
-      </button>
     </div>
   );
 }
