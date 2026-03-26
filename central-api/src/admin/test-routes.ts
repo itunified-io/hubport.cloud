@@ -6,9 +6,7 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { randomBytes } from 'node:crypto';
-import { TOTP } from 'otpauth';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword } from '../lib/crypto.js';
 import { getLastSentEmail } from './index.js';
 
 const KEY_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -64,63 +62,6 @@ export async function testRoutes(app: FastifyInstance): Promise<void> {
 
   app.addHook('preHandler', testAuth);
 
-  // POST /test/setup-password — set password for a tenant
-  app.post('/test/setup-password', async (req, reply) => {
-    const body = req.body as { tenantId?: string; password?: string } | null;
-    if (!body?.tenantId || !body?.password) {
-      return reply.status(400).send({ error: 'tenantId and password required' });
-    }
-
-    const hash = await hashPassword(body.password);
-    await prisma.tenantAuth.upsert({
-      where: { tenantId: body.tenantId },
-      create: { tenantId: body.tenantId, passwordHash: hash },
-      update: { passwordHash: hash },
-    });
-
-    return reply.send({ ok: true });
-  });
-
-  // POST /test/enroll-totp — generate and enable TOTP for a tenant
-  app.post('/test/enroll-totp', async (req, reply) => {
-    const body = req.body as { tenantId?: string } | null;
-    if (!body?.tenantId) {
-      return reply.status(400).send({ error: 'tenantId required' });
-    }
-
-    const totp = new TOTP({
-      issuer: 'hubport.cloud',
-      label: 'test',
-      algorithm: 'SHA1',
-      digits: 6,
-      period: 30,
-    });
-
-    const secret = totp.secret.base32;
-
-    await prisma.tenantAuth.update({
-      where: { tenantId: body.tenantId },
-      data: { totpSecret: secret, totpEnabled: true },
-    });
-
-    return reply.send({ ok: true, secret });
-  });
-
-  // POST /test/complete-mfa — mark MFA setup as completed
-  app.post('/test/complete-mfa', async (req, reply) => {
-    const body = req.body as { tenantId?: string } | null;
-    if (!body?.tenantId) {
-      return reply.status(400).send({ error: 'tenantId required' });
-    }
-
-    await prisma.tenantAuth.update({
-      where: { tenantId: body.tenantId },
-      data: { mfaCompleted: true },
-    });
-
-    return reply.send({ ok: true });
-  });
-
   // POST /test/reset-tenant — reset auth state for a tenant
   app.post('/test/reset-tenant', async (req, reply) => {
     const body = req.body as { tenantId?: string } | null;
@@ -128,8 +69,7 @@ export async function testRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'tenantId required' });
     }
 
-    // Delete passkeys, tokens, setup codes
-    await prisma.tenantPasskey.deleteMany({ where: { tenantId: body.tenantId } });
+    // Delete tokens, setup codes
     await prisma.tenantApiToken.deleteMany({ where: { tenantId: body.tenantId } });
     await prisma.setupCode.deleteMany({ where: { tenantId: body.tenantId } });
     await prisma.tenantAuditLog.deleteMany({ where: { tenantId: body.tenantId } });
@@ -138,10 +78,7 @@ export async function testRoutes(app: FastifyInstance): Promise<void> {
     await prisma.tenantAuth.updateMany({
       where: { tenantId: body.tenantId },
       data: {
-        passwordHash: null,
-        totpSecret: null,
-        totpEnabled: false,
-        mfaCompleted: false,
+        keycloakUserId: null,
         failedAttempts: 0,
         lockedUntil: null,
       },

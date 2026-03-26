@@ -111,9 +111,6 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
             status: "pending_approval",
           },
         }),
-        prisma.securitySetup.create({
-          data: { keycloakSub },
-        }),
       ]);
     } catch (err) {
       app.log.error({ err, keycloakSub }, "DB update failed — deleting orphaned KC user");
@@ -202,55 +199,6 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     await audit("onboarding.user_info", publisher.keycloakSub!, "Publisher", publisherId);
 
     return reply.send({ token, onboardingStep: "user_info" });
-  });
-
-  // ─── Complete Security Step ────────────────────────────────────────
-
-  app.post("/onboarding/complete-security", async (request, reply) => {
-    const ok = await requireOnboardingToken(app, request, reply);
-    if (!ok) return;
-
-    const { publisherId } = (request as any).user;
-    const publisher = await prisma.publisher.findUnique({ where: { id: publisherId } });
-
-    if (publisher?.onboardingStep !== "user_info") {
-      return reply.code(400).send({ error: "Ungültiger Schritt", code: "WRONG_STEP" });
-    }
-
-    // Verify security is actually set up
-    const setup = await prisma.securitySetup.findUnique({
-      where: { keycloakSub: publisher.keycloakSub! },
-    });
-    if (!setup?.passwordChanged) {
-      return reply.code(400).send({ error: "Passwort muss zuerst geändert werden", code: "PASSWORD_REQUIRED" });
-    }
-
-    const hasPasskey = (await prisma.webAuthnCredential.count({
-      where: { keycloakSub: publisher.keycloakSub! },
-    })) > 0;
-    const hasTotp = !!setup.totpSecret;
-
-    if (!hasPasskey && !hasTotp) {
-      return reply.code(400).send({
-        error: "Mindestens ein zweiter Faktor erforderlich (Passkey oder TOTP)",
-        code: "2FA_REQUIRED",
-      });
-    }
-
-    await prisma.publisher.update({
-      where: { id: publisherId },
-      data: { onboardingStep: "security" },
-    });
-
-    const token = await generateOnboardingToken(app, publisherId, publisher.keycloakSub!);
-    await prisma.publisher.update({
-      where: { id: publisherId },
-      data: { onboardingToken: hashToken(token) },
-    });
-
-    await audit("onboarding.security_complete", publisher.keycloakSub!, "Publisher", publisherId);
-
-    return reply.send({ token, onboardingStep: "security" });
   });
 
   // ─── Accept Privacy (uses existing visibility enum format) ─────────
