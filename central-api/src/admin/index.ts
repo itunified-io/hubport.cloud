@@ -128,8 +128,8 @@ export async function adminRoutes(app: FastifyInstance) {
     reply.type('text/html').send(shell(`Tenant: ${tenant.subdomain}`, tenantDetail(tenant, devices)));
   });
 
-  // Internal-only endpoint for MCP skill to provision auth (Keycloak user link)
-  // Called during tenant approval — creates or resets TenantAuth record.
+  // Internal-only endpoint for MCP skill to provision auth (Keycloak user creation + DB link)
+  // Called during tenant approval — creates Keycloak user, stores link in TenantAuth.
   // Auth: ADMIN_SECRET — operator-only, NOT shared with tenants (SEC-003 privilege boundary fix)
   app.post('/internal/provision-auth', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!validateAdminAuth(req.headers.authorization)) {
@@ -144,21 +144,43 @@ export async function adminRoutes(app: FastifyInstance) {
     const tenant = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found' });
 
+    // Check for existing TenantAuth with keycloakUserId (idempotent)
+    const existingAuth = await prisma.tenantAuth.findUnique({ where: { tenantId: body.tenantId } });
+    let keycloakUserId = existingAuth?.keycloakUserId ?? body.keycloakUserId ?? null;
+
+    // Create Keycloak user if not already linked
+    if (!keycloakUserId && tenant.email) {
+      try {
+        const { createPortalUser } = await import('../lib/keycloak-admin.js');
+        keycloakUserId = await createPortalUser(
+          tenant.email,
+          tenant.name || tenant.subdomain,
+          '',
+        );
+        app.log.info({ tenantId: body.tenantId, keycloakUserId }, 'Portal Keycloak user created');
+      } catch (err) {
+        app.log.error({ err, tenantId: body.tenantId }, 'Failed to create Keycloak user — continuing without');
+      }
+    }
+
     // Upsert: create if missing, reset if exists (for re-approve cycles)
     await prisma.tenantAuth.upsert({
       where: { tenantId: body.tenantId },
       create: {
         tenantId: body.tenantId,
-        keycloakUserId: body.keycloakUserId ?? null,
+        keycloakUserId,
       },
       update: {
-        keycloakUserId: body.keycloakUserId ?? undefined,
+        keycloakUserId: keycloakUserId ?? undefined,
         failedAttempts: 0,
         lockedUntil: null,
       },
     });
 
-    return reply.send({ ok: true });
+    const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
+    const setupUrl = `${portalUrl}/portal/login`;
+
+    return reply.send({ ok: true, setupUrl });
   });
 
   // Internal-only endpoint for MCP skill to provision an M2M API token.
@@ -197,6 +219,32 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true, token: plaintext, expiresAt: expiresAt.toISOString() });
   });
 
+  // Internal-only endpoint for MCP skill to delete a portal Keycloak user during decommission.
+  // Auth: ADMIN_SECRET — operator-only
+  app.delete('/internal/portal-user/:tenantId', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
+    if (!validateAdminAuth(req.headers.authorization)) {
+      return reply.status(401).send({ error: 'unauthorized', message: 'Invalid or missing admin secret' });
+    }
+
+    const { tenantId } = req.params as { tenantId: string };
+    const auth = await prisma.tenantAuth.findUnique({ where: { tenantId } });
+
+    if (!auth?.keycloakUserId) {
+      return reply.send({ ok: true, message: 'No Keycloak user linked' });
+    }
+
+    try {
+      const { deletePortalUser } = await import('../lib/keycloak-admin.js');
+      await deletePortalUser(auth.keycloakUserId);
+      app.log.info({ tenantId, keycloakUserId: auth.keycloakUserId }, 'Portal Keycloak user deleted');
+    } catch (err) {
+      app.log.error({ err, tenantId }, 'Failed to delete Keycloak user');
+      return reply.status(500).send({ error: 'Failed to delete Keycloak user' });
+    }
+
+    return reply.send({ ok: true });
+  });
+
   // Internal-only endpoint for sending emails via pre-defined templates.
   // Auth: dedicated MAIL_RELAY_SECRET (not tenant API tokens) — ADR-0079.
   // Callers: hub-api (invite emails), hubport-admin skill (onboarding/rejection).
@@ -233,6 +281,7 @@ export async function adminRoutes(app: FastifyInstance) {
           name: string;
           subdomain: string;
           id: string;
+          setupUrl?: string;
         });
       } else if (body.templateName === 'rejection') {
         html = rejectionEmailHtml(
