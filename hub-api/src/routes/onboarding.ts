@@ -240,7 +240,9 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const publisher = await prisma.publisher.findUnique({ where: { id: publisherId } });
-    if (publisher?.onboardingStep !== "security") {
+    // Accept from "user_info" (invite wizard skips security step — Keycloak handles it via requiredActions)
+    // or "security" (if security step was explicitly completed)
+    if (publisher?.onboardingStep !== "user_info" && publisher?.onboardingStep !== "security") {
       return reply.code(400).send({ error: "Ungültiger Schritt", code: "WRONG_STEP" });
     }
 

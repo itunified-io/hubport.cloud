@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.6
+
+### Fix invite wizard privacy step "Ungültiger Schritt" (#256)
+- fix: `accept-privacy` endpoint required `onboardingStep === "security"` but invite wizard skips security step
+- fix: now accepts `"user_info"` or `"security"` — Keycloak handles security via requiredActions
+
 ## v2026.03.31.5
 
 ### Fix Matrix RBAC — ministerial_servant never matched (#254)
