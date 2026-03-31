@@ -85,7 +85,6 @@ export function useMapLibre({
 
     async function initMap() {
       try {
-        // @ts-expect-error -- maplibre-gl may not be installed yet
         const maplibregl = await import("maplibre-gl");
         if (cancelled || !container.current) return;
 
