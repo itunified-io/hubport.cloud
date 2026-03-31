@@ -415,32 +415,30 @@ export function getHeatmap(
 
 // ─── Import endpoints ───────────────────────────────────────────
 
-export function importKml(file: File, token: string): Promise<ImportKmlResult> {
-  const form = new FormData();
-  form.append("file", file);
+export async function importKml(file: File, token: string): Promise<ImportKmlResult> {
+  const kml = await file.text();
   return apiFetch("/territories/import/kml", token, {
     method: "POST",
-    body: form,
+    body: JSON.stringify({ kml, name: file.name.replace(/\.kml$/i, "") }),
   });
 }
 
-export function previewCsv(file: File, token: string): Promise<CsvPreviewResult> {
-  const form = new FormData();
-  form.append("file", file);
+export async function previewCsv(file: File, token: string): Promise<CsvPreviewResult> {
+  const csv = await file.text();
   return apiFetch("/territories/import/csv/preview", token, {
     method: "POST",
-    body: form,
+    body: JSON.stringify({ csv }),
   });
 }
 
 export function confirmCsvImport(
   data: {
+    csv: string;
     columns: Record<string, string>;
-    territoryId?: string;
   },
   token: string,
 ): Promise<CsvImportResult> {
-  return apiFetch("/territories/import/csv", token, {
+  return apiFetch("/territories/import/csv/confirm", token, {
     method: "POST",
     body: JSON.stringify(data),
   });

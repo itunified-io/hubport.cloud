@@ -35,6 +35,7 @@ export function ImportWizard() {
   const [kmlResult, setKmlResult] = useState<ImportKmlResult | null>(null);
 
   // CSV state
+  const [csvRawText, setCsvRawText] = useState<string>("");
   const [csvPreview, setCsvPreview] = useState<CsvPreviewResult | null>(null);
   const [csvColumns, setCsvColumns] = useState<Record<string, string>>({});
   const [csvResult, setCsvResult] = useState<CsvImportResult | null>(null);
@@ -67,6 +68,8 @@ export function ImportWizard() {
     setLoading(true);
     setError(null);
     try {
+      const text = await file.text();
+      setCsvRawText(text);
       const preview = await previewCsv(file, token);
       setCsvPreview(preview);
       setCsvColumns(preview.columns);
@@ -84,7 +87,7 @@ export function ImportWizard() {
     setLoading(true);
     setError(null);
     try {
-      const result = await confirmCsvImport({ columns: csvColumns }, token);
+      const result = await confirmCsvImport({ csv: csvRawText, columns: csvColumns }, token);
       setCsvResult(result);
       setMode("done");
     } catch (err) {
@@ -182,7 +185,7 @@ export function ImportWizard() {
             )}
             <input
               type="file"
-              accept=".kml"
+              accept=".kml,application/vnd.google-earth.kml+xml"
               onChange={handleKmlUpload}
               disabled={loading}
               className="hidden"
