@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.3
+
+### Fix invited user onboarding — password policy compliance (#250)
+- fix: `createInvitedKeycloakUser()` temp password doesn't meet KC policy — `randomUUID()` has no uppercase/special chars
+- fix: add CONFIGURE_TOTP + webauthn-register-passwordless to requiredActions for invited users
+
 ## v2026.03.31.2
 
 ### Fix German translation for midweek overseer (#248)

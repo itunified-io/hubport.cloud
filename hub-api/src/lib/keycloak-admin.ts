@@ -163,8 +163,9 @@ export async function createKeycloakUser(
  */
 export async function createInvitedKeycloakUser(email: string): Promise<string> {
   const token = await getAdminToken();
-  const { randomUUID } = await import("node:crypto");
-  const tempPassword = randomUUID();
+  const { randomBytes } = await import("node:crypto");
+  // Password must meet KC policy: 12+ chars, upper, lower, digit, special
+  const tempPassword = randomBytes(9).toString("base64").slice(0, 12) + "Aa1!";
 
   const res = await fetch(`${adminUrl()}/users`, {
     method: "POST",
@@ -184,7 +185,7 @@ export async function createInvitedKeycloakUser(email: string): Promise<string> 
           temporary: true,
         },
       ],
-      requiredActions: ["UPDATE_PASSWORD"],
+      requiredActions: ["UPDATE_PASSWORD", "CONFIGURE_TOTP", "webauthn-register-passwordless"],
     }),
   });
 
