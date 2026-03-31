@@ -261,7 +261,7 @@ model TerritoryAssignment {
   returnedAt  DateTime?
 
   territory Territory @relation(fields: [territoryId], references: [id])
-  publisher Publisher @relation(fields: [publisherId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
   @@index([territoryId])
   @@index([publisherId])
@@ -478,8 +478,8 @@ model MeetingAssignment {
   meeting      Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   slotTemplate MeetingSlotTemplate @relation(fields: [slotTemplateId], references: [id])
   workbookPart WorkbookPart?       @relation(fields: [workbookPartId], references: [id], onDelete: SetNull)
-  assignee     Publisher?          @relation("AssignedParts", fields: [assigneePublisherId], references: [id])
-  assistant    Publisher?          @relation("AssistedParts", fields: [assistantPublisherId], references: [id])
+  assignee     Publisher?          @relation("AssignedParts", fields: [assigneePublisherId], references: [id], onDelete: SetNull)
+  assistant    Publisher?          @relation("AssistedParts", fields: [assistantPublisherId], references: [id], onDelete: SetNull)
 
   @@unique([meetingId, slotTemplateId, workbookPartId])
   @@index([meetingId])
@@ -514,7 +514,7 @@ model Speaker {
   email             String?       /// @encrypted — contact email
   phone             String?       /// @encrypted — contact phone
   publisherId       String?       @unique /// FK to Publisher — set for local speakers, null for manual/hubport
-  publisher         Publisher?    @relation("PublisherSpeaker", fields: [publisherId], references: [id])
+  publisher         Publisher?    @relation("PublisherSpeaker", fields: [publisherId], references: [id], onDelete: SetNull)
   source            SpeakerSource @default(local)
   isLocal           Boolean       @default(true) /// @deprecated — use source enum. Kept for migration.
   status            SpeakerStatus @default(active)
@@ -731,7 +731,7 @@ model Notification {
   readAt      DateTime?
   createdAt   DateTime  @default(now())
 
-  publisher Publisher @relation(fields: [publisherId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
   @@index([publisherId, readAt])
 }
@@ -766,7 +766,7 @@ model CampaignInvite {
   id          String               @id @default(uuid())
   campaign    Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId  String
-  publisher   Publisher            @relation(fields: [publisherId], references: [id])
+  publisher   Publisher            @relation(fields: [publisherId], references: [id], onDelete: Cascade)
   publisherId String
   status      CampaignInviteStatus @default(pending)
   respondedAt DateTime?

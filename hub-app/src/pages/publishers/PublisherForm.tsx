@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
@@ -228,6 +228,10 @@ export function PublisherForm() {
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
 
+  // ─── Delete state ──────────────────────────────────────────────
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // ─── Load data ──────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -322,7 +326,9 @@ export function PublisherForm() {
 
   // ─── Status actions ─────────────────────────────────────────────
   const doStatusAction = async (action: string) => {
-    const res = await fetch(`${apiUrl}/users/${id}/${action}`, { method: "POST", headers });
+    const res = await fetch(`${apiUrl}/users/${id}/${action}`, {
+      method: "POST", headers, body: JSON.stringify({}),
+    });
     if (res.ok) {
       const updated = await res.json() as Publisher;
       setPublisherStatus(updated.status);
@@ -364,7 +370,7 @@ export function PublisherForm() {
     setResendError(null);
     try {
       const res = await fetch(`${apiUrl}/users/${id}/resend-invite`, {
-        method: "POST", headers,
+        method: "POST", headers, body: JSON.stringify({}),
       });
       if (res.ok) {
         setResendSuccess(true);
@@ -376,6 +382,26 @@ export function PublisherForm() {
       setResendError("Netzwerkfehler — bitte erneut versuchen");
     } finally {
       setResending(false);
+    }
+  };
+
+  // ─── Delete publisher ─────────────────────────────────────────
+  const deletePublisher = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${apiUrl}/publishers/${id}`, { method: "DELETE", headers });
+      if (res.ok || res.status === 204) {
+        navigate("/publishers");
+      } else {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        setFormError(data.error || `Delete failed: ${res.status}`);
+      }
+    } catch {
+      setFormError("Network error");
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -462,63 +488,71 @@ export function PublisherForm() {
 
       {/* ── Status Management Bar (edit mode only) ────────────────── */}
       {isEdit && canManageUsers && (
-        <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-[var(--text-muted)]"><FormattedMessage id="publishers.status" />:</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-              publisherStatus === "active" ? "text-[var(--green)] bg-[#22c55e14]" :
-              publisherStatus === "invited" || publisherStatus === "pending_approval" ? "text-[var(--amber)] bg-[#d9770614]" :
-              publisherStatus === "rejected" ? "text-[var(--red)] bg-[#ef444414]" :
-              "text-[var(--text-muted)] bg-[var(--glass)]"
-            }`}>
-              {publisherStatus === "active" && <UserCheck size={10} />}
-              {publisherStatus === "inactive" && <UserX size={10} />}
-              {publisherStatus.replace("_", " ")}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            {(publisherStatus === "pending_approval" || publisherStatus === "invited") && (
-              <>
-                <button type="button" onClick={() => doStatusAction("approve")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--green)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
-                  <UserCheck size={14} />
-                  <FormattedMessage id="publishers.approve" />
-                </button>
-                <button type="button" onClick={() => doStatusAction("reject")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
-                  <UserX size={14} />
-                  <FormattedMessage id="publishers.reject" />
-                </button>
-                {email && (
-                  <button
-                    type="button"
-                    onClick={resendInvite}
-                    disabled={resending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--amber)] border border-[var(--amber)] border-opacity-30 rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer disabled:opacity-50"
-                  >
-                    <RotateCw size={14} className={resending ? "animate-spin" : ""} />
-                    {resendSuccess
-                      ? <FormattedMessage id="publishers.resendInvite.success" />
-                      : <FormattedMessage id="publishers.resendInvite" />
-                    }
+        <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-[var(--text-muted)]"><FormattedMessage id="publishers.status" />:</span>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                publisherStatus === "active" ? "text-[var(--green)] bg-[#22c55e14]" :
+                publisherStatus === "invited" || publisherStatus === "pending_approval" ? "text-[var(--amber)] bg-[#d9770614]" :
+                publisherStatus === "rejected" ? "text-[var(--red)] bg-[#ef444414]" :
+                "text-[var(--text-muted)] bg-[var(--glass)]"
+              }`}>
+                {publisherStatus === "active" && <UserCheck size={12} />}
+                {(publisherStatus === "invited" || publisherStatus === "pending_approval") && <Mail size={12} />}
+                {publisherStatus === "rejected" && <UserX size={12} />}
+                {publisherStatus === "inactive" && <UserX size={12} />}
+                {publisherStatus.replace("_", " ")}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(publisherStatus === "pending_approval" || publisherStatus === "invited") && (
+                <>
+                  <button type="button" onClick={() => doStatusAction("approve")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--green)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                    <UserCheck size={14} />
+                    <FormattedMessage id="publishers.approve" />
                   </button>
-                )}
-                {resendError && (
-                  <span className="text-xs text-[var(--red)]">{resendError}</span>
-                )}
-              </>
-            )}
-            {publisherStatus === "active" && (
-              <button type="button" onClick={() => doStatusAction("deactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--red)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
-                <UserX size={14} />
-                <FormattedMessage id="publishers.deactivate" />
-              </button>
-            )}
-            {publisherStatus === "inactive" && (
-              <button type="button" onClick={() => doStatusAction("reactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--green)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
-                <UserCheck size={14} />
-                <FormattedMessage id="publishers.reactivate" />
-              </button>
-            )}
+                  <button type="button" onClick={() => doStatusAction("reject")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                    <UserX size={14} />
+                    <FormattedMessage id="publishers.reject" />
+                  </button>
+                  {email && (
+                    <button
+                      type="button"
+                      onClick={resendInvite}
+                      disabled={resending}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 transition-colors ${
+                        resendSuccess
+                          ? "text-[var(--green)] border-[var(--green)]/30 bg-[var(--green)]/5"
+                          : "text-[var(--amber)] border-[var(--amber)]/30 hover:bg-[var(--glass)]"
+                      }`}
+                    >
+                      <RotateCw size={14} className={resending ? "animate-spin" : ""} />
+                      {resendSuccess
+                        ? <FormattedMessage id="publishers.resendInvite.success" />
+                        : <FormattedMessage id="publishers.resendInvite" />
+                      }
+                    </button>
+                  )}
+                </>
+              )}
+              {publisherStatus === "active" && (
+                <button type="button" onClick={() => doStatusAction("deactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--red)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                  <UserX size={14} />
+                  <FormattedMessage id="publishers.deactivate" />
+                </button>
+              )}
+              {publisherStatus === "inactive" && (
+                <button type="button" onClick={() => doStatusAction("reactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--green)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                  <UserCheck size={14} />
+                  <FormattedMessage id="publishers.reactivate" />
+                </button>
+              )}
+            </div>
           </div>
+          {resendError && (
+            <div className="text-xs text-[var(--red)] px-1">{resendError}</div>
+          )}
         </div>
       )}
 
@@ -958,6 +992,50 @@ export function PublisherForm() {
           </button>
         </div>
       </form>
+
+      {/* ── Danger Zone (edit mode, admin only) ───────────────────── */}
+      {isEdit && canManageUsers && (
+        <div className="border border-[var(--red)]/30 rounded-[var(--radius)] bg-[var(--red)]/5 p-6 space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--red)] uppercase tracking-wide">
+            <AlertTriangle size={16} />
+            <FormattedMessage id="publishers.dangerZone" />
+          </h2>
+          {!showDeleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--red)] border border-[var(--red)]/30 rounded-[var(--radius-sm)] hover:bg-[var(--red)]/10 cursor-pointer transition-colors"
+            >
+              <Trash2 size={14} />
+              <FormattedMessage id="publishers.delete" />
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-[var(--text-muted)]">
+                <FormattedMessage id="publishers.delete.confirm" />
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={deletePublisher}
+                  disabled={deleting}
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                  {deleting ? "..." : <FormattedMessage id="publishers.delete" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+                >
+                  <FormattedMessage id="common.cancel" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
