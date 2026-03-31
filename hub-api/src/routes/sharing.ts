@@ -428,6 +428,134 @@ export async function sharingRoutes(app: FastifyInstance) {
     },
   );
 
+  // ─── Shared Territories ─────────────────────────────────────────────
+
+  // POST /sharing/territories/sync — push non-excluded territories to central
+  app.post(
+    "/sharing/territories/sync",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_SHARE)] },
+    async (_request, reply) => {
+      const cHeaders = await centralHeaders();
+
+      const territories = await prisma.territory.findMany({
+        where: { shareExcluded: false },
+        include: { addresses: true },
+      });
+
+      const sharedData = territories.map((t) => ({
+        number: t.number,
+        name: t.name,
+        boundaries: t.boundaries,
+        addresses: t.addresses.map((a) => ({
+          id: a.id,
+          lat: a.lat,
+          lng: a.lng,
+          street: a.street,
+          houseNumber: a.houseNumber,
+          city: a.city,
+          postcode: a.postcode,
+          status: a.status,
+          lastVisitAt: a.lastVisitAt,
+          notes: a.notes,
+        })),
+      }));
+
+      await fetch(`${CENTRAL_API_URL}/sharing/territories/${TENANT_ID}`, {
+        method: "PUT",
+        headers: cHeaders,
+        body: JSON.stringify(sharedData),
+      });
+
+      return reply.send({ synced: sharedData.length });
+    },
+  );
+
+  // GET /sharing/territories/:partnerId — fetch shared territories from a partner
+  app.get(
+    "/sharing/territories/:partnerId",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_VIEW)] },
+    async (request, reply) => {
+      const { partnerId } = request.params as { partnerId: string };
+      const cHeaders = await centralHeaders();
+
+      // Check local visibility: is "territories" enabled for this partner?
+      const vis = await prisma.sharingVisibility.findUnique({
+        where: { partnerId_category: { partnerId, category: "territories" } },
+      });
+      if (vis?.minRole === "disabled") {
+        return reply.send([]);
+      }
+
+      // Fetch from central-api
+      const res = await fetch(
+        `${CENTRAL_API_URL}/sharing/territories?tenantIds=${partnerId}`,
+        { headers: cHeaders },
+      );
+      if (!res.ok) return reply.code(res.status).send({ error: "Failed to fetch partner territories" });
+
+      const shared = (await res.json()) as Array<{ tenantId: string; data: unknown }>;
+      if (shared.length === 0) return reply.send([]);
+
+      const partnerData = shared[0];
+      return reply.send(partnerData?.data ?? []);
+    },
+  );
+
+  // GET /sharing/discover — search discoverable tenants
+  app.get(
+    "/sharing/discover",
+    { preHandler: [requirePermission(PERMISSIONS.SHARING_VIEW)] },
+    async (request, reply) => {
+      const query = request.query as Record<string, string>;
+      const cHeaders = await centralHeaders();
+
+      const params = new URLSearchParams();
+      if (query.name) params.set("name", query.name);
+      if (query.lat) params.set("lat", query.lat);
+      if (query.lng) params.set("lng", query.lng);
+      if (query.radius) params.set("radius", query.radius);
+      if (query.circuit) params.set("circuit", query.circuit);
+      if (query.region) params.set("region", query.region);
+
+      const res = await fetch(
+        `${CENTRAL_API_URL}/sharing/discover?${params.toString()}`,
+        { headers: cHeaders },
+      );
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        return reply.code(res.status).send(err);
+      }
+
+      return reply.send(await res.json());
+    },
+  );
+
+  // PUT /sharing/discovery — update own discovery profile
+  app.put(
+    "/sharing/discovery",
+    { preHandler: [requirePermission(PERMISSIONS.SHARING_CONFIGURE)] },
+    async (request, reply) => {
+      const cHeaders = await centralHeaders();
+
+      const res = await fetch(
+        `${CENTRAL_API_URL}/sharing/discovery/${TENANT_ID}`,
+        {
+          method: "PUT",
+          headers: cHeaders,
+          body: JSON.stringify(request.body),
+        },
+      );
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        return reply.code(res.status).send(err);
+      }
+
+      return reply.send(await res.json());
+    },
+  );
+
   // ─── Info ───────────────────────────────────────────────────────────
 
   // GET /sharing/info — return this tenant's sharing identity
