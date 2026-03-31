@@ -29,6 +29,9 @@ export interface PolicyContext {
   effectivePermissions: string[];
   denyRules: string[];
   privacyAccepted: boolean;
+  scopes?: {
+    territoryIds?: string[];
+  };
 }
 
 interface ActiveAppRole {
@@ -109,6 +112,42 @@ export async function buildContext(request: FastifyRequest): Promise<PolicyConte
     activeAppRoles.flatMap((r) => r.deniedPermissions),
   );
 
+  // Dynamic permissions from campaign meeting points
+  let scopes: { territoryIds?: string[] } | undefined;
+  if (publisher?.id) {
+    const activeMeetingPoints = await prisma.campaignMeetingPoint.findMany({
+      where: {
+        campaign: { status: "active" },
+        OR: [
+          { conductorId: publisher.id },
+          { assistantIds: { has: publisher.id } },
+        ],
+      },
+    });
+
+    for (const mp of activeMeetingPoints) {
+      const isConductor = mp.conductorId === publisher.id;
+
+      // Both conductors and assistants get:
+      basePerms.add(PERMISSIONS.CAMPAIGNS_ASSIST);
+      basePerms.add(PERMISSIONS.LOCATION_VIEW);
+
+      // Conductors additionally get:
+      if (isConductor) {
+        basePerms.add(PERMISSIONS.CAMPAIGNS_CONDUCT);
+        basePerms.add(PERMISSIONS.ASSIGNMENTS_MANAGE);
+      }
+    }
+
+    // Collect territory IDs for scope isolation
+    const territoryIds = [...new Set(
+      activeMeetingPoints.flatMap((mp) => mp.territoryIds),
+    )];
+    if (territoryIds.length > 0) {
+      scopes = { territoryIds };
+    }
+  }
+
   // Split into effective permissions and deny rules
   const allPerms = [...basePerms];
   const effectivePermissions = allPerms.filter(
@@ -125,6 +164,7 @@ export async function buildContext(request: FastifyRequest): Promise<PolicyConte
     effectivePermissions: [...new Set(effectivePermissions)],
     denyRules: [...new Set(denyRules)],
     privacyAccepted: publisher?.privacyAccepted ?? false,
+    ...(scopes ? { scopes } : {}),
   };
 }
 

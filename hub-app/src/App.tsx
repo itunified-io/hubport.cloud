@@ -9,6 +9,14 @@ import { PublisherForm } from "./pages/publishers/PublisherForm";
 import { ServiceGroups } from "./pages/publishers/ServiceGroups";
 import { TerritoryList } from "./pages/territories/TerritoryList";
 import { TerritoryMap } from "./pages/territories/TerritoryMap";
+import { ImportWizard } from "./pages/territories/ImportWizard";
+import { KanbanBoard } from "./pages/territories/KanbanBoard";
+import { CampaignList } from "./pages/territories/CampaignList";
+import { CampaignForm } from "./pages/territories/CampaignForm";
+import { CampaignDetail } from "./pages/territories/CampaignDetail";
+import { CampaignReport } from "./pages/territories/CampaignReport";
+import { GapDetection } from "./pages/territories/GapDetection";
+import ShareRedeemPage from "./pages/territories/ShareRedeemPage";
 import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
 import { MidweekPlanner } from "./pages/meetings/planner/MidweekPlanner";
@@ -71,6 +79,11 @@ export function App() {
     return <InviteWizard />;
   }
 
+  // Public route: shared territory view (no auth required)
+  if (window.location.pathname.startsWith("/shared/t/")) {
+    return <ShareRedeemPage />;
+  }
+
   if (!isAuthenticated) {
     return <LoginPage />;
   }
@@ -127,6 +140,62 @@ export function App() {
           element={
             <PermissionGuard requires="app:territories.view">
               <TerritoryMap />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/import"
+          element={
+            <PermissionGuard requires="app:territories.import">
+              <ImportWizard />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/kanban"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <KanbanBoard />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/campaigns"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <CampaignList />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/campaigns/new"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <CampaignForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/campaigns/:id"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <CampaignDetail />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/campaigns/:id/report"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <CampaignReport />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/gap-detection"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <GapDetection />
             </PermissionGuard>
           }
         />

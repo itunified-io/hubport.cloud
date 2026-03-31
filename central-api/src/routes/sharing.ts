@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma.js';
 import { apiTokenAuth } from '../middleware/api-token-auth.js';
+import { distanceKm } from '../lib/haversine.js';
 
 const VALID_CATEGORIES = ['speakers', 'territories'] as const;
 
@@ -438,5 +439,158 @@ export async function sharingRoutes(app: FastifyInstance) {
     });
 
     return reply.send(talks);
+  });
+
+  // ─── Discovery ───────────────────────────────────────────────────────
+
+  // GET /discover — search discoverable tenants by name/location/circuit/region
+  app.get('/discover', { preHandler: apiTokenAuth }, async (request, reply) => {
+    const { name, lat, lng, radius, circuit, region } = request.query as {
+      name?: string;
+      lat?: string;
+      lng?: string;
+      radius?: string;
+      circuit?: string;
+      region?: string;
+    };
+
+    // At least one filter required
+    if (!name && !lat && !lng && !circuit && !region) {
+      return reply.status(400).send({ error: 'At least one filter required (name, lat+lng, circuit, region)' });
+    }
+
+    const tenantId = (request as unknown as Record<string, unknown>).tenantId as string;
+
+    // Build where clause
+    const where: Record<string, unknown> = {
+      discoverable: true,
+      id: { not: tenantId }, // Exclude self
+      status: { in: ['APPROVED', 'ACTIVE'] },
+    };
+
+    if (name) {
+      where.name = { contains: name, mode: 'insensitive' };
+    }
+    if (circuit) {
+      where.circuitNumber = circuit;
+    }
+    if (region) {
+      where.region = { contains: region, mode: 'insensitive' };
+    }
+
+    const tenants = await prisma.tenant.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+        centroidLat: true,
+        centroidLng: true,
+        circuitNumber: true,
+        region: true,
+        country: true,
+        city: true,
+      },
+    });
+
+    // If lat/lng provided, calculate distances and optionally filter by radius
+    const parsedLat = lat ? parseFloat(lat) : undefined;
+    const parsedLng = lng ? parseFloat(lng) : undefined;
+    const parsedRadius = radius ? parseFloat(radius) : undefined;
+
+    let results = tenants.map((t) => {
+      let distance: number | null = null;
+      if (parsedLat != null && parsedLng != null && t.centroidLat != null && t.centroidLng != null) {
+        distance = distanceKm(parsedLat, parsedLng, t.centroidLat, t.centroidLng);
+      }
+      return { ...t, distance };
+    });
+
+    // Filter by radius if specified
+    if (parsedRadius != null && parsedLat != null && parsedLng != null) {
+      results = results.filter((r) => r.distance != null && r.distance <= parsedRadius);
+    }
+
+    // Sort by distance if lat/lng provided
+    if (parsedLat != null && parsedLng != null) {
+      results.sort((a, b) => {
+        if (a.distance == null) return 1;
+        if (b.distance == null) return -1;
+        return a.distance - b.distance;
+      });
+    }
+
+    // Look up partnership status for each result
+    const resultIds = results.map((r) => r.id);
+    const approvals = resultIds.length > 0
+      ? await prisma.sharingApproval.findMany({
+          where: {
+            OR: [
+              { requesterId: tenantId, approverId: { in: resultIds } },
+              { approverId: tenantId, requesterId: { in: resultIds } },
+            ],
+          },
+          select: { requesterId: true, approverId: true, status: true },
+        })
+      : [];
+
+    const partnershipMap = new Map<string, string>();
+    for (const a of approvals) {
+      const partnerId = a.requesterId === tenantId ? a.approverId : a.requesterId;
+      partnershipMap.set(partnerId, a.status);
+    }
+
+    const enriched = results.map((r) => ({
+      ...r,
+      partnershipStatus: partnershipMap.get(r.id) || null,
+    }));
+
+    return reply.send(enriched);
+  });
+
+  // PUT /discovery/:tenantId — update tenant discovery profile
+  app.put('/discovery/:tenantId', { preHandler: apiTokenAuth }, async (request, reply) => {
+    const { tenantId: paramTenantId } = request.params as { tenantId: string };
+    const callerTenantId = (request as unknown as Record<string, unknown>).tenantId as string;
+
+    // Only the tenant itself can update its discovery profile
+    if (paramTenantId !== callerTenantId) {
+      return reply.status(403).send({ error: 'Can only update own discovery profile' });
+    }
+
+    const body = request.body as {
+      discoverable?: boolean;
+      centroidLat?: number;
+      centroidLng?: number;
+      circuitNumber?: string;
+      region?: string;
+      country?: string;
+      city?: string;
+    };
+
+    const updated = await prisma.tenant.update({
+      where: { id: paramTenantId },
+      data: {
+        discoverable: body.discoverable,
+        centroidLat: body.centroidLat,
+        centroidLng: body.centroidLng,
+        circuitNumber: body.circuitNumber,
+        region: body.region,
+        country: body.country,
+        city: body.city,
+      },
+      select: {
+        id: true,
+        discoverable: true,
+        centroidLat: true,
+        centroidLng: true,
+        circuitNumber: true,
+        region: true,
+        country: true,
+        city: true,
+      },
+    });
+
+    return reply.send(updated);
   });
 }

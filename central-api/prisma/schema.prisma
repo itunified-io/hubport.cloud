@@ -28,6 +28,13 @@ model Tenant {
   tunnelId     String?
   tunnelToken  String?
   ztAppId      String?
+  discoverable   Boolean  @default(false)
+  centroidLat    Float?
+  centroidLng    Float?
+  circuitNumber  String?
+  region         String?
+  country        String?
+  city           String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   activatedAt  DateTime?
@@ -111,6 +118,7 @@ model SharedTerritory {
   id        String   @id @default(uuid())
   tenantId  String   @unique
   data      Json
+  syncedAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

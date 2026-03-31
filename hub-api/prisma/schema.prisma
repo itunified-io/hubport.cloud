@@ -178,6 +178,8 @@ model Publisher {
   awayPeriods        AwayPeriod[]
   speaker            Speaker?            @relation("PublisherSpeaker")
   notifications      Notification[]
+  addressVisits      AddressVisit[]
+  locationShares     LocationShare[]
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -248,11 +250,18 @@ model Territory {
   number      String   @unique
   name        String
   description String?
-  boundaries  Json? // GeoJSON for map display
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  boundaries     Json? // GeoJSON for map display
+  shareExcluded  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  assignments TerritoryAssignment[]
+  assignments      TerritoryAssignment[]
+  addresses        Address[]
+  osmFeatures      LocalOsmFeature[]
+  ignoredBuildings IgnoredOsmBuilding[]
+  osmRefreshJobs   OsmRefreshQueue[]
+  gapDetectionRuns GapDetectionRun[]
+  shares           TerritoryShare[]
 }
 
 model TerritoryAssignment {
@@ -260,13 +269,21 @@ model TerritoryAssignment {
   territoryId String
   publisherId String
   assignedAt  DateTime  @default(now())
+  assignedBy  String?   /// publisherId who assigned
   returnedAt  DateTime?
+  returnedBy  String?   /// publisherId who returned it
+  dueDate     DateTime? /// Adaptive due date
+  isActive    Boolean   @default(true)
+  campaignId  String?
+  isSuspended Boolean   @default(false)
+  groupId     String?   /// field group ID (deliberately unlinked)
+  notes       String?
 
   territory Territory @relation(fields: [territoryId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
-  @@index([territoryId])
-  @@index([publisherId])
+  @@index([territoryId, isActive])
+  @@index([publisherId, isActive])
 }
 
 model Meeting {
@@ -313,6 +330,17 @@ model CongregationSettings {
   defaultWeekendDay  Int @default(0)    /// 0=Sun
   defaultWeekendTime String @default("10:00")
   defaultLocation    String?
+  // Territory module settings
+  defaultCheckoutDays      Int     @default(120)
+  overdueReminderDays      Int     @default(14)
+  returnedVisibleDays      Int     @default(30)
+  osmRefreshCooldownHours  Int     @default(24)
+  gapDetectionMinArea      Int     @default(50)
+  defaultShareScope        String  @default("boundary")
+  defaultShareDays         Int     @default(30)
+  shareMaxDays             Int     @default(90)
+  autoSyncTerritories      Boolean @default(false)
+  requirePINForFullShare   Boolean @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -740,11 +768,63 @@ model Notification {
   @@index([publisherId, readAt])
 }
 
+enum AddressType {
+  residential
+  business
+  apartment_building
+  rural
+}
+
+enum AddressStatus {
+  active
+  do_not_call
+  not_at_home
+  moved
+  deceased
+  foreign_language
+  archived
+}
+
+enum AddressSource {
+  manual
+  osm
+  csv_import
+}
+
+enum VisitOutcome {
+  contacted
+  not_at_home
+  do_not_call
+  moved
+  letter_sent
+  phone_attempted
+}
+
+enum LocalOsmType {
+  building_override
+  street
+  poi
+  custom
+}
+
+enum CampaignStatus {
+  draft
+  active
+  closed
+  archived
+}
+
 enum CampaignTemplate {
   gedaechtnismahl
   kongress
   predigtdienstaktion
   custom
+}
+
+enum FieldGroupStatus {
+  open
+  in_field
+  closed
 }
 
 enum CampaignInviteStatus {
@@ -757,11 +837,13 @@ model Campaign {
   id           String             @id @default(uuid())
   title        String
   template     CampaignTemplate
+  status       CampaignStatus     @default(draft)
   startDate    DateTime
   endDate      DateTime
   matrixRoomId String?
   createdBy    String             /// keycloakSub of creator
   invitations  CampaignInvite[]
+  meetingPoints CampaignMeetingPoint[]
   createdAt    DateTime           @default(now())
   deletedAt    DateTime?          /// auto-delete 7 days after endDate
 }
@@ -779,6 +861,75 @@ model CampaignInvite {
   @@index([publisherId])
 }
 
+// ─── Campaign Meeting Points ────────────────────────────────────────
+
+/// Meeting point within a campaign — links conductor, assistants, and territories.
+/// Full model in Chunk 2; stub for policy engine dynamic permissions.
+model CampaignMeetingPoint {
+  id           String   @id @default(uuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  conductorId  String   /// publisherId of conductor
+  assistantIds String[] /// publisherIds of assistants
+  territoryIds String[] /// territory IDs assigned to this meeting point
+  name         String?  /// Meeting point name/location
+  latitude     Float?
+  longitude    Float?
+  address      String?
+  dayOfWeek    String?
+  time         String?
+  createdAt    DateTime @default(now())
+
+  fieldGroups CampaignFieldGroup[]
+
+  @@index([campaignId])
+  @@index([conductorId])
+}
+
+model CampaignFieldGroup {
+  id              String           @id @default(uuid())
+  meetingPointId  String
+  meetingPoint    CampaignMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
+  name            String?
+  memberIds       String[]         /// publisherIds
+  territoryIds    String[]         /// territory IDs (a group can work multiple territories)
+  sessionDate     DateTime?        @db.Date
+  sessionTime     String?
+  status          FieldGroupStatus @default(open)
+  startedAt       DateTime?
+  closedAt        DateTime?
+  notes           String?
+  createdAt       DateTime         @default(now())
+
+  locationShares  LocationShare[]
+
+  @@index([meetingPointId])
+}
+
+enum LocationDuration {
+  one_hour
+  four_hours
+  eight_hours
+}
+
+model LocationShare {
+  id             String            @id @default(uuid())
+  fieldGroupId   String
+  fieldGroup     CampaignFieldGroup @relation(fields: [fieldGroupId], references: [id], onDelete: Cascade)
+  publisherId    String
+  publisher      Publisher         @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  lastLatitude   Float?            /// Cleared on deactivation
+  lastLongitude  Float?            /// Cleared on deactivation
+  isActive       Boolean           @default(true)
+  duration       LocationDuration
+  consentedAt    DateTime          @default(now())
+  lastUpdatedAt  DateTime?
+  expiresAt      DateTime          /// Auto-expire after duration
+
+  @@index([fieldGroupId, isActive])
+  @@index([publisherId])
+}
+
 // ─── Sharing Visibility RBAC ──────────────────────────────────────────
 
 /// Controls which roles in THIS congregation can see shared data from each partner.
@@ -788,8 +939,169 @@ model SharingVisibility {
   partnerId String   // The sharing partner's tenantId (from central-api)
   category  String   // "speakers" | "territories"
   minRole   String   // "enabled" | "disabled"
+  depth     String   @default("boundary") /// "boundary" | "addresses" | "full"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([partnerId, category])
+}
+
+// ─── Territory Sharing ──────────────────────────────────────────────
+
+model TerritoryShare {
+  id          String    @id @default(uuid())
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  codeHash    String    @unique /// SHA-256 of share code
+  scope       String    @default("boundary") /// "boundary" | "addresses" | "full"
+  pinHash     String?   /// SHA-256 hash of PIN (required for scope=full)
+  pinAttempts Int       @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  revokedBy   String?   /// publisherId
+  isActive    Boolean   @default(true)
+  createdBy   String    /// publisherId
+  createdAt   DateTime  @default(now())
+
+  accessLogs ShareAccessLog[]
+
+  @@index([territoryId])
+  @@index([isActive, expiresAt])
+}
+
+model ShareAccessLog {
+  id        String   @id @default(uuid())
+  shareId   String
+  share     TerritoryShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  ipHash    String   /// SHA-256 of IP
+  userAgent String?
+  scope     String   /// What was actually viewed
+  createdAt DateTime @default(now())
+
+  @@index([shareId])
+  @@index([createdAt])
+}
+
+// ─── Territory Addresses & OSM ──────────────────────────────────────
+
+model Address {
+  id           String        @id @default(uuid())
+  territoryId  String
+  territory    Territory     @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  osmId        String?       /// OSM node/way ID
+  lat          Float
+  lng          Float
+  // point column added via raw SQL (PostGIS)
+  street       String?
+  houseNumber  String?
+  city         String?
+  postcode     String?
+  buildingType String?       /// e.g. "apartments", "house", "yes"
+  units        Int           @default(1)
+  bellCount    Int           @default(1) /// Number of doorbells/units
+  floor        String?
+  type         AddressType   @default(residential)
+  status       AddressStatus @default(active)
+  source       AddressSource @default(manual)
+  languages    String[]      /// ISO 639-1 codes spoken here
+  doNotCallReason  String?   /// Reason for DNC status
+  doNotVisitUntil  DateTime? /// Temporary DNC expiry
+  notes        String?
+  lastVisitAt  DateTime?
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  visits AddressVisit[]
+
+  @@index([territoryId])
+  @@index([osmId])
+  @@index([status])
+}
+
+model AddressVisit {
+  id          String       @id @default(uuid())
+  addressId   String
+  address     Address      @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  publisherId String
+  publisher   Publisher    @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  outcome     VisitOutcome
+  notes       String?
+  visitedAt   DateTime     @default(now())
+
+  @@index([addressId])
+  @@index([publisherId])
+  @@index([visitedAt])
+}
+
+model LocalOsmFeature {
+  id           String       @id @default(uuid())
+  territoryId  String
+  territory    Territory    @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  osmId        String?      /// Nullable for user-created features
+  featureType  LocalOsmType
+  tags         Json         /// Raw OSM tags
+  geometry     Json         /// GeoJSON geometry
+  enrichedName String?      /// Manual name override
+  enrichedType String?      /// Manual type override
+  createdBy    String?      /// publisherId
+  updatedBy    String?      /// publisherId
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([territoryId, osmId])
+  @@index([territoryId])
+}
+
+model IgnoredOsmBuilding {
+  id            String    @id @default(uuid())
+  territoryId   String
+  territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  osmId         String
+  reason        String    /// Required reason for ignoring
+  notes         String?
+  evidence      String?   /// What evidence prompted the ignore
+  lat           Float?
+  lng           Float?
+  streetAddress String?
+  buildingType  String?
+  ignoredBy     String    /// publisherId
+  createdAt     DateTime  @default(now())
+
+  @@unique([territoryId, osmId])
+}
+
+model OsmRefreshQueue {
+  id               String    @id @default(uuid())
+  territoryId      String
+  territory        Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  status           String    @default("pending") /// pending, processing, completed, failed
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  buildingsFound   Int?
+  addressesCreated Int?
+  addressesUpdated Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([territoryId])
+  @@index([status])
+}
+
+model GapDetectionRun {
+  id              String    @id @default(uuid())
+  territoryId     String
+  territory       Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  status          String    @default("pending") /// pending, running, completed, failed
+  totalBuildings  Int?
+  coveredCount    Int?
+  gapCount        Int?
+  resultGeoJson   Json?     /// GeoJSON of uncovered areas
+  startedAt       DateTime?
+  completedAt     DateTime?
+  runBy           String    /// publisherId
+  createdAt       DateTime  @default(now())
+
+  @@index([territoryId])
 }
