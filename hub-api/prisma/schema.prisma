@@ -1105,3 +1105,170 @@ model GapDetectionRun {
 
   @@index([territoryId])
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Central-API owned tables — @@ignore prevents hub-api db push from
+// dropping them. These stubs MUST stay in sync with central-api/prisma/schema.prisma.
+// See incident history in hubport-deploy skill (#241, #244).
+// ═══════════════════════════════════════════════════════════════════
+
+enum TenantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+}
+
+enum SharingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}
+
+model Tenant {
+  id             String       @id @default(uuid())
+  name           String
+  email          String
+  ownerFirstName String?
+  ownerLastName  String?
+  subdomain      String       @unique
+  status         TenantStatus @default(PENDING)
+  role           String       @default("owner")
+  rejectReason   String?
+  tunnelId       String?
+  tunnelToken    String?
+  ztAppId        String?
+  discoverable   Boolean  @default(false)
+  centroidLat    Float?
+  centroidLng    Float?
+  circuitNumber  String?
+  region         String?
+  country        String?
+  city           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  activatedAt    DateTime?
+
+  @@ignore
+}
+
+model TenantAuth {
+  id             String    @id @default(uuid())
+  tenantId       String    @unique
+  keycloakUserId String?
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@ignore
+}
+
+model TenantApiToken {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tokenHash String
+  expiresAt DateTime
+  rotatedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([tenantId])
+  @@ignore
+}
+
+model SharingApproval {
+  id                    String        @id @default(uuid())
+  requesterId           String
+  approverId            String
+  status                SharingStatus @default(PENDING)
+  offeredCategories     Json     @default("[\"speakers\",\"territories\"]")
+  acceptedCategories    Json?
+  requesterContactName  String?
+  requesterContactEmail String?
+  message               String?
+  termsAcceptedAt       DateTime?
+  termsVersion          String?
+  rejectedReason        String?
+  respondedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([requesterId, approverId])
+  @@ignore
+}
+
+model SharedTerritory {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json
+  syncedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@ignore
+}
+
+model SharedTalk {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  @@ignore
+}
+
+model SharedSpeaker {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  @@ignore
+}
+
+model SetupCode {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  tenantId   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  consumedIp String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+  @@ignore
+}
+
+model TenantDevice {
+  id         String    @id @default(uuid())
+  tenantId   String
+  deviceCode String    @unique
+  hostname   String
+  os         String
+  arch       String
+  ip         String
+  status     String    @default("pending")
+  expiresAt  DateTime
+  approvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([deviceCode])
+  @@ignore
+}
+
+model TenantAuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  action    String
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@ignore
+}
