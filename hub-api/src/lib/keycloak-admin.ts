@@ -230,6 +230,9 @@ export async function createInvitedKeycloakUser(
       throw new Error(`Keycloak update existing user error: ${updateRes.status} ${await updateRes.text()}`);
     }
 
+    // Ensure "publisher" realm role is assigned
+    try { await assignKeycloakRole(userId, "publisher"); } catch { /* role may already be assigned */ }
+
     return { userId, tempPassword };
   }
 
@@ -239,7 +242,12 @@ export async function createInvitedKeycloakUser(
 
   const location = res.headers.get("Location");
   if (!location) throw new Error("No Location header in Keycloak create response");
-  return { userId: location.split("/").pop()!, tempPassword };
+  const userId = location.split("/").pop()!;
+
+  // Assign default "publisher" realm role for base permissions
+  try { await assignKeycloakRole(userId, "publisher"); } catch { /* role may not exist yet */ }
+
+  return { userId, tempPassword };
 }
 
 /**
@@ -275,6 +283,42 @@ export async function assignKeycloakRole(
 
   if (!res.ok) {
     throw new Error(`Keycloak assign role error: ${res.status}`);
+  }
+}
+
+/**
+ * Remove a realm role from a Keycloak user.
+ */
+export async function removeKeycloakRole(
+  userId: string,
+  roleName: string,
+): Promise<void> {
+  const token = await getAdminToken();
+
+  // First get the role representation
+  const roleRes = await fetch(`${adminUrl()}/roles/${roleName}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!roleRes.ok) {
+    throw new Error(`Keycloak role lookup error: ${roleRes.status}`);
+  }
+  const role = await roleRes.json();
+
+  // Remove role from user
+  const res = await fetch(
+    `${adminUrl()}/users/${safePath(userId, "userId")}/role-mappings/realm`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([role]),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Keycloak remove role error: ${res.status}`);
   }
 }
 
