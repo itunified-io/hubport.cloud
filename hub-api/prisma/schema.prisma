@@ -250,9 +250,10 @@ model Territory {
   number      String   @unique
   name        String
   description String?
-  boundaries  Json? // GeoJSON for map display
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  boundaries     Json? // GeoJSON for map display
+  shareExcluded  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   assignments      TerritoryAssignment[]
   addresses        Address[]
@@ -269,6 +270,10 @@ model TerritoryAssignment {
   publisherId String
   assignedAt  DateTime  @default(now())
   returnedAt  DateTime?
+  campaignId  String?
+  isSuspended Boolean   @default(false)
+  returnedBy  String?   /// publisherId who returned it
+  groupId     String?   /// field group ID (deliberately unlinked)
 
   territory Territory @relation(fields: [territoryId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
@@ -321,6 +326,17 @@ model CongregationSettings {
   defaultWeekendDay  Int @default(0)    /// 0=Sun
   defaultWeekendTime String @default("10:00")
   defaultLocation    String?
+  // Territory module settings
+  defaultCheckoutDays      Int     @default(120)
+  overdueReminderDays      Int     @default(14)
+  returnedVisibleDays      Int     @default(30)
+  osmRefreshCooldownHours  Int     @default(24)
+  gapDetectionMinArea      Int     @default(50)
+  defaultShareScope        String  @default("boundary")
+  defaultShareDays         Int     @default(30)
+  shareMaxDays             Int     @default(90)
+  autoSyncTerritories      Boolean @default(false)
+  requirePINForFullShare   Boolean @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -796,6 +812,12 @@ enum CampaignTemplate {
   custom
 }
 
+enum FieldGroupStatus {
+  open
+  in_field
+  closed
+}
+
 enum CampaignInviteStatus {
   pending
   accepted
@@ -813,6 +835,7 @@ model Campaign {
   createdBy    String             /// keycloakSub of creator
   invitations  CampaignInvite[]
   meetingPoints CampaignMeetingPoint[]
+  locationShares LocationShare[]
   createdAt    DateTime           @default(now())
   deletedAt    DateTime?          /// auto-delete 7 days after endDate
 }
@@ -841,10 +864,47 @@ model CampaignMeetingPoint {
   conductorId  String   /// publisherId of conductor
   assistantIds String[] /// publisherIds of assistants
   territoryIds String[] /// territory IDs assigned to this meeting point
+  name         String?  /// Meeting point name/location
+  location     Json?    /// { lat, lng, address }
+  schedule     Json?    /// { dayOfWeek, time }
   createdAt    DateTime @default(now())
+
+  fieldGroups CampaignFieldGroup[]
 
   @@index([campaignId])
   @@index([conductorId])
+}
+
+model CampaignFieldGroup {
+  id              String           @id @default(uuid())
+  meetingPointId  String
+  meetingPoint    CampaignMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
+  conductorId     String           /// publisherId
+  memberIds       String[]         /// publisherIds
+  territoryId     String?
+  status          FieldGroupStatus @default(open)
+  startedAt       DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([meetingPointId])
+}
+
+model LocationShare {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  publisherId String
+  publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  lat         Float
+  lng         Float
+  accuracy    Float?
+  sharedAt    DateTime @default(now())
+  expiresAt   DateTime /// Auto-expire after campaign configurable duration
+
+  @@index([campaignId])
+  @@index([publisherId])
+  @@index([expiresAt])
 }
 
 // ─── Sharing Visibility RBAC ──────────────────────────────────────────
