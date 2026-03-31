@@ -1,6 +1,11 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.2
+
+### Fix German translation for midweek overseer (#248)
+- fix: rename "LAD-Aufseher" to "Leben und Dienst Aufseher" in de-DE.json
+
 ## v2026.03.26.9
 
 ### Mandatory Keycloak auth — remove custom WebAuthn/TOTP (#241)
