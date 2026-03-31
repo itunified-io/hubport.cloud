@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Kanban,
   Megaphone,
+  ScanSearch,
+  Upload,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getAppVersion } from "@/lib/config";
@@ -39,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { to: "/territories/kanban", labelId: "nav.territories.kanban", icon: Kanban, requiredPermission: "app:territories.view" },
       { to: "/territories/campaigns", labelId: "nav.territories.campaigns", icon: Megaphone, requiredPermission: "app:territories.view" },
+      { to: "/territories/gap-detection", labelId: "nav.territories.gapDetection", icon: ScanSearch, requiredPermission: "app:territories.view" },
+      { to: "/territories/import", labelId: "nav.territories.import", icon: Upload, requiredPermission: "app:territories.import" },
     ],
   },
   {

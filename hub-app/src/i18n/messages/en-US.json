@@ -135,6 +135,8 @@
   "publishers.notes.placeholder": "Internal notes (visible to elders only)",
   "nav.territories.kanban": "Board",
   "nav.territories.campaigns": "Campaigns",
+  "nav.territories.gapDetection": "Gap Detection",
+  "nav.territories.import": "Import",
   "territories.title": "Territories",
   "territories.map": "Map View",
   "territories.empty": "No territories found.",

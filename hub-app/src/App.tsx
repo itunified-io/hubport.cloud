@@ -15,6 +15,8 @@ import { CampaignList } from "./pages/territories/CampaignList";
 import { CampaignForm } from "./pages/territories/CampaignForm";
 import { CampaignDetail } from "./pages/territories/CampaignDetail";
 import { CampaignReport } from "./pages/territories/CampaignReport";
+import { GapDetection } from "./pages/territories/GapDetection";
+import ShareRedeemPage from "./pages/territories/ShareRedeemPage";
 import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
 import { MidweekPlanner } from "./pages/meetings/planner/MidweekPlanner";
@@ -75,6 +77,11 @@ export function App() {
   // Public route: invite signup wizard (no auth required)
   if (window.location.pathname.startsWith("/invite")) {
     return <InviteWizard />;
+  }
+
+  // Public route: shared territory view (no auth required)
+  if (window.location.pathname.startsWith("/shared/t/")) {
+    return <ShareRedeemPage />;
   }
 
   if (!isAuthenticated) {
@@ -181,6 +188,14 @@ export function App() {
           element={
             <PermissionGuard requires="app:territories.view">
               <CampaignReport />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/gap-detection"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <GapDetection />
             </PermissionGuard>
           }
         />
