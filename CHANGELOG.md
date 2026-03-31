@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.5
+
+### Fix Matrix RBAC — ministerial_servant never matched (#254)
+- fix: `shouldJoinRoom()` compared `"ministerialServant"` (camelCase) but Prisma enum is `"ministerial_servant"` (snake_case)
+- fix: applied in both `matrix-rooms.ts` and `matrix-provisioning.ts`
+
 ## v2026.03.31.4
 
 ### Publisher edit UI — resend invite, delete user, polish (#252)
