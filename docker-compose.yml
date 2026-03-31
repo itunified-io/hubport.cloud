@@ -21,6 +21,7 @@ services:
       - APP_PORT=3000
       - API_PORT=3001
       - WIZARD_PORT=8080
+      - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +93,13 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel run --token ${CF_TUNNEL_TOKEN}
@@ -113,6 +121,7 @@ services:
 volumes:
   postgres-data:
   vault-data:
+  redis-data:
   # warp-data:
 
 networks:
