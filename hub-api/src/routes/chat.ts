@@ -6,7 +6,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import prisma from "../lib/prisma.js";
-import { createRoom, setDirectRoom, ensureMatrixUser, getMatrixUserToken } from "../lib/matrix-admin.js";
+import { createRoom, setDirectRoom, getDirectRooms, ensureMatrixUser, getMatrixUserToken, joinUserToRoom, getRoomMembers } from "../lib/matrix-admin.js";
 import {
   ensureSpacesProvisioned,
   provisionAllActivePublishers,
@@ -65,13 +65,43 @@ export async function chatRoutes(app: FastifyInstance) {
       await ensureMatrixUser(me.id, myName);
       await ensureMatrixUser(target.id, targetName);
 
-      // Create DM room
+      // Deduplicate: check both users' m.direct data for an existing DM room
+      const myDirects = await getDirectRooms(myMatrixId);
+      const targetDirects = await getDirectRooms(targetMatrixId);
+      const allCandidateIds = [
+        ...(myDirects[targetMatrixId] ?? []),
+        ...(targetDirects[myMatrixId] ?? []),
+      ].filter((v, i, a) => a.indexOf(v) === i); // unique
+
+      for (const candidateId of allCandidateIds) {
+        const members = await getRoomMembers(candidateId);
+        // Repair: if room exists but a user isn't joined, join them
+        const myJoined = members.includes(myMatrixId);
+        const targetJoined = members.includes(targetMatrixId);
+        if (myJoined || targetJoined) {
+          if (!myJoined) await joinUserToRoom(candidateId, myMatrixId);
+          if (!targetJoined) await joinUserToRoom(candidateId, targetMatrixId);
+          // Ensure m.direct is set on both sides
+          if (!(myDirects[targetMatrixId] ?? []).includes(candidateId)) {
+            await setDirectRoom(myMatrixId, targetMatrixId, candidateId);
+          }
+          if (!(targetDirects[myMatrixId] ?? []).includes(candidateId)) {
+            await setDirectRoom(targetMatrixId, myMatrixId, candidateId);
+          }
+          return reply.code(200).send({ roomId: candidateId, targetPublisherId: target.id, targetName });
+        }
+      }
+
+      // No existing DM found — create new room
       const roomName = `${myName} & ${targetName}`;
       const roomId = await createRoom({
         name: roomName,
         isDirect: true,
-        invite: [targetMatrixId],
       });
+
+      // Join both users to the room via Synapse admin API
+      await joinUserToRoom(roomId, myMatrixId);
+      await joinUserToRoom(roomId, targetMatrixId);
 
       // Set m.direct account data for both users so clients show it as DM
       await setDirectRoom(myMatrixId, targetMatrixId, roomId);

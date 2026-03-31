@@ -173,21 +173,16 @@ export async function createRoom(opts: {
 /**
  * Set the m.direct account data for a user, marking a room as a DM.
  * This is required for Matrix clients to display the room in the DM section.
+ *
+ * Uses a per-user token so the Client API PUT writes to the correct user's
+ * account data (admin token would write to the admin bot instead).
+ * Reads current data via Synapse Admin API (admin-scoped, reads target user).
  */
 export async function setDirectRoom(userId: string, targetUserId: string, roomId: string): Promise<void> {
   const { adminUrl } = await getMatrixConfig();
-  const token = await getAdminToken();
 
-  // GET current m.direct data
-  const getRes = await fetch(
-    `${adminUrl}/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/m.direct`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-
-  let directMap: Record<string, string[]> = {};
-  if (getRes.ok) {
-    directMap = (await getRes.json()) as Record<string, string[]>;
-  }
+  // Read current m.direct via Admin API (correctly reads target user's data)
+  const directMap = await getDirectRooms(userId);
 
   // Add the new DM room
   if (!directMap[targetUserId]) directMap[targetUserId] = [];
@@ -195,15 +190,47 @@ export async function setDirectRoom(userId: string, targetUserId: string, roomId
     directMap[targetUserId].push(roomId);
   }
 
-  // PUT updated m.direct data
+  // Write via Client API using a per-user token (scoped to this user)
+  const userToken = await getMatrixUserToken(userId);
   await fetch(
     `${adminUrl}/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/m.direct`,
     {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${userToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(directMap),
     },
   );
+}
+
+/**
+ * Get all DM room IDs for a user mapped by target user ID.
+ * Uses a per-user token with the Client API so the request reads the
+ * correct user's m.direct (admin token would read the admin bot's data).
+ */
+export async function getDirectRooms(userId: string): Promise<Record<string, string[]>> {
+  const { adminUrl } = await getMatrixConfig();
+  const userToken = await getMatrixUserToken(userId);
+  const res = await fetch(
+    `${adminUrl}/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/m.direct`,
+    { headers: { Authorization: `Bearer ${userToken}` } },
+  );
+  if (!res.ok) return {};
+  return (await res.json()) as Record<string, string[]>;
+}
+
+/**
+ * Get joined members of a room.
+ */
+export async function getRoomMembers(roomId: string): Promise<string[]> {
+  const { adminUrl } = await getMatrixConfig();
+  const token = await getAdminToken();
+  const res = await fetch(
+    `${adminUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/joined_members`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as { joined: Record<string, unknown> };
+  return Object.keys(data.joined || {});
 }
 
 /**
