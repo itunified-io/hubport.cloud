@@ -8,6 +8,7 @@ import { PublisherList } from "./pages/publishers/PublisherList";
 import { PublisherForm } from "./pages/publishers/PublisherForm";
 import { ServiceGroups } from "./pages/publishers/ServiceGroups";
 import { TerritoryList } from "./pages/territories/TerritoryList";
+import { TerritoryDetail } from "./pages/territories/TerritoryDetail";
 import { TerritoryMap } from "./pages/territories/TerritoryMap";
 import { ImportWizard } from "./pages/territories/ImportWizard";
 import { KanbanBoard } from "./pages/territories/KanbanBoard";
@@ -196,6 +197,14 @@ export function App() {
           element={
             <PermissionGuard requires="app:territories.view">
               <GapDetection />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/:id"
+          element={
+            <PermissionGuard requires="app:territories.view">
+              <TerritoryDetail />
             </PermissionGuard>
           }
         />

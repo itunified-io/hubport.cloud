@@ -246,6 +246,10 @@ export function listTerritories(token: string): Promise<TerritoryListItem[]> {
   return apiFetch("/territories", token);
 }
 
+export function getTerritory(id: string, token: string): Promise<TerritoryListItem> {
+  return apiFetch(`/territories/${id}`, token);
+}
+
 // ─── Address endpoints ──────────────────────────────────────────
 
 export function listAddresses(
