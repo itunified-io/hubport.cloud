@@ -46,6 +46,11 @@ export function ImportWizard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.name.toLowerCase().endsWith(".kml")) {
+      setError("Please select a .kml file");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -185,7 +190,7 @@ export function ImportWizard() {
             )}
             <input
               type="file"
-              accept=".kml,application/vnd.google-earth.kml+xml"
+              accept=".kml,application/vnd.google-earth.kml+xml,application/xml,text/xml,text/plain"
               onChange={handleKmlUpload}
               disabled={loading}
               className="hidden"

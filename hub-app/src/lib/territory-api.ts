@@ -223,6 +223,29 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+// ─── Territory list endpoint ────────────────────────────────────
+
+export interface TerritoryListItem {
+  id: string;
+  number: string;
+  name: string;
+  description: string | null;
+  boundaries: unknown | null;
+  createdAt: string;
+  updatedAt: string;
+  assignments: Array<{
+    id: string;
+    publisherId: string;
+    assignedAt: string;
+    returnedAt: string | null;
+    publisher: { id: string; firstName: string; lastName: string };
+  }>;
+}
+
+export function listTerritories(token: string): Promise<TerritoryListItem[]> {
+  return apiFetch("/territories", token);
+}
+
 // ─── Address endpoints ──────────────────────────────────────────
 
 export function listAddresses(
