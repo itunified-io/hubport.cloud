@@ -1,6 +1,17 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.4
+
+### Publisher edit UI — resend invite, delete user, polish (#252)
+- fix: resend invite returns 400 — Fastify rejects empty JSON body when Content-Type is set
+- fix: all status actions (approve/reject/deactivate/reactivate) send empty body `{}`
+- feat: admin can delete a publisher with full cascade cleanup (DB + Keycloak user)
+- feat: danger zone section with delete confirmation on publisher edit page
+- fix: add `onDelete: Cascade` to TerritoryAssignment, Notification, CampaignInvite
+- fix: add `onDelete: SetNull` to MeetingAssignment (assignee/assistant), Speaker
+- polish: status bar wraps on small screens, resend button visual feedback, error on own line
+
 ## v2026.03.31.3
 
 ### Fix invited user onboarding — password policy compliance (#250)

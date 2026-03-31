@@ -5,6 +5,7 @@ import { requirePermission } from "../lib/rbac.js";
 import { maskFields, audit } from "../lib/policy-engine.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
+import { deleteKeycloakUser } from "../lib/keycloak-admin.js";
 
 const PublisherBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
@@ -191,6 +192,15 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
       });
       if (!existing) {
         return reply.code(404).send({ error: "Not found" });
+      }
+
+      // Delete Keycloak user if linked (non-fatal — DB cleanup proceeds)
+      if (existing.keycloakSub) {
+        try {
+          await deleteKeycloakUser(existing.keycloakSub);
+        } catch (err) {
+          app.log.warn({ err, keycloakSub: existing.keycloakSub }, "publisher.delete: Keycloak user removal failed");
+        }
       }
 
       await prisma.publisher.delete({
