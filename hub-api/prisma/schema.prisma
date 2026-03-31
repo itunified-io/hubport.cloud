@@ -916,10 +916,47 @@ model SharingVisibility {
   partnerId String   // The sharing partner's tenantId (from central-api)
   category  String   // "speakers" | "territories"
   minRole   String   // "enabled" | "disabled"
+  depth     String   @default("boundary") /// "boundary" | "addresses" | "full"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([partnerId, category])
+}
+
+// ─── Territory Sharing ──────────────────────────────────────────────
+
+model TerritoryShare {
+  id          String    @id @default(uuid())
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  codeHash    String    @unique /// SHA-256 of share code
+  scope       String    @default("boundary") /// "boundary" | "addresses" | "full"
+  pinHash     String?   /// bcrypt hash of PIN (required for scope=full)
+  pinAttempts Int       @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  revokedBy   String?   /// publisherId
+  isActive    Boolean   @default(true)
+  createdBy   String    /// publisherId
+  createdAt   DateTime  @default(now())
+
+  accessLogs ShareAccessLog[]
+
+  @@index([territoryId])
+  @@index([isActive, expiresAt])
+}
+
+model ShareAccessLog {
+  id        String   @id @default(uuid())
+  shareId   String
+  share     TerritoryShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  ipHash    String   /// SHA-256 of IP
+  userAgent String?
+  scope     String   /// What was actually viewed
+  createdAt DateTime @default(now())
+
+  @@index([shareId])
+  @@index([createdAt])
 }
 
 // ─── Territory Addresses & OSM ──────────────────────────────────────
