@@ -48,10 +48,13 @@ export default function ShareRedeemPage(): React.JSX.Element | null {
     setPinError(null);
 
     try {
-      const url = new URL(`${API_BASE}/territories/shared/${code}`);
-      if (pinValue) url.searchParams.set("pin", pinValue);
+      const url = `${API_BASE}/territories/shared/${code}`;
 
-      const res = await fetch(url.toString());
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pinValue ? { pin: pinValue } : {}),
+      });
 
       if (res.status === 403) {
         const body = await res.json();

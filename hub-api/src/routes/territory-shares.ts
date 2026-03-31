@@ -13,7 +13,6 @@ import {
   generateCode,
   hashCode,
   hashPin,
-  verifyCode,
   verifyPin,
   checkExpiration,
   hashIp,
@@ -45,7 +44,7 @@ const RedeemParams = Type.Object({
   code: Type.String({ minLength: 20, maxLength: 30 }),
 });
 
-const RedeemQuery = Type.Object({
+const RedeemBody = Type.Object({
   pin: Type.Optional(Type.String()),
 });
 
@@ -53,7 +52,7 @@ type IdParamsType = Static<typeof IdParams>;
 type ShareIdParamsType = Static<typeof ShareIdParams>;
 type CreateShareBodyType = Static<typeof CreateShareBody>;
 type RedeemParamsType = Static<typeof RedeemParams>;
-type RedeemQueryType = Static<typeof RedeemQuery>;
+type RedeemBodyType = Static<typeof RedeemBody>;
 
 // ─── Route Registration ────────────────────────────────────────────────
 
@@ -203,16 +202,16 @@ export async function territoryShareRoutes(app: FastifyInstance): Promise<void> 
 
   // ── Public Route (no auth) ───────────────────────────────────────────
 
-  // GET /territories/shared/:code — redeem a share link
-  app.get<{ Params: RedeemParamsType; Querystring: RedeemQueryType }>(
+  // POST /territories/shared/:code — redeem a share link
+  app.post<{ Params: RedeemParamsType; Body: RedeemBodyType }>(
     "/territories/shared/:code",
     {
       config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
-      schema: { params: RedeemParams, querystring: RedeemQuery },
+      schema: { params: RedeemParams, body: RedeemBody },
     },
     async (request, reply) => {
       const { code } = request.params;
-      const { pin } = request.query;
+      const { pin } = request.body;
       const codeH = hashCode(code);
 
       // Look up share by hash
@@ -233,11 +232,6 @@ export async function territoryShareRoutes(app: FastifyInstance): Promise<void> 
       }
 
       if (checkExpiration(share)) {
-        return reply.code(404).send({ error: "Link not found or expired" });
-      }
-
-      // Verify code with constant-time comparison
-      if (!verifyCode(code, share.codeHash)) {
         return reply.code(404).send({ error: "Link not found or expired" });
       }
 

@@ -8,8 +8,16 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import prisma from "./prisma.js";
 
-const SHARE_CODE_PEPPER = process.env.SHARE_CODE_PEPPER || "default-code-pepper";
-const SHARE_PIN_PEPPER = process.env.SHARE_PIN_PEPPER || "default-pin-pepper";
+function requirePepper(name: string): string {
+  const val = process.env[name];
+  if (!val && process.env.NODE_ENV === 'production') {
+    throw new Error(`Missing required env var: ${name}`);
+  }
+  return val || `dev-${name}-not-for-production`;
+}
+
+const SHARE_CODE_PEPPER = requirePepper('SHARE_CODE_PEPPER');
+const SHARE_PIN_PEPPER = requirePepper('SHARE_PIN_PEPPER');
 
 /** Max PIN attempts before auto-revoke. */
 const MAX_PIN_ATTEMPTS = 5;

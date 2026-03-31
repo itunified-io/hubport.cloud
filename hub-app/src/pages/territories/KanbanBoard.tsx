@@ -78,6 +78,7 @@ export function KanbanBoard() {
 
   // Assign dialog state
   const [assignTarget, setAssignTarget] = useState<{ territoryId: string; number: string; prePublisherId?: string } | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -176,44 +177,71 @@ export function KanbanBoard() {
   };
 
   const handleReturn = async (territoryId: string) => {
+    setMutationError(null);
     try {
-      await fetch(`${apiUrl}/territories/${territoryId}/return`, {
+      const res = await fetch(`${apiUrl}/territories/${territoryId}/return`, {
         method: "POST",
         headers,
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = (body as { error?: string }).error || `Return failed (${res.status})`;
+        console.error("Return failed:", msg);
+        setMutationError(msg);
+        return;
+      }
       await fetchBoard();
       await fetchPublishers();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Return failed:", err);
+      setMutationError("Failed to return territory. Please try again.");
     }
   };
 
   const handleExtend = async (territoryId: string) => {
+    setMutationError(null);
     try {
-      await fetch(`${apiUrl}/territories/${territoryId}/extend`, {
+      const res = await fetch(`${apiUrl}/territories/${territoryId}/extend`, {
         method: "POST",
         headers,
         body: JSON.stringify({ days: 30 }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = (body as { error?: string }).error || `Extend failed (${res.status})`;
+        console.error("Extend failed:", msg);
+        setMutationError(msg);
+        return;
+      }
       await fetchBoard();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Extend failed:", err);
+      setMutationError("Failed to extend territory. Please try again.");
     }
   };
 
   const confirmAssign = async (publisherId: string, dueDate: string, notes: string) => {
     if (!assignTarget) return;
+    setMutationError(null);
     try {
-      await fetch(`${apiUrl}/territories/${assignTarget.territoryId}/assign`, {
+      const res = await fetch(`${apiUrl}/territories/${assignTarget.territoryId}/assign`, {
         method: "POST",
         headers,
         body: JSON.stringify({ publisherId, dueDate, notes }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = (body as { error?: string }).error || `Assign failed (${res.status})`;
+        console.error("Assign failed:", msg);
+        setMutationError(msg);
+        return;
+      }
       setAssignTarget(null);
       await fetchBoard();
       await fetchPublishers();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Assign failed:", err);
+      setMutationError("Failed to assign territory. Please try again.");
     }
   };
 
@@ -289,6 +317,14 @@ export function KanbanBoard() {
           </select>
         </div>
       </div>
+
+      {/* Mutation error banner */}
+      {mutationError && (
+        <div className="flex items-center justify-between bg-red-900/30 border border-red-500/40 text-red-300 px-4 py-2 rounded-[var(--radius-sm)] text-sm">
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError(null)} className="ml-4 text-red-400 hover:text-red-200">&times;</button>
+        </div>
+      )}
 
       {/* Board + Sidebar */}
       <DndContext
