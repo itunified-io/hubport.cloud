@@ -72,7 +72,7 @@ export function shouldJoinRoom(
   if (requiredRole === null) return true;
   if (requiredRole === "elder") return congregationRole === "elder";
   if (requiredRole === "elder_or_ms") {
-    return congregationRole === "elder" || congregationRole === "ministerialServant";
+    return congregationRole === "elder" || congregationRole === "ministerial_servant";
   }
   // Check AppRole name match (including aliases)
   const aliases = ROOM_ROLE_ALIASES[requiredRole];

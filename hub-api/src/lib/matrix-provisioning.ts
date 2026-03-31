@@ -144,7 +144,7 @@ function shouldJoinRoom(
   if (requiredRole === null) return true; // Open to all publishers
   if (requiredRole === "elder") return congregationRole === "elder";
   if (requiredRole === "elder_or_ms") {
-    return congregationRole === "elder" || congregationRole === "ministerialServant";
+    return congregationRole === "elder" || congregationRole === "ministerial_servant";
   }
   // Check AppRole name match (also check related roles from ROOM_ACCESS_MAP)
   const relatedRoles = ROOM_ROLE_ALIASES[requiredRole];
