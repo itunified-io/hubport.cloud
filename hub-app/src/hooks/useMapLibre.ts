@@ -26,7 +26,6 @@ export interface MapInstance {
   getContainer: () => HTMLElement;
   on: (event: string, layerOrHandler: string | ((...args: any[]) => void), handler?: (...args: any[]) => void) => void;
   off: (event: string, layerOrHandler: string | ((...args: any[]) => void), handler?: (...args: any[]) => void) => void;
-  getCanvas: () => HTMLCanvasElement;
   remove: () => void;
   resize: () => void;
   project: (lngLat: [number, number]) => { x: number; y: number };
