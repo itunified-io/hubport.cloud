@@ -1,6 +1,29 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.18
+
+### Territory Module (#262)
+- feat: 22 new permission constants, dynamic campaign-based permissions in PolicyEngine
+- feat: 15 new Prisma models (Address, AddressVisit, LocalOsmFeature, CampaignFieldGroup, LocationShare, TerritoryShare, ShareAccessLog, etc.)
+- feat: PostGIS migration for spatial queries, Redis service for BullMQ
+- feat: SnapEngine with priority-based snapping, undo/redo, vertex/midpoint handles
+- feat: Territory editor with creation flow (click-to-place + freehand lasso) and split flow (scissors)
+- feat: Address CRUD with DNC auto-revert, visit logging, bulk operations
+- feat: BullMQ OSM refresh worker, gap detection with ignore list, 6-mode heatmaps
+- feat: KML/CSV import for territories and addresses
+- feat: Campaign lifecycle (draft/active/closed/archived), adaptive due dates, field groups
+- feat: Location sharing with consent dialog, duration picker, auto-expiry
+- feat: Kanban board with drag-and-drop assignment, publisher sidebar
+- feat: Campaign management UI (list, wizard, detail), meeting point manager
+- feat: Campaign reports with per-territory/publisher/meeting-point breakdowns, CSV export
+- feat: SHA-256 share links with PIN protection, central discovery with Haversine
+- feat: Depth-filtered territory sync, sharing frontend (create/revoke/redeem)
+- feat: Tenant discovery fields and SharedTerritory.syncedAt in central-api
+- fix: Share PIN via POST body (not query string), pepper env vars enforced in production
+- fix: PostGIS image (postgis/postgis:16-3.4-alpine), Redis healthcheck, composite indexes
+- 69 vitest tests, TypeScript clean across all packages
+
 ## v2026.03.31.12
 
 ### Fix invite KC user missing name fields (#258)
