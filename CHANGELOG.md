@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.7
+
+### Fix service groups encrypted names + overseer/assistant (#258)
+- fix: service groups showed encrypted ciphertext instead of publisher names — Prisma extension doesn't decrypt nested includes
+- fix: export `decryptPublisherFields()` and call manually for nested Publisher records in service group endpoints
+- feat: replace string-based overseer/assistant with Publisher FK relations (`overseerId`, `assistantId`)
+- feat: overseer/assistant dropdowns per service group card in frontend
+- i18n: add Gruppenaufseher / Gruppengehilfe translations
+
 ## v2026.03.31.6
 
 ### Fix invite wizard privacy step "Ungültiger Schritt" (#256)

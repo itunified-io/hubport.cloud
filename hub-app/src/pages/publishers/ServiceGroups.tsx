@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { ArrowLeft, Users, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Users, UserPlus, X, Shield, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
@@ -16,11 +16,13 @@ interface Publisher {
 interface ServiceGroup {
   id: string;
   name: string;
-  overseer: string | null;
-  assistant: string | null;
+  overseerId: string | null;
+  assistantId: string | null;
+  overseerPub: Publisher | null;
+  assistantPub: Publisher | null;
   sortOrder: number;
   members: Publisher[];
-  _count: { members: number };
+  _count: { members: number; cleaningSchedules: number };
 }
 
 interface UnassignedPublisher {
@@ -80,6 +82,16 @@ export function ServiceGroups() {
     fetchAll();
   };
 
+  const updateGroupRole = async (groupId: string, field: "overseerId" | "assistantId", publisherId: string | null) => {
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return;
+    await fetch(`${apiUrl}/service-groups/${groupId}`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ name: group.name, [field]: publisherId || null }),
+    });
+    fetchAll();
+  };
+
   // Publishers not assigned to any group
   const assignedIds = new Set(groups.flatMap((g) => g.members.map((m) => m.id)));
   const unassigned = allPublishers.filter((p) => !assignedIds.has(p.id));
@@ -132,6 +144,56 @@ export function ServiceGroups() {
                   </p>
                 </div>
                 <Users size={16} className="text-[var(--text-muted)]" />
+              </div>
+
+              {/* Overseer & Assistant */}
+              <div className="px-4 py-2 border-b border-[var(--border)] space-y-1.5">
+                {/* Overseer */}
+                <div className="flex items-center gap-2">
+                  <Shield size={13} className="text-[var(--amber)] shrink-0" />
+                  <span className="text-xs text-[var(--text-muted)] shrink-0">
+                    <FormattedMessage id="serviceGroups.overseer" />:
+                  </span>
+                  {canEdit ? (
+                    <select
+                      className="flex-1 min-w-0 px-1.5 py-0.5 text-xs bg-[var(--bg-2)] border border-[var(--border)] rounded text-[var(--text)]"
+                      value={g.overseerId ?? ""}
+                      onChange={(e) => updateGroupRole(g.id, "overseerId", e.target.value || null)}
+                    >
+                      <option value="">—</option>
+                      {allPublishers.map((p) => (
+                        <option key={p.id} value={p.id}>{p.displayName ?? `${p.firstName} ${p.lastName}`}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--text)]">
+                      {g.overseerPub ? (g.overseerPub.displayName ?? `${g.overseerPub.firstName} ${g.overseerPub.lastName}`) : "—"}
+                    </span>
+                  )}
+                </div>
+                {/* Assistant */}
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={13} className="text-[var(--text-muted)] shrink-0" />
+                  <span className="text-xs text-[var(--text-muted)] shrink-0">
+                    <FormattedMessage id="serviceGroups.assistant" />:
+                  </span>
+                  {canEdit ? (
+                    <select
+                      className="flex-1 min-w-0 px-1.5 py-0.5 text-xs bg-[var(--bg-2)] border border-[var(--border)] rounded text-[var(--text)]"
+                      value={g.assistantId ?? ""}
+                      onChange={(e) => updateGroupRole(g.id, "assistantId", e.target.value || null)}
+                    >
+                      <option value="">—</option>
+                      {allPublishers.map((p) => (
+                        <option key={p.id} value={p.id}>{p.displayName ?? `${p.firstName} ${p.lastName}`}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--text)]">
+                      {g.assistantPub ? (g.assistantPub.displayName ?? `${g.assistantPub.firstName} ${g.assistantPub.lastName}`) : "—"}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Members */}

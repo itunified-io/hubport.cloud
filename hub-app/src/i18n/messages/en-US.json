@@ -274,6 +274,8 @@
   "serviceGroups.addMember": "Add member",
   "serviceGroups.selectPublisher": "Select publisher...",
   "serviceGroups.unassigned": "Unassigned",
+  "serviceGroups.overseer": "Overseer",
+  "serviceGroups.assistant": "Assistant",
 
   "nav.chat": "Chat",
   "chat.notConfigured": "Chat is not configured for this hub.",

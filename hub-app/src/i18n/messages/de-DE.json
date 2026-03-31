@@ -276,6 +276,8 @@
   "serviceGroups.addMember": "Mitglied hinzufügen",
   "serviceGroups.selectPublisher": "Verkündiger auswählen...",
   "serviceGroups.unassigned": "Nicht zugewiesen",
+  "serviceGroups.overseer": "Gruppenaufseher",
+  "serviceGroups.assistant": "Gruppengehilfe",
 
   "nav.chat": "Chat",
   "chat.notConfigured": "Chat ist für diesen Hub nicht konfiguriert.",
