@@ -269,11 +269,15 @@ model TerritoryAssignment {
   territoryId String
   publisherId String
   assignedAt  DateTime  @default(now())
+  assignedBy  String?   /// publisherId who assigned
   returnedAt  DateTime?
+  returnedBy  String?   /// publisherId who returned it
+  dueDate     DateTime? /// Adaptive due date
+  isActive    Boolean   @default(true)
   campaignId  String?
   isSuspended Boolean   @default(false)
-  returnedBy  String?   /// publisherId who returned it
   groupId     String?   /// field group ID (deliberately unlinked)
+  notes       String?
 
   territory Territory @relation(fields: [territoryId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
@@ -766,36 +770,41 @@ model Notification {
 
 enum AddressType {
   residential
-  commercial
-  institutional
-  other
+  business
+  apartment_building
+  rural
 }
 
 enum AddressStatus {
   active
-  do_not_visit
-  revisit
-  language_follow_up
+  do_not_call
+  not_at_home
+  moved
+  deceased
+  foreign_language
+  archived
 }
 
 enum AddressSource {
-  osm_import
   manual
-  kml_import
+  osm
+  csv_import
 }
 
 enum VisitOutcome {
-  not_home
-  spoke_with
-  revisit
-  do_not_visit
-  follow_up
+  contacted
+  not_at_home
+  do_not_call
+  moved
+  letter_sent
+  phone_attempted
 }
 
 enum LocalOsmType {
-  building
-  address
-  amenity
+  building_override
+  street
+  poi
+  custom
 }
 
 enum CampaignStatus {
@@ -835,7 +844,6 @@ model Campaign {
   createdBy    String             /// keycloakSub of creator
   invitations  CampaignInvite[]
   meetingPoints CampaignMeetingPoint[]
-  locationShares LocationShare[]
   createdAt    DateTime           @default(now())
   deletedAt    DateTime?          /// auto-delete 7 days after endDate
 }
@@ -865,8 +873,11 @@ model CampaignMeetingPoint {
   assistantIds String[] /// publisherIds of assistants
   territoryIds String[] /// territory IDs assigned to this meeting point
   name         String?  /// Meeting point name/location
-  location     Json?    /// { lat, lng, address }
-  schedule     Json?    /// { dayOfWeek, time }
+  latitude     Float?
+  longitude    Float?
+  address      String?
+  dayOfWeek    String?
+  time         String?
   createdAt    DateTime @default(now())
 
   fieldGroups CampaignFieldGroup[]
@@ -879,32 +890,44 @@ model CampaignFieldGroup {
   id              String           @id @default(uuid())
   meetingPointId  String
   meetingPoint    CampaignMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
-  conductorId     String           /// publisherId
+  name            String?
   memberIds       String[]         /// publisherIds
-  territoryId     String?
+  territoryIds    String[]         /// territory IDs (a group can work multiple territories)
+  sessionDate     DateTime?        @db.Date
+  sessionTime     String?
   status          FieldGroupStatus @default(open)
   startedAt       DateTime?
   closedAt        DateTime?
+  notes           String?
   createdAt       DateTime         @default(now())
+
+  locationShares  LocationShare[]
 
   @@index([meetingPointId])
 }
 
-model LocationShare {
-  id          String   @id @default(uuid())
-  campaignId  String
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  publisherId String
-  publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
-  lat         Float
-  lng         Float
-  accuracy    Float?
-  sharedAt    DateTime @default(now())
-  expiresAt   DateTime /// Auto-expire after campaign configurable duration
+enum LocationDuration {
+  one_hour
+  four_hours
+  eight_hours
+}
 
-  @@index([campaignId])
+model LocationShare {
+  id             String            @id @default(uuid())
+  fieldGroupId   String
+  fieldGroup     CampaignFieldGroup @relation(fields: [fieldGroupId], references: [id], onDelete: Cascade)
+  publisherId    String
+  publisher      Publisher         @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  lastLatitude   Float?            /// Cleared on deactivation
+  lastLongitude  Float?            /// Cleared on deactivation
+  isActive       Boolean           @default(true)
+  duration       LocationDuration
+  consentedAt    DateTime          @default(now())
+  lastUpdatedAt  DateTime?
+  expiresAt      DateTime          /// Auto-expire after duration
+
+  @@index([fieldGroupId, isActive])
   @@index([publisherId])
-  @@index([expiresAt])
 }
 
 // ─── Sharing Visibility RBAC ──────────────────────────────────────────
@@ -931,7 +954,7 @@ model TerritoryShare {
   territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
   codeHash    String    @unique /// SHA-256 of share code
   scope       String    @default("boundary") /// "boundary" | "addresses" | "full"
-  pinHash     String?   /// bcrypt hash of PIN (required for scope=full)
+  pinHash     String?   /// SHA-256 hash of PIN (required for scope=full)
   pinAttempts Int       @default(0)
   expiresAt   DateTime
   revokedAt   DateTime?
@@ -975,13 +998,17 @@ model Address {
   postcode     String?
   buildingType String?       /// e.g. "apartments", "house", "yes"
   units        Int           @default(1)
+  bellCount    Int           @default(1) /// Number of doorbells/units
   floor        String?
   type         AddressType   @default(residential)
   status       AddressStatus @default(active)
   source       AddressSource @default(manual)
   languages    String[]      /// ISO 639-1 codes spoken here
+  doNotCallReason  String?   /// Reason for DNC status
+  doNotVisitUntil  DateTime? /// Temporary DNC expiry
   notes        String?
   lastVisitAt  DateTime?
+  sortOrder    Int           @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -1011,12 +1038,14 @@ model LocalOsmFeature {
   id           String       @id @default(uuid())
   territoryId  String
   territory    Territory    @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  osmId        String
-  osmType      LocalOsmType
+  osmId        String?      /// Nullable for user-created features
+  featureType  LocalOsmType
   tags         Json         /// Raw OSM tags
   geometry     Json         /// GeoJSON geometry
   enrichedName String?      /// Manual name override
   enrichedType String?      /// Manual type override
+  createdBy    String?      /// publisherId
+  updatedBy    String?      /// publisherId
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -1025,38 +1054,54 @@ model LocalOsmFeature {
 }
 
 model IgnoredOsmBuilding {
-  id          String    @id @default(uuid())
-  territoryId String
-  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  osmId       String
-  reason      String?
-  ignoredBy   String    /// publisherId
-  createdAt   DateTime  @default(now())
+  id            String    @id @default(uuid())
+  territoryId   String
+  territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  osmId         String
+  reason        String    /// Required reason for ignoring
+  notes         String?
+  evidence      String?   /// What evidence prompted the ignore
+  lat           Float?
+  lng           Float?
+  streetAddress String?
+  buildingType  String?
+  ignoredBy     String    /// publisherId
+  createdAt     DateTime  @default(now())
 
   @@unique([territoryId, osmId])
 }
 
 model OsmRefreshQueue {
-  id          String    @id @default(uuid())
-  territoryId String
-  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  status      String    @default("pending") /// pending, processing, completed, failed
-  startedAt   DateTime?
-  completedAt DateTime?
-  error       String?
-  createdAt   DateTime  @default(now())
+  id               String    @id @default(uuid())
+  territoryId      String
+  territory        Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  status           String    @default("pending") /// pending, processing, completed, failed
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  buildingsFound   Int?
+  addressesCreated Int?
+  addressesUpdated Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([territoryId])
   @@index([status])
 }
 
 model GapDetectionRun {
-  id          String   @id @default(uuid())
-  territoryId String
-  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  result      Json     /// { uncoveredBuildings: [...], coverage: 0.85 }
-  runBy       String   /// publisherId
-  createdAt   DateTime @default(now())
+  id              String    @id @default(uuid())
+  territoryId     String
+  territory       Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  status          String    @default("pending") /// pending, running, completed, failed
+  totalBuildings  Int?
+  coveredCount    Int?
+  gapCount        Int?
+  resultGeoJson   Json?     /// GeoJSON of uncovered areas
+  startedAt       DateTime?
+  completedAt     DateTime?
+  runBy           String    /// publisherId
+  createdAt       DateTime  @default(now())
 
   @@index([territoryId])
 }
