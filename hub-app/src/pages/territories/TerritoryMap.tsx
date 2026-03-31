@@ -108,11 +108,11 @@ export function TerritoryMap() {
       const coords = f.geometry.coordinates as number[][][] | number[][][][];
       const flatten = (c: unknown): void => {
         if (Array.isArray(c) && typeof c[0] === "number") {
-          const [lng, lat] = c as number[];
-          if (lng < minLng) minLng = lng;
-          if (lng > maxLng) maxLng = lng;
-          if (lat < minLat) minLat = lat;
-          if (lat > maxLat) maxLat = lat;
+          const pt = c as number[];
+          if (pt[0]! < minLng) minLng = pt[0]!;
+          if (pt[0]! > maxLng) maxLng = pt[0]!;
+          if (pt[1]! < minLat) minLat = pt[1]!;
+          if (pt[1]! > maxLat) maxLat = pt[1]!;
         } else if (Array.isArray(c)) {
           for (const item of c) flatten(item);
         }
@@ -120,7 +120,7 @@ export function TerritoryMap() {
       flatten(coords);
     }
     if (minLng < 180) {
-      fitBounds([minLng, minLat, maxLng, maxLat]);
+      fitBounds([[minLng, minLat], [maxLng, maxLat]]);
     }
 
     // Click handler — navigate to territory detail

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FormattedMessage, FormattedDate } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, MapPin, User, Calendar, Loader2, Map } from "lucide-react";
+import { ArrowLeft, User, Calendar, Loader2, Map } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getTerritory, type TerritoryListItem } from "@/lib/territory-api";
 import { useMapLibre } from "@/hooks/useMapLibre";
@@ -68,18 +68,18 @@ export function TerritoryDetail() {
     let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
     const flatten = (c: unknown): void => {
       if (Array.isArray(c) && typeof c[0] === "number") {
-        const [lng, lat] = c as number[];
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
+        const pt = c as number[];
+        if (pt[0]! < minLng) minLng = pt[0]!;
+        if (pt[0]! > maxLng) maxLng = pt[0]!;
+        if (pt[1]! < minLat) minLat = pt[1]!;
+        if (pt[1]! > maxLat) maxLat = pt[1]!;
       } else if (Array.isArray(c)) {
         for (const item of c) flatten(item);
       }
     };
     flatten((territory.boundaries as { coordinates: unknown }).coordinates);
     if (minLng < 180) {
-      fitBounds([minLng, minLat, maxLng, maxLat]);
+      fitBounds([[minLng, minLat], [maxLng, maxLat]]);
     }
   }, [isLoaded, territory, addSource, addLayer, fitBounds]);
 
