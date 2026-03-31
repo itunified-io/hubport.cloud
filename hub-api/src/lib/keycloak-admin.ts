@@ -198,7 +198,31 @@ export async function createInvitedKeycloakUser(email: string): Promise<string> 
     if (!searchRes.ok) throw new Error(`Keycloak user lookup error: ${searchRes.status}`);
     const users = (await searchRes.json()) as Array<{ id: string }>;
     if (users.length === 0) throw new Error("Keycloak 409 but user not found by email");
-    return users[0].id;
+    const userId = users[0].id;
+
+    // Ensure required actions are set (may be missing from previous incomplete invite)
+    const updateRes = await fetch(`${adminUrl()}/users/${userId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requiredActions: ["UPDATE_PASSWORD", "CONFIGURE_TOTP", "webauthn-register-passwordless"],
+        credentials: [
+          {
+            type: "password",
+            value: tempPassword,
+            temporary: true,
+          },
+        ],
+      }),
+    });
+    if (!updateRes.ok) {
+      throw new Error(`Keycloak update existing user error: ${updateRes.status} ${await updateRes.text()}`);
+    }
+
+    return userId;
   }
 
   if (!res.ok) {

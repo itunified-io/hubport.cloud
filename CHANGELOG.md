@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.9
+
+### Fix invite 409 — enforce required actions on existing KC user (#258)
+- fix: when reusing existing Keycloak user (409), set requiredActions (UPDATE_PASSWORD, CONFIGURE_TOTP, webauthn-register-passwordless) and reset temp password
+- Without this, re-invited users skip password change, TOTP, and passkey setup
+
 ## v2026.03.31.8
 
 ### Fix invite redeem 409 — Keycloak user already exists (#258)
