@@ -390,7 +390,8 @@ export function PublisherForm() {
     if (!id) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${apiUrl}/publishers/${id}`, { method: "DELETE", headers });
+      const { "Content-Type": _, ...deleteHeaders } = headers;
+      const res = await fetch(`${apiUrl}/publishers/${id}`, { method: "DELETE", headers: deleteHeaders });
       if (res.ok || res.status === 204) {
         navigate("/publishers");
       } else {

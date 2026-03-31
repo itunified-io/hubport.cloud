@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.10
+
+### Fix publisher delete Bad Request (#258)
+- fix: DELETE request sent `Content-Type: application/json` with no body — Fastify rejects empty JSON
+- fix: strip Content-Type header from publisher delete fetch (same pattern as role delete)
+
 ## v2026.03.31.9
 
 ### Fix invite 409 — enforce required actions on existing KC user (#258)
