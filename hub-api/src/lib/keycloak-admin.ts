@@ -189,6 +189,18 @@ export async function createInvitedKeycloakUser(email: string): Promise<string> 
     }),
   });
 
+  if (res.status === 409) {
+    // User already exists (e.g., previous invite attempt) — look up by email
+    const searchRes = await fetch(
+      `${adminUrl()}/users?email=${encodeURIComponent(email)}&exact=true`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!searchRes.ok) throw new Error(`Keycloak user lookup error: ${searchRes.status}`);
+    const users = (await searchRes.json()) as Array<{ id: string }>;
+    if (users.length === 0) throw new Error("Keycloak 409 but user not found by email");
+    return users[0].id;
+  }
+
   if (!res.ok) {
     throw new Error(`Keycloak createInvitedUser error: ${res.status} ${await res.text()}`);
   }

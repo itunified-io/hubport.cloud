@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.8
+
+### Fix invite redeem 409 — Keycloak user already exists (#258)
+- fix: `createInvitedKeycloakUser` threw 500 on Keycloak 409 (user exists from previous invite)
+- fix: handle 409 by looking up existing user by email instead of failing
+
 ## v2026.03.31.7
 
 ### Fix service groups encrypted names + overseer/assistant (#258)
