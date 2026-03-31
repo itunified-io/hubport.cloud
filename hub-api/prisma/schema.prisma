@@ -169,6 +169,8 @@ model Publisher {
   inviteCode      InviteCode?
   serviceGroup    ServiceGroup?       @relation(fields: [serviceGroupId], references: [id])
   serviceGroupId  String?
+  overseerOf         ServiceGroup[]      @relation("ServiceGroupOverseer")
+  assistantOf        ServiceGroup[]      @relation("ServiceGroupAssistant")
   gardenDuties       GardenDutyMember[]
   campaignInvites    CampaignInvite[]
   assignedParts      MeetingAssignment[] @relation("AssignedParts")
@@ -610,14 +612,16 @@ model PublicTalkSchedule {
 /// Field service groups — publishers are assigned to one group.
 /// Default: 5 groups, configurable by admin.
 model ServiceGroup {
-  id          String      @id @default(uuid())
-  name        String      @unique /// e.g. "Gruppe 1", "Gruppe 2"
-  overseer    String?     /// Keycloak sub of group overseer
-  assistant   String?     /// Keycloak sub of assistant
-  sortOrder   Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  name           String      @unique /// e.g. "Gruppe 1", "Gruppe 2"
+  overseerId     String?     /// FK to Publisher (group overseer)
+  assistantId    String?     /// FK to Publisher (group assistant)
+  sortOrder      Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
+  overseerPub    Publisher?  @relation("ServiceGroupOverseer", fields: [overseerId], references: [id], onDelete: SetNull)
+  assistantPub   Publisher?  @relation("ServiceGroupAssistant", fields: [assistantId], references: [id], onDelete: SetNull)
   members            Publisher[]
   cleaningSchedules  CleaningSchedule[]
 }

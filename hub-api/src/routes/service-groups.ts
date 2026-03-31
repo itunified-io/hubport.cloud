@@ -4,11 +4,12 @@ import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { audit } from "../lib/policy-engine.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+import { decryptPublisherFields } from "../lib/prisma-encryption.js";
 
 const GroupBody = Type.Object({
   name: Type.String({ minLength: 1 }),
-  overseer: Type.Optional(Type.String()),
-  assistant: Type.Optional(Type.String()),
+  overseerId: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
+  assistantId: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
   sortOrder: Type.Optional(Type.Number()),
 });
 
@@ -24,6 +25,9 @@ const DEFAULT_GROUPS = [
   { name: "Gruppe 4", sortOrder: 4 },
   { name: "Gruppe 5", sortOrder: 5 },
 ];
+
+/** Publisher fields to select for display (name only, minimal PII) */
+const PUBLISHER_SELECT = { id: true, firstName: true, lastName: true, displayName: true } as const;
 
 export async function serviceGroupRoutes(app: FastifyInstance): Promise<void> {
   // Seed default groups if none exist
@@ -41,13 +45,26 @@ export async function serviceGroupRoutes(app: FastifyInstance): Promise<void> {
     "/service-groups",
     { preHandler: requirePermission(PERMISSIONS.PUBLISHERS_VIEW_MINIMAL) },
     async () => {
-      return prisma.serviceGroup.findMany({
+      const groups = await prisma.serviceGroup.findMany({
         orderBy: { sortOrder: "asc" },
         include: {
-          members: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+          members: { select: PUBLISHER_SELECT },
+          overseerPub: { select: PUBLISHER_SELECT },
+          assistantPub: { select: PUBLISHER_SELECT },
           _count: { select: { members: true, cleaningSchedules: true } },
         },
       });
+
+      // Decrypt nested Publisher fields (extension doesn't handle nested includes)
+      for (const group of groups) {
+        for (const member of group.members) {
+          await decryptPublisherFields(member as Record<string, unknown>);
+        }
+        if (group.overseerPub) await decryptPublisherFields(group.overseerPub as Record<string, unknown>);
+        if (group.assistantPub) await decryptPublisherFields(group.assistantPub as Record<string, unknown>);
+      }
+
+      return groups;
     },
   );
 
@@ -60,9 +77,11 @@ export async function serviceGroupRoutes(app: FastifyInstance): Promise<void> {
         where: { id: request.params.id },
         include: {
           members: {
-            select: { id: true, firstName: true, lastName: true, displayName: true, email: true, phone: true },
+            select: { ...PUBLISHER_SELECT, email: true, phone: true },
             orderBy: { lastName: "asc" },
           },
+          overseerPub: { select: PUBLISHER_SELECT },
+          assistantPub: { select: PUBLISHER_SELECT },
           cleaningSchedules: {
             include: { duty: true },
             orderBy: { date: "asc" },
@@ -71,6 +90,14 @@ export async function serviceGroupRoutes(app: FastifyInstance): Promise<void> {
         },
       });
       if (!group) return reply.code(404).send({ error: "Service group not found" });
+
+      // Decrypt nested Publisher fields
+      for (const member of group.members) {
+        await decryptPublisherFields(member as Record<string, unknown>);
+      }
+      if (group.overseerPub) await decryptPublisherFields(group.overseerPub as Record<string, unknown>);
+      if (group.assistantPub) await decryptPublisherFields(group.assistantPub as Record<string, unknown>);
+
       return group;
     },
   );

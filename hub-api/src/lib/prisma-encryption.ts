@@ -59,6 +59,16 @@ async function encryptFields(
 }
 
 /**
+ * Decrypts Publisher fields on a single record (mutates in place).
+ * Exported for use with nested includes where the extension doesn't fire.
+ */
+export async function decryptPublisherFields(
+  record: Record<string, unknown>,
+): Promise<void> {
+  return decryptRecord(record);
+}
+
+/**
  * Decrypts the designated fields on a single record (mutates in place).
  */
 async function decryptRecord(
