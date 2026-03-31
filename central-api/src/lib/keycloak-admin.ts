@@ -15,14 +15,16 @@ function safePath(value: string, name: string): string {
 }
 
 function getConfig() {
-  const url = process.env.KEYCLOAK_URL;
+  // KEYCLOAK_INTERNAL_URL: cluster-internal HTTP (for admin API — bypasses CF tunnel)
+  // KEYCLOAK_URL: external HTTPS (fallback, used by OIDC discovery in login.ts)
+  const url = process.env.KEYCLOAK_INTERNAL_URL || process.env.KEYCLOAK_URL;
   const realm = process.env.KEYCLOAK_REALM;
   const clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID;
   const clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
 
   if (!url || !realm || !clientId || !clientSecret) {
     throw new Error(
-      'Missing Keycloak admin env: KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID, KEYCLOAK_ADMIN_CLIENT_SECRET',
+      'Missing Keycloak admin env: KEYCLOAK_INTERNAL_URL (or KEYCLOAK_URL), KEYCLOAK_REALM, KEYCLOAK_ADMIN_CLIENT_ID, KEYCLOAK_ADMIN_CLIENT_SECRET',
     );
   }
 
@@ -95,7 +97,7 @@ export async function createPortalUser(
       lastName,
       enabled: true,
       emailVerified: true,
-      requiredActions: ['UPDATE_PASSWORD'],
+      requiredActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP', 'webauthn-register-passwordless'],
     }),
   });
 
@@ -128,6 +130,39 @@ async function findUserByEmail(email: string): Promise<string | null> {
   if (!res.ok) return null;
   const users = (await res.json()) as { id: string }[];
   return users.length > 0 ? users[0]!.id : null;
+}
+
+/**
+ * Set a temporary password on a Keycloak user.
+ * Combined with the UPDATE_PASSWORD required action, the user will be forced
+ * to change it on first login. The temp password is included in the onboarding email.
+ */
+export async function setTemporaryPassword(
+  keycloakUserId: string,
+  tempPassword: string,
+): Promise<void> {
+  const token = await getAdminToken();
+  const safeId = safePath(keycloakUserId, 'keycloakUserId');
+
+  const res = await fetch(
+    `${adminUrl()}/users/${safeId}/reset-password`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'password',
+        value: tempPassword,
+        temporary: true,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Keycloak set-password error: ${res.status} ${await res.text()}`);
+  }
 }
 
 /**

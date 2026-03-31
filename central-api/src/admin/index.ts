@@ -147,17 +147,30 @@ export async function adminRoutes(app: FastifyInstance) {
     // Check for existing TenantAuth with keycloakUserId (idempotent)
     const existingAuth = await prisma.tenantAuth.findUnique({ where: { tenantId: body.tenantId } });
     let keycloakUserId = existingAuth?.keycloakUserId ?? body.keycloakUserId ?? null;
+    let tempPassword: string | null = null;
 
     // Create Keycloak user if not already linked
     if (!keycloakUserId && tenant.email) {
       try {
         const { createPortalUser } = await import('../lib/keycloak-admin.js');
+        const { setTemporaryPassword } = await import('../lib/keycloak-admin.js');
         keycloakUserId = await createPortalUser(
           tenant.email,
-          tenant.name || tenant.subdomain,
-          '',
+          tenant.ownerFirstName || tenant.name || tenant.subdomain,
+          tenant.ownerLastName || '',
         );
         app.log.info({ tenantId: body.tenantId, keycloakUserId }, 'Portal Keycloak user created');
+
+        // Set a temporary password — user must change it on first login (UPDATE_PASSWORD required action)
+        const { randomBytes } = await import('node:crypto');
+        const tempPw = randomBytes(12).toString('base64url');
+        try {
+          await setTemporaryPassword(keycloakUserId, tempPw);
+          tempPassword = tempPw;
+          app.log.info({ tenantId: body.tenantId }, 'Temporary password set for portal user');
+        } catch (pwErr) {
+          app.log.error({ err: pwErr, tenantId: body.tenantId }, 'Failed to set temporary password');
+        }
       } catch (err) {
         app.log.error({ err, tenantId: body.tenantId }, 'Failed to create Keycloak user — continuing without');
       }
@@ -180,7 +193,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
     const setupUrl = `${portalUrl}/portal/login`;
 
-    return reply.send({ ok: true, setupUrl });
+    return reply.send({ ok: true, setupUrl, ...(tempPassword ? { tempPassword } : {}) });
   });
 
   // Internal-only endpoint for MCP skill to provision an M2M API token.
@@ -282,6 +295,7 @@ export async function adminRoutes(app: FastifyInstance) {
           subdomain: string;
           id: string;
           setupUrl?: string;
+          tempPassword?: string;
         });
       } else if (body.templateName === 'rejection') {
         html = rejectionEmailHtml(
