@@ -86,8 +86,11 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 
     // First redemption: create Keycloak user
     let keycloakSub: string;
+    let tempPassword: string;
     try {
-      keycloakSub = await createInvitedKeycloakUser(publisher.email!);
+      const result = await createInvitedKeycloakUser(publisher.email!);
+      keycloakSub = result.userId;
+      tempPassword = result.tempPassword;
     } catch (err) {
       app.log.error(err, "Failed to create Keycloak user for invite");
       return reply.code(500).send({
@@ -130,6 +133,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send({
       token,
+      tempPassword,
       publisher: {
         email: publisher.email,
         firstName: publisher.firstName,

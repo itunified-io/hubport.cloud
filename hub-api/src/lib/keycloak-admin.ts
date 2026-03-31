@@ -161,7 +161,7 @@ export async function createKeycloakUser(
  * Unlike createKeycloakUser(), this sets emailVerified=true (invite code = proof)
  * and uses a random temporary password.
  */
-export async function createInvitedKeycloakUser(email: string): Promise<string> {
+export async function createInvitedKeycloakUser(email: string): Promise<{ userId: string; tempPassword: string }> {
   const token = await getAdminToken();
   const { randomBytes } = await import("node:crypto");
   // Password must meet KC policy: 12+ chars, upper, lower, digit, special
@@ -222,7 +222,7 @@ export async function createInvitedKeycloakUser(email: string): Promise<string> 
       throw new Error(`Keycloak update existing user error: ${updateRes.status} ${await updateRes.text()}`);
     }
 
-    return userId;
+    return { userId, tempPassword };
   }
 
   if (!res.ok) {
@@ -231,7 +231,7 @@ export async function createInvitedKeycloakUser(email: string): Promise<string> 
 
   const location = res.headers.get("Location");
   if (!location) throw new Error("No Location header in Keycloak create response");
-  return location.split("/").pop()!;
+  return { userId: location.split("/").pop()!, tempPassword };
 }
 
 /**
@@ -335,6 +335,40 @@ export async function logoutKeycloakUser(userId: string): Promise<void> {
 
   if (!res.ok && res.status !== 204) {
     throw new Error(`Keycloak logout error: ${res.status}`);
+  }
+}
+
+/**
+ * Send Keycloak "execute actions" email — user receives a link to complete
+ * required actions (UPDATE_PASSWORD, CONFIGURE_TOTP, webauthn-register-passwordless).
+ * Requires SMTP configured in Keycloak realm.
+ */
+export async function sendExecuteActionsEmail(
+  userId: string,
+  actions: string[],
+  redirectUri?: string,
+  clientId?: string,
+  lifespan = 86400, // 24 hours
+): Promise<void> {
+  const token = await getAdminToken();
+  const params = new URLSearchParams();
+  params.set("lifespan", String(lifespan));
+  if (redirectUri) params.set("redirect_uri", redirectUri);
+  if (clientId) params.set("client_id", clientId);
+  const res = await fetch(
+    `${adminUrl()}/users/${safePath(userId, "userId")}/execute-actions-email?${params}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(actions),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Keycloak execute-actions-email error: ${res.status} ${await res.text()}`);
   }
 }
 

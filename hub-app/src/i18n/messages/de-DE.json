@@ -377,5 +377,12 @@
 
   "invite.complete.title": "Konto erfolgreich erstellt!",
   "invite.complete.message": "Dein Konto ist bereit. Du wirst in Kürze zum Portal weitergeleitet.",
-  "invite.complete.redirect": "Zum Portal"
+  "invite.complete.redirect": "Zum Portal",
+  "invite.complete.checkEmail": "Wir haben dir eine E-Mail mit einem Link zum Einrichten deines Passworts und deiner Sicherheitseinstellungen gesendet. Bitte überprüfe dein Postfach.",
+  "invite.complete.checkEmailHint": "Der Link ist 24 Stunden gültig. Falls du die E-Mail nicht siehst, prüfe bitte den Spam-Ordner.",
+  "invite.complete.credentialsIntro": "Verwende die untenstehenden Zugangsdaten für die Anmeldung. Du wirst aufgefordert, ein neues Passwort zu setzen, die Zwei-Faktor-Authentifizierung einzurichten und einen Passkey zu registrieren.",
+  "invite.complete.email": "E-Mail",
+  "invite.complete.tempPassword": "Temporäres Passwort",
+  "invite.complete.securityNote": "Dieses Passwort ist temporär — du musst es bei der ersten Anmeldung ändern. Teile es mit niemandem.",
+  "invite.complete.login": "Jetzt anmelden"
 }

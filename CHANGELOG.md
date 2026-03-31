@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.11
+
+### Invite onboarding — show temp password + credential setup flow (#258)
+- feat: `createInvitedKeycloakUser` returns temp password alongside userId
+- feat: redeem endpoint returns `tempPassword` to frontend
+- feat: CompletionStep shows temp password (toggle visibility, copy) and login button
+- feat: after login, Keycloak enforces: password change → TOTP → passkey registration
+- i18n: credential setup instructions in DE/EN
+
 ## v2026.03.31.10
 
 ### Fix publisher delete Bad Request (#258)

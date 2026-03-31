@@ -375,5 +375,12 @@
 
   "invite.complete.title": "Account Created Successfully!",
   "invite.complete.message": "Your account is ready. You will be redirected to the portal shortly.",
-  "invite.complete.redirect": "Go to Portal"
+  "invite.complete.redirect": "Go to Portal",
+  "invite.complete.checkEmail": "We sent you an email with a link to set your password and security settings. Please check your inbox.",
+  "invite.complete.checkEmailHint": "The link is valid for 24 hours. If you don't see the email, check your spam folder.",
+  "invite.complete.credentialsIntro": "Use the credentials below to log in. You will be asked to set a new password, configure two-factor authentication, and register a passkey.",
+  "invite.complete.email": "E-Mail",
+  "invite.complete.tempPassword": "Temporary Password",
+  "invite.complete.securityNote": "This password is temporary — you will be required to change it on first login. Do not share it with anyone.",
+  "invite.complete.login": "Log in now"
 }

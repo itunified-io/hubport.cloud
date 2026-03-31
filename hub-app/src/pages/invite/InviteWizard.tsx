@@ -53,6 +53,7 @@ export function InviteWizard(): ReactNode {
   const [token, setToken] = useState<string>("");
   const [originalCode, setOriginalCode] = useState<string>(urlCode);
   const [publisher, setPublisher] = useState<PublisherData | null>(null);
+  const [tempPassword, setTempPassword] = useState<string>("");
   const [validateError, setValidateError] = useState<string | null>(null);
   const [codeLoading, setCodeLoading] = useState(false);
 
@@ -78,6 +79,7 @@ export function InviteWizard(): ReactNode {
     const data = await res.json();
     setToken(data.token);
     setPublisher(data.publisher);
+    if (data.tempPassword) setTempPassword(data.tempPassword);
 
     const targetPhase = onboardingStepToPhase(data.publisher.onboardingStep || "code_redeemed");
     setPhase(targetPhase);
@@ -204,7 +206,12 @@ export function InviteWizard(): ReactNode {
             />
           )}
 
-          {phase === "complete" && <CompletionStep />}
+          {phase === "complete" && (
+            <CompletionStep
+              email={publisher?.email || ""}
+              tempPassword={tempPassword}
+            />
+          )}
         </div>
       )}
     </div>
