@@ -410,3 +410,11 @@ Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 - Sharing endpoints: approve partner, territories, talks
 - Prisma schema for tenant registry + sharing
 - Dockerfile (multi-stage, distroless runtime)
+
+## v2026.03.31.1
+
+- **Fix provision-auth Keycloak user name mapping** (#246)
+  - Use `ownerFirstName`/`ownerLastName` instead of congregation name
+  - Add `tempPassword` support: generate, return in response, include in email
+  - Add `KEYCLOAK_INTERNAL_URL` for cluster-internal admin API calls
+  - Add `setTemporaryPassword` function + required actions (TOTP, passkey)
