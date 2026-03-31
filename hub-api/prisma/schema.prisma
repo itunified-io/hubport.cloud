@@ -282,8 +282,8 @@ model TerritoryAssignment {
   territory Territory @relation(fields: [territoryId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
-  @@index([territoryId])
-  @@index([publisherId])
+  @@index([territoryId, isActive])
+  @@index([publisherId, isActive])
 }
 
 model Meeting {
