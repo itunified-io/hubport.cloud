@@ -126,6 +126,8 @@ export function onboardingEmailHtml(tenant: {
   name: string;
   subdomain: string;
   id: string;
+  setupUrl?: string;
+  tempPassword?: string;
 }): string {
   const portalUrl = process.env.PORTAL_BASE_URL || 'https://portal.hubport.cloud';
   // portal-uat.hubport.cloud → get-uat.hubport.cloud
@@ -152,8 +154,12 @@ export function onboardingEmailHtml(tenant: {
       </table>
     </div>
 
-    <div style="background: rgba(217,119,6,0.1); border: 1px solid rgba(217,119,6,0.3); border-radius: 10px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0 0 8px; font-size: 14px;"><strong style="color: #d97706;">Log in at <a href="${portalUrl}/portal/login" style="color: #d97706; font-weight: 600;">${portalUrl.replace('https://', '')}</a></strong> to complete your account setup.</p>
+    <div style="background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.4); border-radius: 10px; padding: 24px; margin: 24px 0; text-align: center;">
+      <p style="margin: 0 0 12px; font-size: 15px; color: #e4e4e7;"><strong>Step 1:</strong> Log in and set your password</p>
+      <a href="${sanitizeUrl(tenant.setupUrl || portalUrl + '/portal/login')}" style="display: inline-block; background: #d97706; color: #000; font-weight: 700; font-size: 16px; padding: 14px 40px; border-radius: 8px; text-decoration: none; margin-bottom: 16px;">Log In to Portal</a>
+      ${tenant.tempPassword ? `<p style="margin: 0 0 8px; font-size: 14px; color: #a1a1aa;">Your temporary password:</p>
+      <p style="margin: 0 0 12px; font-family: monospace; font-size: 18px; color: #f59e0b; background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 6px; display: inline-block;">${escapeHtml(tenant.tempPassword)}</p>` : ''}
+      <p style="margin: 12px 0 0; font-size: 12px; color: #71717a;">You will be asked to choose a new password on first login.</p>
     </div>
 
     <h3 style="color: #e4e4e7;">Quick Start</h3>
