@@ -17,8 +17,8 @@ describe('PERMISSIONS', () => {
     expect(PERMISSIONS.ADDRESSES_IMPORT).toBe('app:addresses.import');
     expect(PERMISSIONS.OSM_REFRESH).toBe('app:osm.refresh');
     expect(PERMISSIONS.OSM_EDIT).toBe('app:osm.edit');
-    expect(PERMISSIONS.GAP_DETECTION_VIEW).toBe('app:gapDetection.view');
-    expect(PERMISSIONS.GAP_DETECTION_RUN).toBe('app:gapDetection.run');
+    expect(PERMISSIONS.GAP_DETECTION_VIEW).toBe('app:gap_detection.view');
+    expect(PERMISSIONS.GAP_DETECTION_RUN).toBe('app:gap_detection.run');
   });
 
   // Territory Operations (Spec 3)

@@ -101,8 +101,8 @@ export const PERMISSIONS = {
   ADDRESSES_IMPORT: "app:addresses.import",
   OSM_REFRESH: "app:osm.refresh",
   OSM_EDIT: "app:osm.edit",
-  GAP_DETECTION_VIEW: "app:gapDetection.view",
-  GAP_DETECTION_RUN: "app:gapDetection.run",
+  GAP_DETECTION_VIEW: "app:gap_detection.view",
+  GAP_DETECTION_RUN: "app:gap_detection.run",
 
   // Territory Operations
   ASSIGNMENTS_VIEW: "app:assignments.view",
@@ -274,6 +274,10 @@ export const CONGREGATION_ROLE_PERMISSIONS: Record<string, string[]> = {
   publisher: [
     PERMISSIONS.PUBLISHERS_VIEW_MINIMAL,
     PERMISSIONS.MEETINGS_VIEW,
+    PERMISSIONS.ADDRESSES_VIEW,
+    PERMISSIONS.ASSIGNMENTS_VIEW,
+    PERMISSIONS.CAMPAIGNS_VIEW,
+    PERMISSIONS.CAMPAIGNS_LOCATION_SHARE,
   ],
   ministerial_servant: [
     // Inherits publisher
