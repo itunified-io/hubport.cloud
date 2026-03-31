@@ -15,6 +15,8 @@ import {
   Mic,
   ChevronDown,
   ChevronRight,
+  Kanban,
+  Megaphone,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getAppVersion } from "@/lib/config";
@@ -32,7 +34,13 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: "/", labelId: "nav.dashboard", icon: LayoutDashboard, requiredPermission: null },
   { to: "/publishers", labelId: "nav.publishers", icon: Users, requiredPermission: "app:publishers.view" },
-  { to: "/territories", labelId: "nav.territories", icon: Map, requiredPermission: "app:territories.view" },
+  {
+    to: "/territories", labelId: "nav.territories", icon: Map, requiredPermission: "app:territories.view",
+    children: [
+      { to: "/territories/kanban", labelId: "nav.territories.kanban", icon: Kanban, requiredPermission: "app:territories.view" },
+      { to: "/territories/campaigns", labelId: "nav.territories.campaigns", icon: Megaphone, requiredPermission: "app:territories.view" },
+    ],
+  },
   {
     to: "/meetings", labelId: "nav.meetings", icon: Calendar, requiredPermission: "app:meetings.view",
     children: [

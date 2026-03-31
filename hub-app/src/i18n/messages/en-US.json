@@ -133,6 +133,8 @@
   "publishers.program.assignedAbove": "assigned above",
   "publishers.notes": "Notes",
   "publishers.notes.placeholder": "Internal notes (visible to elders only)",
+  "nav.territories.kanban": "Board",
+  "nav.territories.campaigns": "Campaigns",
   "territories.title": "Territories",
   "territories.map": "Map View",
   "territories.empty": "No territories found.",
