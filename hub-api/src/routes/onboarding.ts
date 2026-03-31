@@ -88,7 +88,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     let keycloakSub: string;
     let tempPassword: string;
     try {
-      const result = await createInvitedKeycloakUser(publisher.email!);
+      const result = await createInvitedKeycloakUser(publisher.email!, publisher.firstName, publisher.lastName);
       keycloakSub = result.userId;
       tempPassword = result.tempPassword;
     } catch (err) {

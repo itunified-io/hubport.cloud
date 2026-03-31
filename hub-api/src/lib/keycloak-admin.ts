@@ -161,7 +161,11 @@ export async function createKeycloakUser(
  * Unlike createKeycloakUser(), this sets emailVerified=true (invite code = proof)
  * and uses a random temporary password.
  */
-export async function createInvitedKeycloakUser(email: string): Promise<{ userId: string; tempPassword: string }> {
+export async function createInvitedKeycloakUser(
+  email: string,
+  firstName?: string,
+  lastName?: string,
+): Promise<{ userId: string; tempPassword: string }> {
   const token = await getAdminToken();
   const { randomBytes } = await import("node:crypto");
   // Password must meet KC policy: 12+ chars, upper, lower, digit, special
@@ -176,6 +180,8 @@ export async function createInvitedKeycloakUser(email: string): Promise<{ userId
     body: JSON.stringify({
       username: email,
       email,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       enabled: true,
       emailVerified: true,
       credentials: [
@@ -208,6 +214,8 @@ export async function createInvitedKeycloakUser(email: string): Promise<{ userId
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
         requiredActions: ["UPDATE_PASSWORD", "CONFIGURE_TOTP", "webauthn-register-passwordless"],
         credentials: [
           {

@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.03.31.12
+
+### Fix invite KC user missing name fields (#258)
+- fix: pass firstName/lastName from publisher record to `createInvitedKeycloakUser`
+- fix: also set name on existing user in 409 path
+- Without this, Keycloak shows "Update Account Information" with empty name fields
+
 ## v2026.03.31.11
 
 ### Invite onboarding — show temp password + credential setup flow (#258)
