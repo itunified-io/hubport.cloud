@@ -20,6 +20,7 @@ interface Publisher {
   address: string | null;
   congregationRole: string;
   congregationFlags: string[];
+  role: string;
   status: string;
   notes: string | null;
   privacyAccepted: boolean;
@@ -206,6 +207,7 @@ export function PublisherForm() {
   const [congregationFlags, setCongregationFlags] = useState<string[]>([]);
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
+  const [systemRole, setSystemRole] = useState("publisher");
 
   // ─── Status / lifecycle state ───────────────────────────────────
   const [publisherStatus, setPublisherStatus] = useState("active");
@@ -265,6 +267,7 @@ export function PublisherForm() {
           setCreatedAt(p.createdAt ?? null);
           setApprovedAt(p.approvedAt ?? null);
           setNotes(p.notes ?? "");
+          setSystemRole(p.role ?? "publisher");
           setAssignedRoleIds(new Set(p.appRoles.map((ar) => ar.roleId)));
         }
       } finally {
@@ -415,7 +418,7 @@ export function PublisherForm() {
       if (isEdit) {
         // Update existing publisher — send all fields
         const body: Record<string, unknown> = {
-          firstName, lastName, congregationRole, congregationFlags, status,
+          firstName, lastName, congregationRole, congregationFlags, status, role: systemRole,
         };
         if (displayName) body.displayName = displayName;
         if (email) body.email = email;
@@ -920,6 +923,25 @@ export function PublisherForm() {
 
         {/* ── Tab: Roles ─────────────────────────────────────────── */}
         {isEdit && activeTab === "roles" && canManageUsers && (
+          <>
+          {/* System Role */}
+          <div className={sectionCls}>
+            <SectionHeader id="publishers.systemRole" />
+            <p className="text-xs text-[var(--text-muted)]">
+              <FormattedMessage id="publishers.systemRole.hint" />
+            </p>
+            <select
+              value={systemRole}
+              onChange={(e) => setSystemRole(e.target.value)}
+              className={selectCls}
+            >
+              <option value="publisher">{intl.formatMessage({ id: "publishers.systemRole.publisher" })}</option>
+              <option value="elder">{intl.formatMessage({ id: "publishers.systemRole.elder" })}</option>
+              <option value="admin">{intl.formatMessage({ id: "publishers.systemRole.admin" })}</option>
+            </select>
+          </div>
+
+          {/* App Roles */}
           <div className={sectionCls}>
             <SectionHeader id="publishers.allRoles" />
             <div className="border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg)] divide-y divide-[var(--border)]">
@@ -972,6 +994,7 @@ export function PublisherForm() {
               </div>
             )}
           </div>
+          </>
         )}
 
         {/* ── Actions ─────────────────────────────────────────────── */}

@@ -5,7 +5,7 @@ import { requirePermission } from "../lib/rbac.js";
 import { maskFields, audit } from "../lib/policy-engine.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
-import { deleteKeycloakUser } from "../lib/keycloak-admin.js";
+import { deleteKeycloakUser, assignKeycloakRole, removeKeycloakRole } from "../lib/keycloak-admin.js";
 
 const PublisherBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
@@ -173,6 +173,20 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
       // If congregationRole changed, sync Matrix room memberships
       if (existing.congregationRole !== publisher.congregationRole) {
         syncPublisherRoomMemberships(publisher.id).catch(() => {});
+      }
+
+      // If system role changed, sync Keycloak realm role
+      if (existing.role !== publisher.role && existing.keycloakSub) {
+        (async () => {
+          try {
+            if (existing.role) await removeKeycloakRole(existing.keycloakSub!, existing.role);
+          } catch { /* old role may not exist */ }
+          try {
+            await assignKeycloakRole(existing.keycloakSub!, publisher.role);
+          } catch (err) {
+            app.log.warn({ err }, "Failed to sync KC realm role");
+          }
+        })().catch(() => {});
       }
 
       return publisher;
