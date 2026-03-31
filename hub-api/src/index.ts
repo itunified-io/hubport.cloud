@@ -27,9 +27,22 @@ import { publicTalkRoutes } from "./routes/public-talks.js";
 import { congregationSettingsRoutes } from "./routes/congregation-settings.js";
 import { awayPeriodRoutes } from "./routes/away-periods.js";
 import { chatRoutes } from "./routes/chat.js";
+import { campaignRoutes } from "./routes/campaigns.js";
+import { meetingPointRoutes } from "./routes/meeting-points.js";
+import { assignmentRoutes } from "./routes/assignments.js";
+import { fieldGroupRoutes } from "./routes/field-groups.js";
+import { territoryShareRoutes } from "./routes/territory-shares.js";
+import { addressRoutes } from "./routes/addresses.js";
+import { osmRefreshRoutes } from "./routes/osm-refresh.js";
+import { gapDetectionRoutes } from "./routes/gap-detection.js";
+import { localOsmRoutes } from "./routes/local-osm.js";
+import { heatmapRoutes } from "./routes/heatmap.js";
+import { importRoutes } from "./routes/import.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
+import { startAssignmentOverdueCheck } from './jobs/assignment-overdue-check.js';
+import { startCampaignAutoClose } from './jobs/campaign-auto-close.js';
 import { seedSystemRoles } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
 
@@ -92,6 +105,17 @@ async function start(): Promise<void> {
   await app.register(congregationSettingsRoutes);
   await app.register(awayPeriodRoutes);
   await app.register(chatRoutes);
+  await app.register(campaignRoutes);
+  await app.register(meetingPointRoutes);
+  await app.register(assignmentRoutes);
+  await app.register(fieldGroupRoutes);
+  await app.register(territoryShareRoutes);
+  await app.register(addressRoutes);
+  await app.register(osmRefreshRoutes);
+  await app.register(gapDetectionRoutes);
+  await app.register(localOsmRoutes);
+  await app.register(heatmapRoutes);
+  await app.register(importRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
@@ -147,6 +171,10 @@ async function start(): Promise<void> {
   startTokenRotationJob(app.log);
   // Start workbook auto-fetch (checks for new editions every 12h)
   startWorkbookAutoFetch(app.log);
+  // Start assignment overdue check (daily)
+  startAssignmentOverdueCheck(app.log);
+  // Start campaign auto-close (daily)
+  startCampaignAutoClose(app.log);
   app.log.info(`hub-api listening on ${host}:${port}`);
 }
 
