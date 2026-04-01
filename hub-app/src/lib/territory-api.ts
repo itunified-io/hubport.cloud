@@ -101,16 +101,18 @@ export interface OsmRefreshJob {
 }
 
 export interface GapDetectionRun {
-  runId: string;
-  tenantId: string;
-  status: "pending" | "running" | "completed" | "failed";
+  id: string;
+  territoryId: string;
+  status: "running" | "completed" | "failed";
   totalBuildings: number | null;
   coveredCount: number | null;
   gapCount: number | null;
   resultGeoJson: GeoJsonFeatureCollection | null;
   startedAt: string;
   completedAt: string | null;
-  createdBy: string;
+  runBy: string;
+  createdAt: string;
+  territory?: { id: string; number: string; name: string };
 }
 
 export interface IgnoredBuilding {
@@ -345,7 +347,7 @@ export function getOsmQueue(token: string): Promise<OsmRefreshJob[]> {
 
 // ─── Gap Detection endpoints ────────────────────────────────────
 
-export function runGapDetection(token: string, territoryIds?: string[]): Promise<GapDetectionRun> {
+export function runGapDetection(token: string, territoryIds?: string[]): Promise<GapDetectionRun[]> {
   return apiFetch("/territories/gap-detection/run", token, {
     method: "POST",
     body: JSON.stringify(territoryIds ? { territoryIds } : {}),
@@ -356,23 +358,19 @@ export function getGapRuns(token: string): Promise<GapDetectionRun[]> {
   return apiFetch("/territories/gap-detection/runs", token);
 }
 
-export function getGapRun(runId: string, token: string): Promise<GapDetectionRun> {
-  return apiFetch(`/territories/gap-detection/runs/${runId}`, token);
-}
-
 export function ignoreBuildings(
   data: Array<{
+    territoryId: string;
     osmId: string;
     reason: string;
-    evidence: string;
     notes?: string;
-    latitude?: number;
-    longitude?: number;
+    lat?: number;
+    lng?: number;
     streetAddress?: string;
     buildingType?: string;
   }>,
   token: string,
-): Promise<{ ignored: number }> {
+): Promise<{ created: string[]; skipped: string[] }> {
   return apiFetch("/territories/gap-detection/ignore", token, {
     method: "POST",
     body: JSON.stringify({ buildings: data }),

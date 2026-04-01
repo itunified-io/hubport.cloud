@@ -109,6 +109,11 @@ function isInsideBoundaries(lat: number, lng: number, boundaries: unknown): bool
 
 export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
   // ─── Run gap detection ───────────────────────────────────────────
+  //
+  // Strategy: Use the congregation boundary bbox for a SINGLE Overpass
+  // query, then distribute buildings to territories via point-in-polygon.
+  // This avoids N separate Overpass calls that cause 504 timeouts.
+  //
   app.post<{ Body: RunBodyType }>(
     "/territories/gap-detection/run",
     {
@@ -116,46 +121,76 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: RunBody },
     },
     async (request, reply) => {
-      const results: {
-        territoryId: string;
-        territoryNumber: string;
-        totalBuildings: number;
-        coveredCount: number;
-        gapCount: number;
-        gaps: { osmId: string; lat: number; lng: number; buildingType?: string; streetAddress?: string }[];
-      }[] = [];
+      const publisherId = request.user?.sub ?? "system";
 
-      // If no territoryIds provided, run on all territories with boundaries
-      let ids = request.body.territoryIds;
-      if (!ids || ids.length === 0) {
-        const allTerritories = await prisma.territory.findMany({
-          where: { type: "territory" },
-          select: { id: true, boundaries: true },
-        });
-        ids = allTerritories
-          .filter((t) => t.boundaries !== null)
-          .slice(0, 20)
-          .map((t) => t.id);
+      // Load territories to scan
+      const allTerritories = await prisma.territory.findMany({
+        select: { id: true, number: true, boundaries: true, type: true },
+      });
+
+      // Find congregation boundary for the Overpass bbox
+      const congBoundary = allTerritories.find(
+        (t) => t.type === "congregation_boundary" && t.boundaries,
+      );
+
+      // Resolve which territories to scan
+      let targetTerritories = allTerritories.filter(
+        (t) => t.type === "territory" && t.boundaries,
+      );
+
+      // If specific IDs requested, filter to those
+      const requestedIds = request.body.territoryIds;
+      if (requestedIds && requestedIds.length > 0) {
+        const idSet = new Set(requestedIds);
+        targetTerritories = targetTerritories.filter((t) => idSet.has(t.id));
       }
-      if (ids.length === 0) {
+
+      if (targetTerritories.length === 0) {
         return reply.code(400).send({ error: "No territories with boundaries found" });
       }
 
-      for (const territoryId of ids) {
-        const territory = await prisma.territory.findUnique({
-          where: { id: territoryId },
+      // Determine bbox: prefer congregation boundary, else union of target territories
+      let bbox: { south: number; west: number; north: number; east: number } | null = null;
+
+      if (congBoundary) {
+        bbox = bboxFromGeoJSON(congBoundary.boundaries);
+      }
+
+      if (!bbox) {
+        // Fallback: compute union bbox from all target territories
+        let south = Infinity, north = -Infinity, west = Infinity, east = -Infinity;
+        for (const t of targetTerritories) {
+          const b = bboxFromGeoJSON(t.boundaries);
+          if (!b) continue;
+          if (b.south < south) south = b.south;
+          if (b.north > north) north = b.north;
+          if (b.west < west) west = b.west;
+          if (b.east > east) east = b.east;
+        }
+        if (south < Infinity) bbox = { south, west, north, east };
+      }
+
+      if (!bbox) {
+        return reply.code(400).send({ error: "Could not compute bounding box" });
+      }
+
+      // Single Overpass query for the entire area
+      let allBuildings: OverpassBuilding[];
+      try {
+        allBuildings = await queryBuildingsInBBox(bbox.south, bbox.west, bbox.north, bbox.east);
+      } catch (err) {
+        return reply.code(502).send({
+          error: err instanceof Error ? err.message : "Overpass API failed",
         });
+      }
 
-        if (!territory || !territory.boundaries) continue;
+      // Distribute buildings to territories via point-in-polygon
+      const runResults: object[] = [];
 
-        const bbox = bboxFromGeoJSON(territory.boundaries);
-        if (!bbox) continue;
-
-        // Create run record
-        const publisherId = request.user?.sub ?? "system";
+      for (const territory of targetTerritories) {
         const run = await prisma.gapDetectionRun.create({
           data: {
-            territoryId,
+            territoryId: territory.id,
             status: "running",
             startedAt: new Date(),
             runBy: publisherId,
@@ -163,40 +198,34 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         });
 
         try {
-          // Fetch buildings from Overpass
-          const buildings = await queryBuildingsInBBox(bbox.south, bbox.west, bbox.north, bbox.east);
-
-          // Filter to buildings inside the territory polygon
-          const insideBuildings = buildings.filter((b: OverpassBuilding) =>
+          const insideBuildings = allBuildings.filter((b) =>
             isInsideBoundaries(b.lat, b.lng, territory.boundaries),
           );
 
-          // Get existing addresses and ignored buildings
           const [existingAddresses, ignoredBuildings] = await Promise.all([
             prisma.address.findMany({
-              where: { territoryId },
+              where: { territoryId: territory.id },
               select: { osmId: true },
             }),
             prisma.ignoredOsmBuilding.findMany({
-              where: { territoryId },
+              where: { territoryId: territory.id },
               select: { osmId: true },
             }),
           ]);
 
-          const coveredOsmIds = new Set(existingAddresses.filter((a) => a.osmId).map((a) => a.osmId!));
+          const coveredOsmIds = new Set(
+            existingAddresses.filter((a) => a.osmId).map((a) => a.osmId!),
+          );
           const ignoredOsmIds = new Set(ignoredBuildings.map((b) => b.osmId));
 
-          // Find gaps: buildings not in addresses and not ignored
           const gaps = insideBuildings.filter(
-            (b: OverpassBuilding) => !coveredOsmIds.has(b.osmId) && !ignoredOsmIds.has(b.osmId),
+            (b) => !coveredOsmIds.has(b.osmId) && !ignoredOsmIds.has(b.osmId),
           );
-
           const coveredCount = insideBuildings.length - gaps.length;
 
-          // Build GeoJSON result
           const resultGeoJson = {
             type: "FeatureCollection" as const,
-            features: gaps.map((g: OverpassBuilding) => ({
+            features: gaps.map((g) => ({
               type: "Feature" as const,
               properties: {
                 osmId: g.osmId,
@@ -210,7 +239,6 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
             })),
           };
 
-          // Update run record
           await prisma.gapDetectionRun.update({
             where: { id: run.id },
             data: {
@@ -223,43 +251,31 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
             },
           });
 
-          results.push({
-            territoryId,
-            territoryNumber: territory.number,
-            totalBuildings: insideBuildings.length,
-            coveredCount,
-            gapCount: gaps.length,
-            gaps: gaps.map((g: OverpassBuilding) => ({
-              osmId: g.osmId,
-              lat: g.lat,
-              lng: g.lng,
-              buildingType: g.buildingType,
-              streetAddress: g.streetAddress,
-            })),
+          const updatedRun = await prisma.gapDetectionRun.findUnique({
+            where: { id: run.id },
+            include: { territory: { select: { id: true, number: true, name: true } } },
           });
-        } catch (err) {
+          if (updatedRun) runResults.push(updatedRun);
+        } catch {
           await prisma.gapDetectionRun.update({
             where: { id: run.id },
-            data: {
-              status: "failed",
-              completedAt: new Date(),
-            },
+            data: { status: "failed", completedAt: new Date() },
           });
-          throw err;
         }
       }
 
-      // Auto-prune: keep last 3 completed + 3 failed per territory
-      const territoryIds = [...new Set(request.body.territoryIds)];
-      for (const tid of territoryIds) {
-        for (const status of ["completed", "failed"]) {
+      // Auto-prune: keep last 5 completed + 3 failed per territory
+      const prunedIds = targetTerritories.map((t) => t.id);
+      for (const tid of prunedIds) {
+        for (const status of ["completed", "failed"] as const) {
+          const keep = status === "completed" ? 5 : 3;
           const runs = await prisma.gapDetectionRun.findMany({
             where: { territoryId: tid, status },
             orderBy: { createdAt: "desc" },
             select: { id: true },
           });
-          if (runs.length > 3) {
-            const toDelete = runs.slice(3).map((r) => r.id);
+          if (runs.length > keep) {
+            const toDelete = runs.slice(keep).map((r) => r.id);
             await prisma.gapDetectionRun.deleteMany({
               where: { id: { in: toDelete } },
             });
@@ -267,7 +283,24 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      return results;
+      return runResults;
+    },
+  );
+
+  // ─── List runs (recent) ─────────────────────────────────────────
+  app.get(
+    "/territories/gap-detection/runs",
+    {
+      preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_VIEW),
+    },
+    async () => {
+      return prisma.gapDetectionRun.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          territory: { select: { id: true, number: true, name: true } },
+        },
+      });
     },
   );
 
