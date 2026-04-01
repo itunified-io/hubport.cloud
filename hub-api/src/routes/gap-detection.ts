@@ -129,11 +129,13 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
       let ids = request.body.territoryIds;
       if (!ids || ids.length === 0) {
         const allTerritories = await prisma.territory.findMany({
-          where: { type: "territory", boundaries: { not: null } },
-          select: { id: true },
-          take: 20,
+          where: { type: "territory" },
+          select: { id: true, boundaries: true },
         });
-        ids = allTerritories.map((t) => t.id);
+        ids = allTerritories
+          .filter((t) => t.boundaries !== null)
+          .slice(0, 20)
+          .map((t) => t.id);
       }
       if (ids.length === 0) {
         return reply.code(400).send({ error: "No territories with boundaries found" });
