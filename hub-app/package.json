@@ -1,6 +1,6 @@
 {
   "name": "@itunified-io/hub-app",
-  "version": "2026.04.01.6",
+  "version": "2026.04.01.7",
   "private": true,
   "type": "module",
   "scripts": {
