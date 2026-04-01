@@ -1,6 +1,21 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.9
+
+### Field Work Mode (#264)
+- feat: GPS-sorted proximity list with Haversine distance, 5s re-sort, freeze toggle
+- feat: one-tap QuickActionBar for visit logging (6 outcomes)
+- feat: full-screen mobile FieldWorkMode with bottom sheet UX (collapsed/peek/expanded)
+- feat: Apple Maps-style blue dot with heading cone + accuracy circle (MyLocationMarker)
+- feat: overseer FieldWorkDashboard — real-time map of publishers sharing location
+- feat: GPS tracker hook with compass heading (iOS + Android), accuracy, speed
+- feat: heading/accuracy fields on LocationShare, joinCode on CampaignFieldGroup
+- feat: active-locations endpoint, join-by-code, generate-code, auto-timeout cleanup
+- feat: FIELD_WORK_GPS + FIELD_WORK_OVERSEER permissions, Service Overseer seed role
+- fix: MapLibre marker memory leak in dashboard (proper Marker.remove())
+- fix: async race condition guard in MyLocationMarker initMarker
+
 ## v2026.03.31.18
 
 ### Territory Module (#262)
