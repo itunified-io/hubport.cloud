@@ -1,8 +1,12 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "./auth/useAuth";
+import { OfflineProvider } from "./providers/OfflineProvider";
 import { PermissionGuard} from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import { MyDevices } from "./pages/profile/MyDevices";
+import { DeviceAdmin } from "./pages/settings/DeviceAdmin";
+import { NotificationSettings } from "./pages/settings/NotificationSettings";
 import { Dashboard } from "./pages/Dashboard";
 import { PublisherList } from "./pages/publishers/PublisherList";
 import { PublisherForm } from "./pages/publishers/PublisherForm";
@@ -97,6 +101,7 @@ export function App() {
   }
 
   return (
+    <OfflineProvider>
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -362,6 +367,7 @@ export function App() {
 
         {/* Profile (any authenticated user) */}
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/devices" element={<MyDevices />} />
 
         {/* Audit Log */}
         <Route
@@ -389,6 +395,23 @@ export function App() {
             </PermissionGuard>
           }
         />
+        <Route
+          path="/settings/devices"
+          element={
+            <PermissionGuard requires="app:admin.devices.view">
+              <DeviceAdmin />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path="/settings/notifications"
+          element={
+            <PermissionGuard requires="app:devices.view">
+              <NotificationSettings />
+            </PermissionGuard>
+          }
+        />
 
         {/* Backward compatibility redirects */}
         <Route path="/users" element={<Navigate to="/publishers" replace />} />
@@ -398,5 +421,6 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </OfflineProvider>
   );
 }
