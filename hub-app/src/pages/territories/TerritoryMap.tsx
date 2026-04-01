@@ -277,7 +277,7 @@ export function TerritoryMap() {
 
       {/* Map container */}
       <div className="relative h-[80vh] border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0" />
+        <div ref={containerRef} className="absolute inset-0" style={{ position: "absolute" }} />
 
         {!isLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-1)]">

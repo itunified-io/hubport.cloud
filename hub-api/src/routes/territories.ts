@@ -20,6 +20,15 @@ const TerritoryBody = Type.Object({
 
 type TerritoryBodyType = Static<typeof TerritoryBody>;
 
+const TerritoryUpdateBody = Type.Object({
+  number: Type.Optional(Type.String({ minLength: 1 })),
+  name: Type.Optional(Type.String({ minLength: 1 })),
+  description: Type.Optional(Type.String()),
+  boundaries: Type.Optional(Type.Any()),
+});
+
+type TerritoryUpdateBodyType = Static<typeof TerritoryUpdateBody>;
+
 const IdParams = Type.Object({
   id: Type.String({ format: "uuid" }),
 });
@@ -492,11 +501,11 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Update territory — requires territories.edit
-  app.put<{ Params: IdParamsType; Body: TerritoryBodyType }>(
+  app.put<{ Params: IdParamsType; Body: TerritoryUpdateBodyType }>(
     "/territories/:id",
     {
       preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
-      schema: { params: IdParams, body: TerritoryBody },
+      schema: { params: IdParams, body: TerritoryUpdateBody },
     },
     async (request, reply) => {
       const { id } = request.params;
