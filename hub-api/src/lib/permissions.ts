@@ -378,4 +378,5 @@ export const FLAG_TO_APP_ROLE: Record<string, string> = {
   life_and_ministry_overseer: "LM Overseer",
   watchtower_conductor: "WT Conductor",
   circuit_overseer: "Circuit Overseer",
+  territory_servant: "Territory Servant",
 };

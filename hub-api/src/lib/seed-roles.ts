@@ -251,6 +251,22 @@ const SYSTEM_ROLES: SeedRole[] = [
     ],
   },
   {
+    name: "Territory Servant",
+    description: "Territory management — draw, edit, assign, import boundaries",
+    scope: "all",
+    permissions: [
+      P.TERRITORIES_VIEW, P.TERRITORIES_EDIT, P.TERRITORIES_ASSIGN,
+      P.TERRITORIES_IMPORT, P.TERRITORIES_SHARE,
+      P.ADDRESSES_VIEW, P.ADDRESSES_EDIT, P.ADDRESSES_IMPORT,
+      P.OSM_REFRESH, P.OSM_EDIT,
+      P.GAP_DETECTION_VIEW, P.GAP_DETECTION_RUN,
+      P.ASSIGNMENTS_VIEW, P.ASSIGNMENTS_MANAGE,
+      P.PUBLISHERS_VIEW, P.CAMPAIGNS_VIEW,
+      P.MEETINGS_VIEW, P.FIELD_SERVICE_VIEW,
+      P.CHAT_VIEW, P.CHAT_SEND,
+    ],
+  },
+  {
     name: "Service Overseer Assistant",
     description: "Assists with territories and publisher records",
     scope: "all",
