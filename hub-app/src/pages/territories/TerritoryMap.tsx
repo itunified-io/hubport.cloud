@@ -6,6 +6,47 @@ import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLib
 import { useAuth } from "@/auth/useAuth";
 import { listTerritories, type TerritoryListItem } from "@/lib/territory-api";
 
+/** Color palette for territory groups (by number prefix) */
+const GROUP_COLORS: Record<string, { fill: string; border: string; label: string }> = {
+  "1": { fill: "rgba(59, 130, 246, 0.28)", border: "#2563eb", label: "blue" },
+  "2": { fill: "rgba(139, 92, 246, 0.28)", border: "#7c3aed", label: "purple" },
+  "3": { fill: "rgba(20, 184, 166, 0.28)", border: "#0d9488", label: "teal" },
+  "4": { fill: "rgba(245, 158, 11, 0.28)", border: "#d97706", label: "amber" },
+  "5": { fill: "rgba(236, 72, 153, 0.28)", border: "#db2777", label: "pink" },
+  "6": { fill: "rgba(34, 197, 94, 0.28)", border: "#16a34a", label: "green" },
+  "7": { fill: "rgba(239, 68, 68, 0.28)", border: "#dc2626", label: "red" },
+  "8": { fill: "rgba(99, 102, 241, 0.28)", border: "#4f46e5", label: "indigo" },
+  "9": { fill: "rgba(168, 85, 247, 0.28)", border: "#9333ea", label: "violet" },
+};
+const DEFAULT_GROUP_COLOR = { fill: "rgba(100, 116, 139, 0.28)", border: "#475569" };
+
+/** Get the group prefix (first digit) from a territory number */
+function getGroupPrefix(number: string): string {
+  return number.charAt(0);
+}
+
+/** Build group info from territories: prefix → representative name */
+function buildGroupInfo(territories: TerritoryListItem[]): Record<string, string> {
+  const groups: Record<string, Record<string, number>> = {};
+  for (const t of territories) {
+    if (!t.boundaries || t.type === "congregation_boundary") continue;
+    const prefix = getGroupPrefix(t.number);
+    if (!groups[prefix]) groups[prefix] = {};
+    const name = t.name.trim();
+    groups[prefix][name] = (groups[prefix][name] ?? 0) + 1;
+  }
+  // Pick the most common name per group
+  const result: Record<string, string> = {};
+  for (const prefix of Object.keys(groups)) {
+    let best = "", bestCount = 0;
+    for (const [name, count] of Object.entries(groups[prefix]!)) {
+      if (count > bestCount) { best = name; bestCount = count; }
+    }
+    result[prefix] = best;
+  }
+  return result;
+}
+
 /** Compute GeoJSON features from territories */
 function buildFeatures(territories: TerritoryListItem[]) {
   return territories
@@ -17,6 +58,7 @@ function buildFeatures(territories: TerritoryListItem[]) {
         number: t.number,
         name: t.name,
         assigned: t.assignments.some((a) => !a.returnedAt),
+        group: getGroupPrefix(t.number),
       },
       geometry: t.boundaries as { type: string; coordinates: unknown },
     }));
@@ -55,6 +97,7 @@ export function TerritoryMap() {
   const [territories, setTerritories] = useState<TerritoryListItem[]>([]);
   const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [groupInfo, setGroupInfo] = useState<Record<string, string>>({});
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
   const congBoundaryRef = useRef<TerritoryListItem | null>(null);
@@ -69,6 +112,7 @@ export function TerritoryMap() {
       .then(([terrs, bounds]) => {
         setTerritories(terrs);
         territoriesRef.current = terrs;
+        setGroupInfo(buildGroupInfo(terrs));
         const cb = bounds[0] ?? null;
         setCongBoundary(cb);
         congBoundaryRef.current = cb;
@@ -112,18 +156,24 @@ export function TerritoryMap() {
 
       addSource("territories", { type: "FeatureCollection", features });
 
+      // Build match expressions for group colors
+      const groups = Object.keys(GROUP_COLORS);
+      const fillMatch: unknown[] = ["match", ["get", "group"]];
+      const borderMatch: unknown[] = ["match", ["get", "group"]];
+      for (const g of groups) {
+        fillMatch.push(g, GROUP_COLORS[g]!.fill);
+        borderMatch.push(g, GROUP_COLORS[g]!.border);
+      }
+      fillMatch.push(DEFAULT_GROUP_COLOR.fill); // fallback
+      borderMatch.push(DEFAULT_GROUP_COLOR.border); // fallback
+
       addLayer({
         id: "territories-fill",
         type: "fill",
         source: "territories",
         paint: {
-          "fill-color": [
-            "case",
-            ["get", "assigned"],
-            "rgba(217, 119, 6, 0.25)",
-            "rgba(22, 163, 74, 0.18)",
-          ],
-          "fill-opacity": 0.8,
+          "fill-color": fillMatch,
+          "fill-opacity": 0.85,
         },
       });
 
@@ -132,7 +182,7 @@ export function TerritoryMap() {
         type: "line",
         source: "territories",
         paint: {
-          "line-color": ["case", ["get", "assigned"], "#b45309", "#15803d"],
+          "line-color": borderMatch,
           "line-width": 2,
         },
       });
@@ -249,19 +299,26 @@ export function TerritoryMap() {
 
         {/* Legend — bottom left */}
         {isLoaded && (
-          <div className="absolute bottom-3 left-3 z-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-lg px-3 py-2 space-y-1.5">
+          <div className="absolute bottom-3 left-3 z-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-lg px-3 py-2 space-y-1.5 max-h-[50vh] overflow-y-auto">
             <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
-              <span className="w-4 h-0.5 bg-red-500 block" style={{ borderTop: "2px dashed #ef4444" }} />
+              <span className="w-4 h-0.5 block" style={{ borderTop: "2px dashed #ef4444" }} />
               <FormattedMessage id="territories.congBoundary" defaultMessage="Congregation Boundary" />
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
-              <span className="w-4 h-3 rounded-sm block" style={{ background: "rgba(22, 163, 74, 0.3)", border: "1px solid #15803d" }} />
-              <FormattedMessage id="territories.available" defaultMessage="Available" />
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
-              <span className="w-4 h-3 rounded-sm block" style={{ background: "rgba(217, 119, 6, 0.3)", border: "1px solid #b45309" }} />
-              <FormattedMessage id="territories.assigned" defaultMessage="Assigned" />
-            </div>
+            {Object.entries(groupInfo)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([prefix, name]) => {
+                const colors = GROUP_COLORS[prefix] ?? DEFAULT_GROUP_COLOR;
+                return (
+                  <div key={prefix} className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                    <span
+                      className="w-4 h-3 rounded-sm block flex-shrink-0"
+                      style={{ background: colors.fill, border: `1.5px solid ${colors.border}` }}
+                    />
+                    <span className="font-mono font-semibold">{prefix}xx</span>
+                    <span className="truncate">{name}</span>
+                  </div>
+                );
+              })}
           </div>
         )}
 
