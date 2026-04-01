@@ -7,7 +7,7 @@ import {
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
   ChevronDown, Check, X, Edit3, Save,
 } from "lucide-react";
-import { Marker } from "maplibre-gl";
+import type { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import {
@@ -313,36 +313,40 @@ export function TerritoryDetail() {
       ? editCoords.length - 1
       : editCoords.length;
 
-    for (let i = 0; i < uniqueCount; i++) {
-      const coord = editCoords[i]!;
-      const el = document.createElement("div");
-      el.style.cssText = `
-        width: 18px; height: 18px; border-radius: 50%;
-        background: #f59e0b; border: 3px solid white;
-        cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        z-index: 100; position: relative;
-      `;
+    // Dynamically import Marker from same maplibre-gl module as the map
+    import("maplibre-gl").then((maplibregl) => {
+      const MarkerClass = maplibregl.Marker;
+      for (let i = 0; i < uniqueCount; i++) {
+        const coord = editCoords[i]!;
+        const el = document.createElement("div");
+        el.style.cssText = `
+          width: 18px; height: 18px; border-radius: 50%;
+          background: #f59e0b; border: 3px solid white;
+          cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+          z-index: 100; position: relative;
+        `;
 
-      const marker = new Marker({ element: el, draggable: true })
-        .setLngLat([coord[0], coord[1]])
-        .addTo(map as any);
+        const marker = new MarkerClass({ element: el, draggable: true })
+          .setLngLat([coord[0], coord[1]])
+          .addTo(map as any);
 
-      const idx = i;
-      marker.on("drag", () => {
-        const lngLat = marker.getLngLat();
-        setEditCoords((prev) => {
-          const next = [...prev];
-          next[idx] = [lngLat.lng, lngLat.lat];
-          // Keep ring closed
-          if (idx === 0 && next.length > 1) {
-            next[next.length - 1] = [lngLat.lng, lngLat.lat];
-          }
-          return next;
+        const idx = i;
+        marker.on("drag", () => {
+          const lngLat = marker.getLngLat();
+          setEditCoords((prev) => {
+            const next = [...prev];
+            next[idx] = [lngLat.lng, lngLat.lat];
+            // Keep ring closed
+            if (idx === 0 && next.length > 1) {
+              next[next.length - 1] = [lngLat.lng, lngLat.lat];
+            }
+            return next;
+          });
         });
-      });
 
-      vertexMarkersRef.current.push(marker);
-    }
+        vertexMarkersRef.current.push(marker);
+      }
+    });
 
     return () => {
       vertexMarkersRef.current.forEach((m) => m.remove());
