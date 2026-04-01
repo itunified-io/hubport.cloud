@@ -15,17 +15,19 @@ const EPOCH = new Date(0);
  * Each entry maps a response table name to:
  * - delegate: Prisma client delegate key
  * - tenantField: field name to filter by tenantId (undefined = no tenantId on table)
+ * - timestampField: field used for delta filtering + ordering (most tables use updatedAt;
+ *   AddressVisit has no updatedAt so we fall back to visitedAt)
  */
 const SYNCABLE_TABLES = [
-  { name: "territories",            delegate: "territory",                tenantField: undefined },
-  { name: "addresses",              delegate: "address",                  tenantField: undefined },
-  { name: "visits",                 delegate: "addressVisit",             tenantField: undefined },
-  { name: "assignments",            delegate: "territoryAssignment",      tenantField: undefined },
-  { name: "publishers",             delegate: "publisher",                tenantField: undefined },
-  { name: "meetingPoints",          delegate: "fieldServiceMeetingPoint", tenantField: "tenantId" as const },
-  { name: "campaignMeetingPoints",  delegate: "campaignMeetingPoint",     tenantField: "tenantId" as const },
-  { name: "meetings",               delegate: "serviceGroupMeeting",      tenantField: "tenantId" as const },
-  { name: "territoryShares",        delegate: "territoryShare",           tenantField: undefined },
+  { name: "territories",            delegate: "territory",                tenantField: undefined,            timestampField: "updatedAt" },
+  { name: "addresses",              delegate: "address",                  tenantField: undefined,            timestampField: "updatedAt" },
+  { name: "visits",                 delegate: "addressVisit",             tenantField: undefined,            timestampField: "visitedAt" },
+  { name: "assignments",            delegate: "territoryAssignment",      tenantField: undefined,            timestampField: "updatedAt" },
+  { name: "publishers",             delegate: "publisher",                tenantField: undefined,            timestampField: "updatedAt" },
+  { name: "meetingPoints",          delegate: "fieldServiceMeetingPoint", tenantField: "tenantId" as const,  timestampField: "updatedAt" },
+  { name: "campaignMeetingPoints",  delegate: "campaignMeetingPoint",     tenantField: "tenantId" as const,  timestampField: "updatedAt" },
+  { name: "meetings",               delegate: "serviceGroupMeeting",      tenantField: "tenantId" as const,  timestampField: "updatedAt" },
+  { name: "territoryShares",        delegate: "territoryShare",           tenantField: undefined,            timestampField: "updatedAt" },
 ] as const;
 
 type TableName = (typeof SYNCABLE_TABLES)[number]["name"];
@@ -168,8 +170,10 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
         const offset = i === startTableIndex ? startOffset : 0;
 
         // Build where clause
+        // Use the table's timestamp field — most use updatedAt, AddressVisit uses visitedAt
+        const tsField = tableConfig.timestampField;
         const where: Record<string, unknown> = {
-          updatedAt: { gt: since },
+          [tsField]: { gt: since },
         };
         if (tableConfig.tenantField && tenantId) {
           where[tableConfig.tenantField] = tenantId;
@@ -179,7 +183,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
           where,
           skip: offset,
           take: remaining,
-          orderBy: { updatedAt: "asc" as const },
+          orderBy: { [tsField]: "asc" as const },
         });
 
         // Split into upserts and deletes
