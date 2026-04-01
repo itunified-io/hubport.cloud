@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useAuth } from "./auth/useAuth";
+import { OfflineProvider } from "./providers/OfflineProvider";
 import { PermissionGuard} from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -100,6 +101,7 @@ export function App() {
   }
 
   return (
+    <OfflineProvider>
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -419,5 +421,6 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </OfflineProvider>
   );
 }
