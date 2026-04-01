@@ -11,7 +11,7 @@ import { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import {
-  getTerritory, listAddresses, updateAddress,
+  getTerritory, listTerritories, listAddresses, updateAddress,
   previewFix, updateTerritoryBoundaries,
   type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult,
 } from "@/lib/territory-api";
@@ -60,6 +60,8 @@ export function TerritoryDetail() {
   const token = user?.access_token ?? "";
 
   const [territory, setTerritory] = useState<TerritoryListItem | null>(null);
+  const [neighbors, setNeighbors] = useState<TerritoryListItem[]>([]);
+  const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapExpanded, setMapExpanded] = useState(false);
@@ -112,10 +114,17 @@ export function TerritoryDetail() {
 
   useEffect(() => {
     if (!token || !id) return;
-    getTerritory(id, token)
-      .then((t) => {
+    Promise.all([
+      getTerritory(id, token),
+      listTerritories(token),
+      listTerritories(token, { type: "congregation_boundary" }),
+    ])
+      .then(([t, allTerritories, congBounds]) => {
         setTerritory(t);
         territoryRef.current = t;
+        // Neighbors = all territories with boundaries except current and congregation boundary
+        setNeighbors(allTerritories.filter((n) => n.id !== id && n.boundaries && n.type !== "congregation_boundary"));
+        setCongBoundary(congBounds[0] ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load territory"))
       .finally(() => setLoading(false));
@@ -148,6 +157,48 @@ export function TerritoryDetail() {
     const t = territoryRef.current;
     if (!t?.boundaries) return;
 
+    // Congregation boundary — red dashed line (render first, below everything)
+    if (congBoundary?.boundaries) {
+      addSource("cong-boundary", {
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          properties: { name: congBoundary.name },
+          geometry: congBoundary.boundaries,
+        }],
+      });
+      addLayer({
+        id: "cong-boundary-line", type: "line", source: "cong-boundary",
+        paint: { "line-color": "#ef4444", "line-width": 2.5, "line-dasharray": [4, 3] },
+      });
+    }
+
+    // Neighbor territories — subtle grey fill + border
+    const neighborFeatures = neighbors
+      .filter((n) => n.boundaries)
+      .map((n) => ({
+        type: "Feature" as const,
+        properties: { number: n.number, name: n.name },
+        geometry: n.boundaries,
+      }));
+    if (neighborFeatures.length > 0) {
+      addSource("neighbors", { type: "FeatureCollection", features: neighborFeatures });
+      addLayer({
+        id: "neighbors-fill", type: "fill", source: "neighbors",
+        paint: { "fill-color": "rgba(100, 116, 139, 0.12)", "fill-opacity": 0.8 },
+      });
+      addLayer({
+        id: "neighbors-outline", type: "line", source: "neighbors",
+        paint: { "line-color": "#94a3b8", "line-width": 1.5 },
+      });
+      addLayer({
+        id: "neighbors-labels", type: "symbol", source: "neighbors",
+        layout: { "text-field": ["get", "number"], "text-size": 11, "text-font": ["Open Sans Bold"], "text-allow-overlap": false },
+        paint: { "text-color": "#94a3b8", "text-halo-color": "#ffffff", "text-halo-width": 1 },
+      });
+    }
+
+    // Current territory — amber fill (on top)
     addSource("territory", {
       type: "FeatureCollection",
       features: [{
@@ -185,7 +236,7 @@ export function TerritoryDetail() {
     };
     flatten((t.boundaries as { coordinates: unknown }).coordinates);
     if (minLng < 180) fitBounds([[minLng, minLat], [maxLng, maxLat]]);
-  }, [addSource, addLayer, fitBounds]);
+  }, [addSource, addLayer, fitBounds, neighbors, congBoundary]);
 
   useEffect(() => {
     onStyleReady(() => {
@@ -266,9 +317,10 @@ export function TerritoryDetail() {
       const coord = editCoords[i]!;
       const el = document.createElement("div");
       el.style.cssText = `
-        width: 14px; height: 14px; border-radius: 50%;
-        background: #f59e0b; border: 2px solid white;
-        cursor: grab; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        width: 18px; height: 18px; border-radius: 50%;
+        background: #f59e0b; border: 3px solid white;
+        cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        z-index: 100; position: relative;
       `;
 
       const marker = new Marker({ element: el, draggable: true })
