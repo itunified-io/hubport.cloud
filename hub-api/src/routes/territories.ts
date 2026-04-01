@@ -9,6 +9,7 @@ import {
   queryBuildingsInBBox,
   queryWaterBodiesInBBox,
 } from "../lib/osm-overpass.js";
+import { reverseGeocode } from "../lib/osm-nominatim.js";
 
 const TerritoryBody = Type.Object({
   number: Type.String({ minLength: 1 }),
@@ -61,6 +62,105 @@ async function createBoundaryVersion(
   });
 
   return nextVersion;
+}
+
+/**
+ * Given a drawn polygon, reverse-geocode centroid to get city name,
+ * then find the territory number group for that city and suggest next number.
+ */
+export async function suggestFromBoundaries(
+  prismaClient: typeof prisma,
+  boundaries: { type: string; coordinates: number[][][] },
+): Promise<{
+  city: string | null;
+  suggestedPrefix: string;
+  suggestedNumber: string;
+  existingInGroup: string[];
+}> {
+  // 1. Compute centroid from polygon exterior ring
+  const ring = boundaries.coordinates[0] ?? [];
+  const verts =
+    ring.length > 1 &&
+    ring[0]![0] === ring[ring.length - 1]![0] &&
+    ring[0]![1] === ring[ring.length - 1]![1]
+      ? ring.slice(0, -1)
+      : ring;
+  let cx = 0,
+    cy = 0;
+  for (const v of verts) {
+    cx += v[0]!;
+    cy += v[1]!;
+  }
+  cx /= verts.length || 1;
+  cy /= verts.length || 1;
+
+  // 2. Reverse geocode centroid via Nominatim
+  let city: string | null = null;
+  try {
+    const result = await reverseGeocode(cy, cx); // lat, lng
+    city = result?.address?.city ?? null;
+  } catch {
+    // Nominatim unavailable — city stays null
+  }
+
+  // 3. Fetch all territories to find groups
+  const allTerritories = await prismaClient.territory.findMany({
+    select: { number: true, name: true },
+  });
+
+  // 4. Find group prefix for this city
+  const usedPrefixes = new Map<string, string>(); // prefix -> city name
+  for (const t of allTerritories) {
+    const prefix = (t.number as string).charAt(0);
+    if (prefix >= "1" && prefix <= "9") {
+      const existing = usedPrefixes.get(prefix);
+      if (!existing) usedPrefixes.set(prefix, t.name as string);
+    }
+  }
+
+  let suggestedPrefix: string;
+  if (city) {
+    // Find if city already has a prefix
+    const existingPrefix = [...usedPrefixes.entries()].find(
+      ([, name]) => name.toLowerCase() === city!.toLowerCase(),
+    );
+    if (existingPrefix) {
+      suggestedPrefix = existingPrefix[0];
+    } else {
+      suggestedPrefix = "1";
+      for (let i = 1; i <= 9; i++) {
+        if (!usedPrefixes.has(String(i))) {
+          suggestedPrefix = String(i);
+          break;
+        }
+      }
+    }
+  } else {
+    suggestedPrefix = "1";
+    for (let i = 1; i <= 9; i++) {
+      if (!usedPrefixes.has(String(i))) {
+        suggestedPrefix = String(i);
+        break;
+      }
+    }
+  }
+
+  // 5. Find existing numbers in this group and suggest next
+  const groupNumbers = allTerritories
+    .filter((t) => (t.number as string).startsWith(suggestedPrefix))
+    .map((t) => t.number as string)
+    .sort();
+
+  let suggestedNumber = `${suggestedPrefix}01`;
+  for (let i = 1; i <= 99; i++) {
+    const candidate = `${suggestedPrefix}${String(i).padStart(2, "0")}`;
+    if (!groupNumbers.includes(candidate)) {
+      suggestedNumber = candidate;
+      break;
+    }
+  }
+
+  return { city, suggestedPrefix, suggestedNumber, existingInGroup: groupNumbers };
 }
 
 export async function territoryRoutes(app: FastifyInstance): Promise<void> {
@@ -269,6 +369,47 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return reply.code(201).send({ ...territory, autoFix });
+    },
+  );
+
+  // Suggest territory number + city from drawn polygon
+  app.post<{ Body: { boundaries: unknown } }>(
+    "/territories/suggest",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
+      schema: {
+        body: Type.Object({
+          boundaries: Type.Any(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { boundaries } = request.body;
+      if (!boundaries || typeof boundaries !== "object") {
+        return reply.code(400).send({ error: "boundaries required" });
+      }
+
+      const geo = boundaries as { type?: string; coordinates?: number[][][] };
+      if (geo.type !== "Polygon" || !geo.coordinates?.length) {
+        return reply.code(400).send({ error: "boundaries must be a GeoJSON Polygon" });
+      }
+
+      try {
+        const suggestion = await suggestFromBoundaries(prisma, geo as any);
+
+        // Optionally run auto-fix
+        let autoFix = null;
+        try {
+          autoFix = await runAutoFixPipeline(prisma, boundaries as object, null);
+        } catch {
+          // auto-fix failure is non-fatal for suggest
+        }
+
+        return reply.send({ ...suggestion, autoFix });
+      } catch (err: any) {
+        request.log.error(err, "suggest failed");
+        return reply.code(500).send({ error: "Suggest failed" });
+      }
     },
   );
 

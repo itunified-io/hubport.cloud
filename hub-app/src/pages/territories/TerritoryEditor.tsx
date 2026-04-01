@@ -8,6 +8,7 @@ import {
   type Territory,
 } from "../../hooks/useTerritoryEditor";
 import { useSnapEngine } from "../../hooks/useSnapEngine";
+import { snapAll, type SnapReport } from "./SnapEngine";
 import { VertexHandle } from "./VertexHandle";
 import { MidpointHandle } from "./MidpointHandle";
 import { ContextMenu } from "./ContextMenu";
@@ -44,6 +45,11 @@ export function TerritoryEditor({
 
   // Track polygon coordinates for the selected territory in edit mode
   const [editCoords, setEditCoords] = useState<[number, number][]>([]);
+  const [snapPreview, setSnapPreview] = useState<{
+    original: [number, number][];
+    snapped: [number, number][];
+    report: SnapReport[];
+  } | null>(null);
 
   // Get neighbor geometries for snap engine
   const neighborGeometries = territories
@@ -297,8 +303,21 @@ export function TerritoryEditor({
           </button>
         )}
 
-        {(editor.mode === "edit" || editor.mode === "create") && (
+        {(editor.mode === "edit" || editor.mode === "create") && !snapPreview && (
           <>
+            {editor.mode === "edit" && editCoords.length >= 4 && (
+              <button
+                onClick={() => {
+                  const verts = editCoords.slice(0, -1); // exclude closing vertex
+                  const result = snapAll(verts, snapEngine.targets, snapEngine.tolerance);
+                  setSnapPreview({ original: verts, snapped: result.snapped, report: result.report });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500/80 text-white font-medium rounded-[var(--radius-sm)] hover:bg-blue-400 transition-colors cursor-pointer"
+                title="Snap all vertices to nearest roads"
+              >
+                Snap All
+              </button>
+            )}
             <button
               onClick={handleSave}
               disabled={editor.saving}
@@ -321,6 +340,39 @@ export function TerritoryEditor({
               />
             </button>
           </>
+        )}
+
+        {snapPreview && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-1)] px-2 py-1 rounded border border-[var(--border)]">
+              {snapPreview.report.filter((r) => r.snappedTo !== null).length}/{snapPreview.report.length} snapped
+            </span>
+            <button
+              onClick={() => {
+                // Apply snapped coords (re-close ring)
+                const closed = [...snapPreview.snapped, snapPreview.snapped[0]!];
+                setEditCoords(closed);
+                if (editor.selectedTerritory) {
+                  undoRedo.push({
+                    territoryId: editor.selectedTerritory.id,
+                    beforeGeometry: { type: "snap_all", coords: snapPreview.original },
+                    afterGeometry: { type: "snap_all", coords: snapPreview.snapped },
+                    description: "Snap All",
+                  });
+                }
+                setSnapPreview(null);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-green-500/90 text-white rounded-[var(--radius-sm)] hover:bg-green-400 transition-colors cursor-pointer"
+            >
+              Accept Snap
+            </button>
+            <button
+              onClick={() => setSnapPreview(null)}
+              className="px-3 py-1.5 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+            >
+              Revert
+            </button>
+          </div>
         )}
       </div>
 

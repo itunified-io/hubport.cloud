@@ -544,11 +544,29 @@ export interface TerritoryViolation {
 
 export function createTerritory(
   token: string,
-  data: { number: string; name: string },
+  data: { number: string; name: string; boundaries?: unknown },
 ): Promise<TerritoryListItem> {
   return apiFetch("/territories", token, {
     method: "POST",
     body: JSON.stringify(data),
+  });
+}
+
+export interface TerritorySuggestion {
+  city: string | null;
+  suggestedPrefix: string;
+  suggestedNumber: string;
+  existingInGroup: string[];
+  autoFix: AutoFixResult | null;
+}
+
+export function suggestTerritory(
+  token: string,
+  boundaries: unknown,
+): Promise<TerritorySuggestion> {
+  return apiFetch("/territories/suggest", token, {
+    method: "POST",
+    body: JSON.stringify({ boundaries }),
   });
 }
 

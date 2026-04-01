@@ -1,12 +1,13 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { FormattedMessage } from "react-intl";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Map, Plus, Loader2 } from "lucide-react";
+import { ArrowLeft, Map, Plus, Loader2, X } from "lucide-react";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLibre";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
-import { listTerritories, createTerritory, type TerritoryListItem } from "@/lib/territory-api";
-import { NewTerritoryModal } from "./NewTerritoryModal";
+import { listTerritories, createTerritory, suggestTerritory, type TerritoryListItem, type TerritorySuggestion } from "@/lib/territory-api";
+import { CreationFlow } from "./CreationFlow";
+import { CreateTerritoryModal } from "./CreateTerritoryModal";
 import { ViolationBadges } from "./ViolationBadges";
 
 /** Color palette for territory groups (by number prefix) */
@@ -102,7 +103,11 @@ export function TerritoryMap() {
   const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [groupInfo, setGroupInfo] = useState<Record<string, string>>({});
-  const [showNewModal, setShowNewModal] = useState(false);
+  const [creationMode, setCreationMode] = useState(false);
+  const [suggestion, setSuggestion] = useState<TerritorySuggestion | null>(null);
+  const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [creating, setCreating] = useState(false);
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
   const congBoundaryRef = useRef<TerritoryListItem | null>(null);
@@ -329,13 +334,55 @@ export function TerritoryMap() {
 
         {/* New territory button — top right */}
         {can("app:territories.edit") && (
-          <button
-            onClick={() => setShowNewModal(true)}
-            className="absolute top-3 right-3 z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer shadow-lg"
-          >
-            <Plus size={16} />
-            <FormattedMessage id="territories.newTerritory" defaultMessage="New Territory" />
-          </button>
+          creationMode ? (
+            <button
+              onClick={() => { setCreationMode(false); setPendingBoundaries(null); setSuggestion(null); }}
+              className="absolute top-3 right-3 z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--text)] bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+            >
+              <X size={16} />
+              <FormattedMessage id="common.cancel" defaultMessage="Cancel" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setCreationMode(true)}
+              className="absolute top-3 right-3 z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer shadow-lg"
+            >
+              <Plus size={16} />
+              <FormattedMessage id="territories.newTerritory" defaultMessage="New Territory" />
+            </button>
+          )
+        )}
+
+        {/* Creation flow drawing overlay */}
+        {creationMode && isLoaded && mapRef.current && !suggestion && (
+          <CreationFlow
+            map={mapRef.current}
+            onComplete={async (coords) => {
+              const geojson = { type: "Polygon" as const, coordinates: [coords] };
+              setPendingBoundaries(geojson);
+              setSuggesting(true);
+              try {
+                const result = await suggestTerritory(token!, geojson);
+                setSuggestion(result);
+              } catch (err) {
+                console.error("Suggest failed:", err);
+                setSuggestion({ city: null, suggestedPrefix: "1", suggestedNumber: "101", existingInGroup: [], autoFix: null });
+              } finally {
+                setSuggesting(false);
+              }
+            }}
+            onCancel={() => { setCreationMode(false); setPendingBoundaries(null); }}
+          />
+        )}
+
+        {/* Suggesting spinner */}
+        {suggesting && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-20">
+            <div className="bg-[var(--bg-2)] rounded-xl p-4 flex items-center gap-3 shadow-xl">
+              <Loader2 size={20} className="animate-spin text-[var(--amber)]" />
+              <span className="text-sm">Detecting city...</span>
+            </div>
+          </div>
         )}
 
         {/* Violation warning badges */}
@@ -346,18 +393,25 @@ export function TerritoryMap() {
         />
       </div>
 
-      {/* New Territory modal */}
-      {showNewModal && (
-        <NewTerritoryModal
-          onCancel={() => setShowNewModal(false)}
+      {/* Smart create modal (after drawing) */}
+      {suggestion && pendingBoundaries != null && (
+        <CreateTerritoryModal
+          suggestion={suggestion}
+          submitting={creating}
+          onCancel={() => { setSuggestion(null); setPendingBoundaries(null); setCreationMode(false); }}
           onSubmit={async (number, name) => {
             if (!token) return;
+            setCreating(true);
             try {
-              const territory = await createTerritory(token, { number, name });
-              setShowNewModal(false);
+              const territory = await createTerritory(token, { number, name, boundaries: pendingBoundaries });
+              setSuggestion(null);
+              setPendingBoundaries(null);
+              setCreationMode(false);
               navigate(`/territories/${territory.id}`);
             } catch (err) {
               console.error("Create territory failed:", err);
+            } finally {
+              setCreating(false);
             }
           }}
         />
