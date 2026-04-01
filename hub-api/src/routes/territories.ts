@@ -32,19 +32,38 @@ type AssignBodyType = Static<typeof AssignBody>;
 
 export async function territoryRoutes(app: FastifyInstance): Promise<void> {
   // List all territories — requires territories.view
-  app.get(
+  // ?lite=true excludes boundaries for faster loading (list/board views)
+  app.get<{ Querystring: { lite?: string } }>(
     "/territories",
     { preHandler: requirePermission(PERMISSIONS.TERRITORIES_VIEW) },
-    async () => {
-      return prisma.territory.findMany({
+    async (request) => {
+      const lite = request.query.lite === "true";
+      const territories = await prisma.territory.findMany({
         orderBy: { number: "asc" },
-        include: {
-          assignments: {
-            where: { returnedAt: null },
-            include: { publisher: true },
-          },
-        },
+        select: lite
+          ? {
+              id: true,
+              number: true,
+              name: true,
+              description: true,
+              createdAt: true,
+              updatedAt: true,
+              assignments: {
+                where: { returnedAt: null },
+                include: { publisher: true },
+              },
+            }
+          : undefined,
+        include: lite
+          ? undefined
+          : {
+              assignments: {
+                where: { returnedAt: null },
+                include: { publisher: true },
+              },
+            },
       });
+      return territories;
     },
   );
 

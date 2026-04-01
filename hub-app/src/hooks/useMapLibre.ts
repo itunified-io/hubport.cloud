@@ -3,12 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * MapLibre GL JS map instance lifecycle hook.
  *
- * Note: MapLibre GL JS is not yet in dependencies — this hook provides
- * the interface contract. When maplibre-gl is added to package.json,
- * the actual Map class will be imported here.
- *
- * For now, we define a minimal MapInstance interface so consumers can
- * type against it without the dependency.
+ * Manages map creation, load state, and cleanup.
+ * Provides helper methods for common operations including style switching.
  */
 
 export interface MapInstance {
@@ -18,6 +14,7 @@ export interface MapInstance {
   removeSource: (id: string) => void;
   getSource: (id: string) => object | undefined;
   getLayer: (id: string) => object | undefined;
+  setStyle: (style: string | object) => void;
   fitBounds: (
     bounds: [[number, number], [number, number]],
     options?: object,
@@ -35,6 +32,50 @@ export interface MapInstance {
   };
 }
 
+/** Available map styles */
+export const MAP_STYLES = {
+  street: {
+    label: "Street",
+    url: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+  },
+  satellite: {
+    label: "Satellite",
+    url: {
+      version: 8,
+      sources: {
+        "esri-satellite": {
+          type: "raster",
+          tiles: [
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          ],
+          tileSize: 256,
+          attribution: "Esri, Maxar, Earthstar Geographics",
+          maxzoom: 19,
+        },
+      },
+      layers: [{ id: "esri-satellite", type: "raster", source: "esri-satellite" }],
+    } as object,
+  },
+  osm: {
+    label: "OSM",
+    url: {
+      version: 8,
+      sources: {
+        "osm-raster": {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          attribution: "&copy; OpenStreetMap contributors",
+          maxzoom: 19,
+        },
+      },
+      layers: [{ id: "osm-raster", type: "raster", source: "osm-raster" }],
+    } as object,
+  },
+} as const;
+
+export type MapStyleKey = keyof typeof MAP_STYLES;
+
 export interface UseMapLibreOptions {
   /** Container element ref */
   container: React.RefObject<HTMLDivElement | null>;
@@ -42,7 +83,7 @@ export interface UseMapLibreOptions {
   center?: [number, number];
   /** Initial zoom level */
   zoom?: number;
-  /** Map style URL */
+  /** Map style URL or key */
   style?: string;
 }
 
@@ -51,6 +92,8 @@ export interface UseMapLibreReturn {
   mapRef: React.RefObject<MapInstance | null>;
   /** Whether the map has finished initial load */
   isLoaded: boolean;
+  /** Current style key */
+  activeStyle: MapStyleKey;
   /** Add a GeoJSON source to the map */
   addSource: (id: string, data: object) => void;
   /** Add a layer to the map */
@@ -60,27 +103,26 @@ export interface UseMapLibreReturn {
     bounds: [[number, number], [number, number]],
     options?: object,
   ) => void;
+  /** Switch map style — layers must be re-added after switch via onStyleReady */
+  changeStyle: (key: MapStyleKey) => void;
+  /** Register a callback that fires when the style is loaded (after changeStyle) */
+  onStyleReady: (cb: () => void) => void;
 }
 
-/**
- * MapLibre GL JS lifecycle hook.
- *
- * Manages map creation, load state, and cleanup.
- * Provides helper methods for common operations.
- */
 export function useMapLibre({
   container,
   center = [10.0, 48.0],
   zoom = 13,
-  style = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+  style = MAP_STYLES.street.url,
 }: UseMapLibreOptions): UseMapLibreReturn {
   const mapRef = useRef<MapInstance | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeStyle, setActiveStyle] = useState<MapStyleKey>("street");
+  const styleReadyCb = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!container.current) return;
 
-    // Dynamic import of maplibre-gl to avoid hard dependency at module level
     let cancelled = false;
 
     async function initMap() {
@@ -103,8 +145,6 @@ export function useMapLibre({
           }
         });
       } catch {
-        // maplibre-gl not installed — leave map as null
-        // This allows the component to render a fallback
         console.warn(
           "maplibre-gl not available. Install with: npm install maplibre-gl",
         );
@@ -159,11 +199,39 @@ export function useMapLibre({
     [],
   );
 
+  const changeStyle = useCallback((key: MapStyleKey) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const styleDef = MAP_STYLES[key];
+    setActiveStyle(key);
+
+    map.setStyle(styleDef.url);
+
+    // After style loads, notify consumers to re-add layers
+    const handler = () => {
+      if (styleReadyCb.current) {
+        styleReadyCb.current();
+      }
+    };
+    // "styledata" fires when style is fully loaded
+    map.on("styledata", handler);
+    // Clean up after one fire
+    setTimeout(() => map.off("styledata", handler), 5000);
+  }, []);
+
+  const onStyleReady = useCallback((cb: () => void) => {
+    styleReadyCb.current = cb;
+  }, []);
+
   return {
     mapRef: mapRef as React.RefObject<MapInstance | null>,
     isLoaded,
+    activeStyle,
     addSource,
     addLayer,
     fitBounds,
+    changeStyle,
+    onStyleReady,
   };
 }

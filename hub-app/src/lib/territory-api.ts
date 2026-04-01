@@ -242,8 +242,9 @@ export interface TerritoryListItem {
   }>;
 }
 
-export function listTerritories(token: string): Promise<TerritoryListItem[]> {
-  return apiFetch("/territories", token);
+export function listTerritories(token: string, opts?: { lite?: boolean }): Promise<TerritoryListItem[]> {
+  const q = opts?.lite ? "?lite=true" : "";
+  return apiFetch(`/territories${q}`, token);
 }
 
 export function getTerritory(id: string, token: string): Promise<TerritoryListItem> {

@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { FormattedMessage, FormattedDate } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash, Layers } from "lucide-react";
+import { ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash, Layers, Maximize2, Minimize2 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getTerritory, type TerritoryListItem } from "@/lib/territory-api";
-import { useMapLibre } from "@/hooks/useMapLibre";
+import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
 
 export function TerritoryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,38 +15,41 @@ export function TerritoryDetail() {
   const [territory, setTerritory] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   // Mini map
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const { isLoaded, mapRef, addSource, addLayer, fitBounds } = useMapLibre({
+  const { isLoaded, mapRef, addSource, addLayer, fitBounds, activeStyle, changeStyle, onStyleReady } = useMapLibre({
     container: mapContainerRef,
     center: [11.38, 47.75],
     zoom: 14,
   });
   const layerAdded = useRef(false);
+  const territoryRef = useRef<TerritoryListItem | null>(null);
 
   useEffect(() => {
     if (!token || !id) return;
     getTerritory(id, token)
-      .then(setTerritory)
+      .then((t) => {
+        setTerritory(t);
+        territoryRef.current = t;
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load territory"))
       .finally(() => setLoading(false));
   }, [token, id]);
 
-  // Render boundary on mini map
-  useEffect(() => {
-    if (!isLoaded || !territory?.boundaries || layerAdded.current) return;
-
-    const map = mapRef.current;
-    if (!map) return;
+  /** Add territory boundary layers to map */
+  const addBoundaryLayers = useCallback(() => {
+    const t = territoryRef.current;
+    if (!t?.boundaries) return;
 
     addSource("territory", {
       type: "FeatureCollection",
       features: [
         {
           type: "Feature",
-          properties: { number: territory.number },
-          geometry: territory.boundaries,
+          properties: { number: t.number },
+          geometry: t.boundaries,
         },
       ],
     });
@@ -81,9 +84,7 @@ export function TerritoryDetail() {
       },
     });
 
-    layerAdded.current = true;
-
-    // Fit bounds to territory
+    // Fit bounds
     let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
     const flatten = (c: unknown): void => {
       if (Array.isArray(c) && typeof c[0] === "number") {
@@ -96,11 +97,38 @@ export function TerritoryDetail() {
         for (const item of c) flatten(item);
       }
     };
-    flatten((territory.boundaries as { coordinates: unknown }).coordinates);
+    flatten((t.boundaries as { coordinates: unknown }).coordinates);
     if (minLng < 180) {
       fitBounds([[minLng, minLat], [maxLng, maxLat]]);
     }
-  }, [isLoaded, territory, mapRef, addSource, addLayer, fitBounds]);
+  }, [addSource, addLayer, fitBounds]);
+
+  // Register style-change callback
+  useEffect(() => {
+    onStyleReady(() => {
+      layerAdded.current = false;
+      addBoundaryLayers();
+      layerAdded.current = true;
+    });
+  }, [onStyleReady, addBoundaryLayers]);
+
+  // Render boundary on mini map
+  useEffect(() => {
+    if (!isLoaded || !territory?.boundaries || layerAdded.current) return;
+
+    addBoundaryLayers();
+    layerAdded.current = true;
+  }, [isLoaded, territory, addBoundaryLayers]);
+
+  // Resize map when expanded/collapsed
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && isLoaded) {
+      // Small delay to let CSS transition finish
+      const timer = setTimeout(() => map.resize(), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [mapExpanded, mapRef, isLoaded]);
 
   if (loading) {
     return (
@@ -155,11 +183,14 @@ export function TerritoryDetail() {
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map — takes 2 cols on large screens */}
-        <div className="lg:col-span-2 border border-[var(--border)] rounded-[var(--radius)] overflow-hidden bg-[var(--bg-1)]">
+      <div className={mapExpanded ? "space-y-6" : "grid grid-cols-1 lg:grid-cols-3 gap-6"}>
+        {/* Map — takes 2 cols on large, or full width when expanded */}
+        <div className={`${mapExpanded ? "" : "lg:col-span-2"} border border-[var(--border)] rounded-[var(--radius)] overflow-hidden bg-[var(--bg-1)] relative`}>
           {hasBoundary ? (
-            <div ref={mapContainerRef} className="h-80 w-full" />
+            <div
+              ref={mapContainerRef}
+              className={`w-full transition-[height] duration-300 ${mapExpanded ? "h-[70vh]" : "h-80"}`}
+            />
           ) : (
             <>
               <div ref={mapContainerRef} className="hidden" />
@@ -176,10 +207,41 @@ export function TerritoryDetail() {
               </div>
             </>
           )}
+
+          {/* Map controls overlay */}
+          {hasBoundary && isLoaded && (
+            <>
+              {/* Style switcher — top left */}
+              <div className="absolute top-3 left-3 z-10 flex rounded-[var(--radius-sm)] overflow-hidden shadow-lg border border-[var(--border)]">
+                {(Object.keys(MAP_STYLES) as MapStyleKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => changeStyle(key)}
+                    className={`px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                      activeStyle === key
+                        ? "bg-[var(--amber)] text-black"
+                        : "bg-[var(--bg-1)] text-[var(--text-muted)] hover:bg-[var(--glass)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {MAP_STYLES[key].label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Expand/collapse — top right */}
+              <button
+                onClick={() => setMapExpanded((v) => !v)}
+                className="absolute top-3 right-3 z-10 p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                title={mapExpanded ? "Collapse" : "Expand"}
+              >
+                {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Info sidebar */}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${mapExpanded ? "grid grid-cols-1 sm:grid-cols-3 gap-4 space-y-0" : ""}`}>
           {/* Current assignment card */}
           <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-4">
             <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -210,9 +272,9 @@ export function TerritoryDetail() {
             )}
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-3 text-center">
+          {/* Stats */}
+          <div className={`${mapExpanded ? "" : "grid grid-cols-2 gap-3"} ${mapExpanded ? "flex gap-3" : ""}`}>
+            <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-3 text-center flex-1">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <Hash size={12} className="text-[var(--text-muted)]" />
                 <p className="text-lg font-bold text-[var(--text)]">{territory.assignments.length}</p>
@@ -221,7 +283,7 @@ export function TerritoryDetail() {
                 <FormattedMessage id="territories.totalAssignments" defaultMessage="Assignments" />
               </p>
             </div>
-            <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-3 text-center">
+            <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-3 text-center flex-1">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <MapPin size={12} className="text-[var(--text-muted)]" />
                 <p className={`text-lg font-bold ${hasBoundary ? "text-[var(--green)]" : "text-[var(--text-muted)]"}`}>

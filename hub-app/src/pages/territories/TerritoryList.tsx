@@ -16,7 +16,7 @@ export function TerritoryList() {
 
   useEffect(() => {
     if (!token) return;
-    listTerritories(token)
+    listTerritories(token, { lite: true })
       .then(setTerritories)
       .catch(() => setTerritories([]))
       .finally(() => setLoading(false));
