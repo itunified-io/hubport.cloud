@@ -40,6 +40,7 @@ import { heatmapRoutes } from "./routes/heatmap.js";
 import { importRoutes } from "./routes/import.js";
 import { fieldServiceMeetingPointRoutes } from "./routes/field-service-meeting-points.js";
 import { serviceGroupMeetingRoutes } from "./routes/service-group-meetings.js";
+import { deviceRoutes } from "./routes/devices.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
@@ -122,6 +123,7 @@ async function start(): Promise<void> {
   await app.register(importRoutes);
   await app.register(fieldServiceMeetingPointRoutes);
   await app.register(serviceGroupMeetingRoutes);
+  await app.register(deviceRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {

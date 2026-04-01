@@ -211,6 +211,12 @@ export const PERMISSIONS = {
   MANAGE_MEETING_DUTIES: "manage:meeting_duties",
   MANAGE_PUBLIC_TALKS: "manage:public_talks",
 
+  // Devices
+  DEVICES_VIEW: "app:devices.view",
+  DEVICES_MANAGE: "app:devices.manage",
+  ADMIN_DEVICES_VIEW: "app:admin.devices.view",
+  ADMIN_DEVICES_MANAGE: "app:admin.devices.manage",
+
   // Wildcard
   WILDCARD: "*",
 } as const;
@@ -242,6 +248,8 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.SERVICE_MEETINGS_VIEW,
     PERMISSIONS.SERVICE_MEETINGS_SIGNUP,
     PERMISSIONS.FIELD_WORK_GPS,
+    PERMISSIONS.DEVICES_VIEW,
+    PERMISSIONS.DEVICES_MANAGE,
   ],
   elder: [
     PERMISSIONS.PUBLISHERS_VIEW,
@@ -292,6 +300,8 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.SHARING_VIEW,
     PERMISSIONS.SHARING_EDIT,
     PERMISSIONS.FIELD_WORK_GPS,
+    PERMISSIONS.DEVICES_VIEW,
+    PERMISSIONS.DEVICES_MANAGE,
   ],
   admin: [PERMISSIONS.WILDCARD],
 };
