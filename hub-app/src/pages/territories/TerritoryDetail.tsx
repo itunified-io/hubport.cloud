@@ -11,7 +11,6 @@ import { useAuth } from "@/auth/useAuth";
 import {
   getTerritory, listAddresses, updateAddress,
   type TerritoryListItem, type Address, type AddressStatus,
-  type AddressListResponse,
 } from "@/lib/territory-api";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
 
@@ -98,8 +97,10 @@ export function TerritoryDetail() {
     if (!token || !id) return;
     setAddressLoading(true);
     try {
-      const res: AddressListResponse = await listAddresses(id, token, {});
-      setAddresses(res.addresses);
+      const res = await listAddresses(id, token, {});
+      // API returns raw array or { addresses: [...] } — handle both
+      const list = Array.isArray(res) ? res : (res.addresses ?? []);
+      setAddresses(list);
     } catch {
       // silently fail
     } finally {
