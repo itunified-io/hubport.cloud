@@ -425,19 +425,22 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           Type.Literal("elders_only"),
           Type.Literal("nobody"),
         ]),
+        allowLocationSharing: Type.Optional(Type.Boolean()),
       }),
     },
   }, async (request, reply) => {
     const ctx = request.policyCtx;
     if (!ctx?.publisherId) return reply.code(404).send({ error: "No publisher record" });
 
-    const body = request.body as Record<string, string>;
+    const body = request.body as Record<string, unknown>;
+    const { allowLocationSharing, ...visibilitySettings } = body;
     const updated = await prisma.publisher.update({
       where: { id: ctx.publisherId },
       data: {
-        privacySettings: body,
+        privacySettings: visibilitySettings as Record<string, string>,
         privacyAccepted: true,
         privacyAcceptedAt: new Date(),
+        ...(typeof allowLocationSharing === "boolean" && { allowLocationSharing }),
       },
     });
 

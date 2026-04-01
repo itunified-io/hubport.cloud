@@ -38,6 +38,8 @@ import { gapDetectionRoutes } from "./routes/gap-detection.js";
 import { localOsmRoutes } from "./routes/local-osm.js";
 import { heatmapRoutes } from "./routes/heatmap.js";
 import { importRoutes } from "./routes/import.js";
+import { fieldServiceMeetingPointRoutes } from "./routes/field-service-meeting-points.js";
+import { serviceGroupMeetingRoutes } from "./routes/service-group-meetings.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
@@ -61,8 +63,10 @@ async function start(): Promise<void> {
   });
 
   // Rate limiting (CodeQL js/missing-rate-limiting)
+  // 300/min global — SPA makes many parallel calls on page load;
+  // sensitive endpoints (password, TOTP, redeem) have tighter per-route limits.
   await app.register(rateLimit, {
-    max: 100,
+    max: 300,
     timeWindow: "1 minute",
   });
 
@@ -116,6 +120,8 @@ async function start(): Promise<void> {
   await app.register(localOsmRoutes);
   await app.register(heatmapRoutes);
   await app.register(importRoutes);
+  await app.register(fieldServiceMeetingPointRoutes);
+  await app.register(serviceGroupMeetingRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {

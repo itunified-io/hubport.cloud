@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Sparkles,
   BookOpen,
+  BookOpenText,
   CalendarClock,
   Mic,
   ChevronDown,
@@ -19,6 +20,8 @@ import {
   Megaphone,
   ScanSearch,
   Upload,
+  MapPin,
+  CalendarDays,
 } from "lucide-react";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getAppVersion } from "@/lib/config";
@@ -40,9 +43,16 @@ const NAV_ITEMS: NavItem[] = [
     to: "/territories", labelId: "nav.territories", icon: Map, requiredPermission: "app:territories.view",
     children: [
       { to: "/territories/kanban", labelId: "nav.territories.kanban", icon: Kanban, requiredPermission: "app:territories.view" },
-      { to: "/territories/campaigns", labelId: "nav.territories.campaigns", icon: Megaphone, requiredPermission: "app:territories.view" },
       { to: "/territories/gap-detection", labelId: "nav.territories.gapDetection", icon: ScanSearch, requiredPermission: "app:territories.view" },
       { to: "/territories/import", labelId: "nav.territories.import", icon: Upload, requiredPermission: "app:territories.import" },
+    ],
+  },
+  {
+    to: "/field-service", labelId: "nav.fieldService", icon: BookOpenText, requiredPermission: "app:field_service.view",
+    children: [
+      { to: "/field-service/campaigns", labelId: "nav.fieldService.campaigns", icon: Megaphone, requiredPermission: "app:campaigns.view" },
+      { to: "/field-service/meeting-points", labelId: "nav.fieldService.meetingPoints", icon: MapPin, requiredPermission: "app:meeting_points.view" },
+      { to: "/field-service/groups", labelId: "nav.fieldService.serviceGroups", icon: CalendarDays, requiredPermission: "app:service_meetings.view" },
     ],
   },
   {
