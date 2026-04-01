@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.10
+
+### Address API response mapper + superpowers docs (#265)
+- feat: add `toApiAddress()` response mapper normalizing Prisma fields for frontend
+- feat: add `languageSpoken` compat alias to AddressUpdateBody
+- docs: add superpowers plan and spec for Field Work Mode
+
 ## v2026.04.01.9
 
 ### Field Work Mode (#264)
