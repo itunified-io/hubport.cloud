@@ -7,8 +7,8 @@ interface Address {
   streetAddress: string | null;
   status: string;
   lastVisitDate: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface ProximityListProps {
@@ -66,7 +66,7 @@ export function ProximityList({
     const withDist = addresses.map((a) => ({
       ...a,
       distance:
-        userLat != null && userLng != null
+        userLat != null && userLng != null && a.latitude != null && a.longitude != null
           ? haversineM(userLat, userLng, a.latitude, a.longitude)
           : Infinity,
     }));

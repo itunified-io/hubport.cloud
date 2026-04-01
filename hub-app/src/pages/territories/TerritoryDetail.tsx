@@ -13,6 +13,8 @@ import {
   type TerritoryListItem, type Address, type AddressStatus,
 } from "@/lib/territory-api";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
+import { useGpsTracker } from "@/hooks/useGpsTracker";
+import { MyLocationMarker, MY_LOCATION_MARKER_CSS } from "@/components/map/MyLocationMarker";
 
 // ─── Status & type visuals ──────────────────────────────────────
 
@@ -77,6 +79,18 @@ export function TerritoryDetail() {
   });
   const layerAdded = useRef(false);
   const territoryRef = useRef<TerritoryListItem | null>(null);
+  const gps = useGpsTracker();
+
+  // Inject GPS marker CSS
+  useEffect(() => {
+    const styleId = "my-location-marker-style";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = MY_LOCATION_MARKER_CSS;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   // ─── Fetch territory ─────────────────────────────────────────
 
@@ -340,12 +354,39 @@ export function TerritoryDetail() {
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setMapExpanded((v) => !v)}
-                className="absolute top-3 right-3 z-10 p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
-              >
-                {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
+              <div className="absolute top-3 right-3 z-10 flex gap-1.5">
+                <button
+                  onClick={gps.toggle}
+                  title={gps.active ? "Disable GPS" : "Enable GPS"}
+                  className={`p-2 rounded-[var(--radius-sm)] border border-[var(--border)] transition-colors cursor-pointer shadow-lg ${
+                    gps.active
+                      ? "bg-[var(--blue)] text-white"
+                      : "bg-[var(--bg-1)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)]"
+                  }`}
+                >
+                  <MapPin size={16} />
+                </button>
+                <button
+                  onClick={() => navigate(`/territories/${id}/field-work`)}
+                  className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--blue)] text-white text-[11px] font-semibold border border-[var(--blue)] hover:opacity-90 transition-opacity cursor-pointer shadow-lg"
+                >
+                  Field Work
+                </button>
+                <button
+                  onClick={() => setMapExpanded((v) => !v)}
+                  className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                >
+                  {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+              </div>
+              <MyLocationMarker
+                map={mapRef.current}
+                lat={gps.lat}
+                lng={gps.lng}
+                heading={gps.heading}
+                accuracy={gps.accuracy}
+                visible={gps.active}
+              />
             </>
           )}
         </div>
