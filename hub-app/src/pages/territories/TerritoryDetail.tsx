@@ -90,7 +90,7 @@ export function TerritoryDetail() {
 
   // Map
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const { isLoaded, mapRef, addSource, addLayer, fitBounds, activeStyle, changeStyle, onStyleReady } = useMapLibre({
+  const { isLoaded, mapRef, addSource, addLayer, fitBounds, activeStyle, changeStyle, onStyleReady, maplibreModule } = useMapLibre({
     container: mapContainerRef,
     center: [11.38, 47.75],
     zoom: 14,
@@ -300,7 +300,8 @@ export function TerritoryDetail() {
   /** Create draggable vertex markers */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !editMode || editCoords.length < 3) return;
+    const mgl = maplibreModule.current;
+    if (!map || !mgl || !editMode || editCoords.length < 3) return;
 
     // Clean old markers
     vertexMarkersRef.current.forEach((m) => m.remove());
@@ -313,47 +314,50 @@ export function TerritoryDetail() {
       ? editCoords.length - 1
       : editCoords.length;
 
-    // Dynamically import Marker from same maplibre-gl module as the map
-    import("maplibre-gl").then((maplibregl) => {
-      const MarkerClass = maplibregl.Marker;
-      for (let i = 0; i < uniqueCount; i++) {
-        const coord = editCoords[i]!;
-        const el = document.createElement("div");
-        el.style.cssText = `
-          width: 18px; height: 18px; border-radius: 50%;
-          background: #f59e0b; border: 3px solid white;
-          cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-          z-index: 100; position: relative;
-        `;
+    // Use the same maplibre-gl module instance that created the map
+    const MarkerClass = mgl.Marker || mgl.default?.Marker;
+    if (!MarkerClass) {
+      console.warn("Marker class not found in maplibre-gl module");
+      return;
+    }
 
-        const marker = new MarkerClass({ element: el, draggable: true })
-          .setLngLat([coord[0], coord[1]])
-          .addTo(map as any);
+    for (let i = 0; i < uniqueCount; i++) {
+      const coord = editCoords[i]!;
+      const el = document.createElement("div");
+      el.style.cssText = `
+        width: 18px; height: 18px; border-radius: 50%;
+        background: #f59e0b; border: 3px solid white;
+        cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        z-index: 100; position: relative;
+      `;
 
-        const idx = i;
-        marker.on("drag", () => {
-          const lngLat = marker.getLngLat();
-          setEditCoords((prev) => {
-            const next = [...prev];
-            next[idx] = [lngLat.lng, lngLat.lat];
-            // Keep ring closed
-            if (idx === 0 && next.length > 1) {
-              next[next.length - 1] = [lngLat.lng, lngLat.lat];
-            }
-            return next;
-          });
+      const marker = new MarkerClass({ element: el, draggable: true })
+        .setLngLat([coord[0], coord[1]])
+        .addTo(map as any);
+
+      const idx = i;
+      marker.on("drag", () => {
+        const lngLat = marker.getLngLat();
+        setEditCoords((prev) => {
+          const next = [...prev];
+          next[idx] = [lngLat.lng, lngLat.lat];
+          // Keep ring closed
+          if (idx === 0 && next.length > 1) {
+            next[next.length - 1] = [lngLat.lng, lngLat.lat];
+          }
+          return next;
         });
+      });
 
-        vertexMarkersRef.current.push(marker);
-      }
-    });
+      vertexMarkersRef.current.push(marker);
+    }
 
     return () => {
       vertexMarkersRef.current.forEach((m) => m.remove());
       vertexMarkersRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, editCoords.length, mapRef]);
+  }, [editMode, editCoords.length, mapRef, maplibreModule]);
 
   /** Live-update polygon on map as vertices are dragged */
   useEffect(() => {

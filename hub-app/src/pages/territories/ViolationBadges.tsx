@@ -4,11 +4,12 @@ import { getViolations, type TerritoryViolation } from "@/lib/territory-api";
 
 interface ViolationBadgesProps {
   map: any;
+  maplibreModule: React.RefObject<any | null>;
   token: string | null;
   territories: Array<{ id: string; number: string; boundaries: unknown }>;
 }
 
-export function ViolationBadges({ map, token, territories }: ViolationBadgesProps) {
+export function ViolationBadges({ map, maplibreModule, token, territories }: ViolationBadgesProps) {
   const navigate = useNavigate();
   const [violations, setViolations] = useState<TerritoryViolation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,8 +36,13 @@ export function ViolationBadges({ map, token, territories }: ViolationBadgesProp
 
     if (violations.length === 0) return;
 
-    import("maplibre-gl").then((maplibregl) => {
-      const MarkerClass = maplibregl.Marker;
+    const mgl = maplibreModule.current;
+    if (!mgl) return;
+
+    const MarkerClass = mgl.Marker || mgl.default?.Marker;
+    if (!MarkerClass) return;
+
+    {
       for (const v of violations) {
         const territory = territories.find((t) => t.id === v.territoryId);
         if (!territory?.boundaries) continue;
@@ -71,7 +77,7 @@ export function ViolationBadges({ map, token, territories }: ViolationBadgesProp
           .addTo(map);
         markersRef.current.push(marker);
       }
-    });
+    }
 
     return () => {
       markersRef.current.forEach((m) => m.remove());

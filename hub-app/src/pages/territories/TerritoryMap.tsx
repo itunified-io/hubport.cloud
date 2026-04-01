@@ -92,7 +92,7 @@ export function TerritoryMap() {
   const navigate = useNavigate();
   const token = user?.access_token ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isLoaded, addSource, addLayer, fitBounds, mapRef, activeStyle, changeStyle, onStyleReady } = useMapLibre({
+  const { isLoaded, addSource, addLayer, fitBounds, mapRef, activeStyle, changeStyle, onStyleReady, maplibreModule } = useMapLibre({
     container: containerRef,
     center: [11.38, 47.75],
     zoom: 13,
@@ -388,6 +388,7 @@ export function TerritoryMap() {
         {/* Violation warning badges */}
         <ViolationBadges
           map={isLoaded ? mapRef.current : null}
+          maplibreModule={maplibreModule}
           token={token}
           territories={territories}
         />

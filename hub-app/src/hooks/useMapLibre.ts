@@ -108,6 +108,8 @@ export interface UseMapLibreReturn {
   changeStyle: (key: MapStyleKey) => void;
   /** Register a callback that fires when the style is loaded (after changeStyle) */
   onStyleReady: (cb: () => void) => void;
+  /** The maplibre-gl module — use for creating Markers etc. */
+  maplibreModule: React.RefObject<any | null>;
 }
 
 export function useMapLibre({
@@ -117,6 +119,7 @@ export function useMapLibre({
   style = MAP_STYLES.street.url,
 }: UseMapLibreOptions): UseMapLibreReturn {
   const mapRef = useRef<MapInstance | null>(null);
+  const maplibreModuleRef = useRef<any | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeStyle, setActiveStyle] = useState<MapStyleKey>("street");
   const styleReadyCb = useRef<(() => void) | null>(null);
@@ -136,6 +139,7 @@ export function useMapLibre({
       try {
         const maplibregl = await import("maplibre-gl");
         if (cancelled) return;
+        maplibreModuleRef.current = maplibregl;
 
         const map = new maplibregl.Map({
           container: el,
@@ -235,5 +239,6 @@ export function useMapLibre({
     fitBounds,
     changeStyle,
     onStyleReady,
+    maplibreModule: maplibreModuleRef,
   };
 }
