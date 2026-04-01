@@ -243,15 +243,15 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         for (const territory of territories) {
           const territoryViolations: string[] = [];
 
-          // Check congregation boundary violation
+          // Check congregation boundary violation (with 1 m² tolerance for floating-point artifacts)
           if (congregation?.boundaries) {
-            const exceedsResult = await prisma.$queryRaw<Array<{ exceeds: boolean }>>`
-              SELECT NOT ST_CoveredBy(
+            const exceedsResult = await prisma.$queryRaw<Array<{ exceeds_area: number }>>`
+              SELECT ST_Area(ST_Difference(
                 ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)})),
                 ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(congregation.boundaries)}))
-              ) as exceeds
+              )::geography) as exceeds_area
             `;
-            if (exceedsResult[0]?.exceeds) {
+            if ((exceedsResult[0]?.exceeds_area ?? 0) > 1.0) {
               territoryViolations.push("exceeds_boundary");
             }
           }
