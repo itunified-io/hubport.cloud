@@ -18,6 +18,7 @@ export default function FieldWorkDashboard() {
 
   const [locations, setLocations] = useState<LocationShareData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const markersRef = useRef<{ remove: () => void }[]>([]);
 
   // Poll active locations every 10s
   useEffect(() => {
@@ -42,8 +43,9 @@ export default function FieldWorkDashboard() {
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return;
 
-    const existingMarkers = document.querySelectorAll(".overseer-publisher-marker");
-    existingMarkers.forEach((el) => el.remove());
+    // Remove previous markers properly via MapLibre API
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
 
     locations.forEach(async (loc) => {
       if (loc.lastLatitude == null || loc.lastLongitude == null) return;
@@ -62,9 +64,10 @@ export default function FieldWorkDashboard() {
 
       el.title = `${loc.publisher?.firstName ?? ""} ${loc.publisher?.lastName ?? ""}`;
 
-      new maplibregl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([loc.lastLongitude!, loc.lastLatitude!])
         .addTo(mapRef.current as unknown as maplibregl.Map);
+      markersRef.current.push(marker);
     });
   }, [locations, mapRef, isLoaded]);
 

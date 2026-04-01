@@ -36,10 +36,13 @@ export function MyLocationMarker({
       return;
     }
 
+    let cancelled = false;
+
     async function initMarker() {
       if (!map || lat == null || lng == null) return;
 
       const maplibregl = await import("maplibre-gl");
+      if (cancelled) return;
 
       if (!elRef.current) {
         // Build DOM elements safely (no innerHTML)
@@ -98,6 +101,7 @@ export function MyLocationMarker({
     }
 
     initMarker();
+    return () => { cancelled = true; };
   }, [map, lat, lng, heading, accuracy, visible]);
 
   // Cleanup on unmount
