@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "@/auth/useAuth";
 import { useLocale } from "@/i18n/IntlSetup";
 import { useTheme } from "@/theme/ThemeProvider";
+import { SyncStatusBar } from "./SyncStatusBar";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -59,7 +60,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1">
-        {/* Hub connection status */}
+        {/* Sync status bar (online indicator + pending badge + sync button) */}
+        <SyncStatusBar />
+
+        {/* Hub connection status (legacy indicator — kept for visual parity) */}
         <div
           className={`flex items-center justify-center w-7 h-7 rounded-full ${
             isOnline

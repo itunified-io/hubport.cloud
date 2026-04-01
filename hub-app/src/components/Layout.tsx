@@ -2,6 +2,7 @@ import { type ReactNode, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { ChatWidget } from "./chat/ChatWidget";
+import { UpdateBanner } from "./UpdateBanner";
 
 interface LayoutProps {
   children: ReactNode;
@@ -51,6 +52,8 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Update banner — sits above everything else */}
+        <UpdateBanner />
         <Header onMenuToggle={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>

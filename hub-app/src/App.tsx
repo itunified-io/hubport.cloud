@@ -3,6 +3,8 @@ import { useAuth } from "./auth/useAuth";
 import { PermissionGuard} from "./auth/PermissionGuard";
 import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import { MyDevices } from "./pages/profile/MyDevices";
+import { DeviceAdmin } from "./pages/settings/DeviceAdmin";
 import { Dashboard } from "./pages/Dashboard";
 import { PublisherList } from "./pages/publishers/PublisherList";
 import { PublisherForm } from "./pages/publishers/PublisherForm";
@@ -362,6 +364,7 @@ export function App() {
 
         {/* Profile (any authenticated user) */}
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/devices" element={<MyDevices />} />
 
         {/* Audit Log */}
         <Route
@@ -386,6 +389,14 @@ export function App() {
           element={
             <PermissionGuard requires="app:settings.view">
               <Settings />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/settings/devices"
+          element={
+            <PermissionGuard requires="app:admin.devices.view">
+              <DeviceAdmin />
             </PermissionGuard>
           }
         />
