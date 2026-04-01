@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { snapVertex, type SnapTarget } from "../SnapEngine";
+import { snapVertex, snapAll, type SnapTarget } from "../SnapEngine";
 
 describe("SnapEngine", () => {
   describe("snapVertex", () => {
@@ -157,6 +157,54 @@ describe("SnapEngine", () => {
       const result = snapVertex([10.05, 48.0002], targets, 0.001);
       expect(result.snappedTo).toBe("boundary");
       expect(result.position[1]).toBeCloseTo(48.0, 5);
+    });
+  });
+
+  describe("snapAll", () => {
+    const roadTargets: SnapTarget[] = [
+      {
+        type: "road",
+        label: "Hauptstraße",
+        geometry: {
+          type: "LineString",
+          coordinates: [[10.0, 48.0], [10.1, 48.0]],
+        },
+      },
+    ];
+
+    it("snaps all vertices within tolerance", () => {
+      const vertices: [number, number][] = [
+        [10.02, 48.0003],
+        [10.05, 48.0002],
+        [10.08, 48.0004],
+      ];
+
+      const result = snapAll(vertices, roadTargets, 0.001);
+      expect(result.snapped.length).toBe(3);
+      for (const v of result.snapped) {
+        expect(v[1]).toBeCloseTo(48.0, 4);
+      }
+      expect(result.report.length).toBe(3);
+      expect(result.report[0]!.snappedTo).toBe("road");
+    });
+
+    it("leaves vertices unchanged when beyond tolerance", () => {
+      const vertices: [number, number][] = [
+        [10.02, 48.1],
+        [10.05, 48.0002],
+      ];
+
+      const result = snapAll(vertices, roadTargets, 0.001);
+      expect(result.snapped[0]).toEqual([10.02, 48.1]);
+      expect(result.snapped[1]![1]).toBeCloseTo(48.0, 4);
+      expect(result.report[0]!.snappedTo).toBeNull();
+      expect(result.report[1]!.snappedTo).toBe("road");
+    });
+
+    it("returns empty arrays for empty input", () => {
+      const result = snapAll([], roadTargets, 0.001);
+      expect(result.snapped).toEqual([]);
+      expect(result.report).toEqual([]);
     });
   });
 });

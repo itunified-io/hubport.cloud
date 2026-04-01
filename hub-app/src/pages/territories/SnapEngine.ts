@@ -176,3 +176,46 @@ export function snapVertex(
     snappedTo: null,
   };
 }
+
+export interface SnapReport {
+  /** Original position */
+  original: [number, number];
+  /** Snapped position (same as original if no snap) */
+  snapped: [number, number];
+  /** What it snapped to, or null */
+  snappedTo: SnapTargetType | null;
+  /** Label of snap target */
+  label: string | null;
+  /** Distance moved (coordinate units) */
+  distance: number;
+}
+
+/**
+ * Snap all vertices in a polygon to nearest snap targets.
+ * Returns new vertex array and per-vertex report.
+ */
+export function snapAll(
+  vertices: [number, number][],
+  snapTargets: SnapTarget[],
+  tolerance: number,
+): { snapped: [number, number][]; report: SnapReport[] } {
+  const snapped: [number, number][] = [];
+  const report: SnapReport[] = [];
+
+  for (const vertex of vertices) {
+    const result = snapVertex(vertex, snapTargets, tolerance);
+    snapped.push(result.position);
+    report.push({
+      original: vertex,
+      snapped: result.position,
+      snappedTo: result.snappedTo,
+      label: result.label,
+      distance: Math.sqrt(
+        (result.position[0] - vertex[0]) ** 2 +
+        (result.position[1] - vertex[1]) ** 2,
+      ),
+    });
+  }
+
+  return { snapped, report };
+}

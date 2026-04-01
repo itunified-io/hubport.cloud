@@ -439,10 +439,16 @@ export function TerritoryDetail() {
                 >
                   Field Work
                 </button>
-                {can("app:territories.edit") && !editMode && (
+                {!editMode && (
                   <button
-                    onClick={() => setEditMode(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/80 text-black rounded-[var(--radius-sm)] hover:bg-amber-400 transition-colors cursor-pointer shadow-lg"
+                    onClick={() => {
+                      if (can("app:territories.edit")) setEditMode(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors shadow-lg ${
+                      can("app:territories.edit")
+                        ? "bg-amber-500/80 text-black hover:bg-amber-400 cursor-pointer"
+                        : "bg-[var(--bg-1)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
+                    }`}
                   >
                     <Edit3 size={13} />
                     <FormattedMessage id="territories.edit" defaultMessage="Edit" />

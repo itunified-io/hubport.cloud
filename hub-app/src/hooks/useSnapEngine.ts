@@ -28,6 +28,10 @@ export interface UseSnapEngineReturn {
   ) => SnapResult;
   /** Number of available snap targets */
   targetCount: number;
+  /** Raw snap targets for batch operations (snapAll) */
+  targets: SnapTarget[];
+  /** Snap tolerance in coordinate units */
+  tolerance: number;
 }
 
 /**
@@ -118,6 +122,8 @@ export function useSnapEngine(
   return {
     snap,
     targetCount: snapTargets.length,
+    targets: snapTargets,
+    tolerance: toleranceCoordUnits,
   };
 }
 

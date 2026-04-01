@@ -1,6 +1,18 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.13
+
+### Territory Editor Enhancement (#271)
+- feat: smart creation flow — draw polygon → auto reverse-geocode city → suggest territory number by group prefix
+- feat: `POST /territories/suggest` endpoint with Nominatim city detection and number suggestion
+- feat: `CreateTerritoryModal` with pre-filled city/number and group hint (e.g., "5xx — Antdorf")
+- feat: batch Snap All — snap all vertices to nearest targets with preview → Accept / Revert
+- feat: `snapAll()` function in SnapEngine with `SnapReport` per vertex
+- feat: expose `targets` and `tolerance` from `useSnapEngine` hook for batch operations
+- fix: edit button always visible (disabled when no permission) instead of hidden
+- fix: ViolationBadges loading/error/empty state indicators instead of silent failure
+
 ## v2026.04.01.12
 
 ### Bug Fixes (#269)
