@@ -904,6 +904,7 @@ model CampaignFieldGroup {
   startedAt       DateTime?
   closedAt        DateTime?
   notes           String?
+  joinCode        String?          /// 6-char alphanumeric join code, unique while active
   createdAt       DateTime         @default(now())
 
   locationShares  LocationShare[]
@@ -925,6 +926,8 @@ model LocationShare {
   publisher      Publisher         @relation(fields: [publisherId], references: [id], onDelete: Cascade)
   lastLatitude   Float?            /// Cleared on deactivation
   lastLongitude  Float?            /// Cleared on deactivation
+  heading        Float?            /// Compass heading in degrees (0-360)
+  accuracy       Float?            /// GPS accuracy in meters
   isActive       Boolean           @default(true)
   duration       LocationDuration
   consentedAt    DateTime          @default(now())

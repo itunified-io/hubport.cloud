@@ -125,6 +125,10 @@ export const PERMISSIONS = {
   SERVICE_MEETINGS_SIGNUP: "app:service_meetings.signup",
   SERVICE_MEETINGS_CONDUCT: "app:service_meetings.conduct",
 
+  // Field Work
+  FIELD_WORK_GPS: "app:field_work.gps",
+  FIELD_WORK_OVERSEER: "app:field_work.overseer",
+
   // Groups
   GROUPS_VIEW: "app:groups.view",
   GROUPS_EDIT: "app:groups.edit",
@@ -237,6 +241,7 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.MEETING_POINTS_VIEW,
     PERMISSIONS.SERVICE_MEETINGS_VIEW,
     PERMISSIONS.SERVICE_MEETINGS_SIGNUP,
+    PERMISSIONS.FIELD_WORK_GPS,
   ],
   elder: [
     PERMISSIONS.PUBLISHERS_VIEW,
@@ -286,6 +291,7 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.CHAT_CROSS_TENANT,
     PERMISSIONS.SHARING_VIEW,
     PERMISSIONS.SHARING_EDIT,
+    PERMISSIONS.FIELD_WORK_GPS,
   ],
   admin: [PERMISSIONS.WILDCARD],
 };
@@ -352,6 +358,7 @@ export const PAGE_PERMISSIONS: Record<string, string[]> = {
   "/territories": [PERMISSIONS.TERRITORIES_VIEW, PERMISSIONS.ADDRESSES_VIEW],
   "/territories/gap-detection": [PERMISSIONS.GAP_DETECTION_VIEW],
   "/territories/kanban": [PERMISSIONS.ASSIGNMENTS_VIEW],
+  "/territories/field-work": [PERMISSIONS.FIELD_WORK_OVERSEER],
   "/field-service": [PERMISSIONS.FIELD_SERVICE_VIEW],
   "/field-service/campaigns": [PERMISSIONS.CAMPAIGNS_VIEW],
   "/field-service/meeting-points": [PERMISSIONS.MEETING_POINTS_VIEW],

@@ -1,0 +1,76 @@
+/**
+ * Shared spatial utility functions for territory boundary operations.
+ * Used by gap detection, OSM refresh, and OSM populate.
+ */
+
+export interface BBox {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+/**
+ * Compute bounding box from GeoJSON Polygon or MultiPolygon boundaries.
+ */
+export function bboxFromGeoJSON(boundaries: unknown): BBox | null {
+  if (!boundaries || typeof boundaries !== "object") return null;
+  const geo = boundaries as { type?: string; coordinates?: number[][][] | number[][][][] };
+  if (!geo.coordinates) return null;
+
+  let allCoords: number[][] = [];
+  if (geo.type === "Polygon") {
+    for (const ring of geo.coordinates as number[][][]) allCoords = allCoords.concat(ring);
+  } else if (geo.type === "MultiPolygon") {
+    for (const poly of geo.coordinates as number[][][][]) {
+      for (const ring of poly) allCoords = allCoords.concat(ring);
+    }
+  } else {
+    return null;
+  }
+
+  if (allCoords.length === 0) return null;
+
+  let south = Infinity, north = -Infinity, west = Infinity, east = -Infinity;
+  for (const [lng, lat] of allCoords as [number, number][]) {
+    if (lat < south) south = lat;
+    if (lat > north) north = lat;
+    if (lng < west) west = lng;
+    if (lng > east) east = lng;
+  }
+  return { south, west, north, east };
+}
+
+/**
+ * Simple point-in-polygon test using ray casting algorithm.
+ * Polygon is an array of rings (first = outer boundary, rest = holes).
+ * Each ring is an array of [lng, lat] coordinate pairs.
+ */
+export function pointInPolygon(lat: number, lng: number, polygon: number[][][]): boolean {
+  for (const ring of polygon) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i]![0]!, yi = ring[i]![1]!;
+      const xj = ring[j]![0]!, yj = ring[j]![1]!;
+      const intersect = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    if (inside) return true;
+  }
+  return false;
+}
+
+/**
+ * Test whether a point is inside GeoJSON boundaries (Polygon or MultiPolygon).
+ */
+export function isInsideBoundaries(lat: number, lng: number, boundaries: unknown): boolean {
+  if (!boundaries || typeof boundaries !== "object") return false;
+  const geo = boundaries as { type?: string; coordinates?: number[][][] | number[][][][] };
+  if (geo.type === "Polygon") {
+    return pointInPolygon(lat, lng, geo.coordinates as number[][][]);
+  }
+  if (geo.type === "MultiPolygon") {
+    return (geo.coordinates as number[][][][]).some((poly) => pointInPolygon(lat, lng, poly));
+  }
+  return false;
+}

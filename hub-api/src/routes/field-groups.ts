@@ -1,8 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
+import crypto from "node:crypto";
 import prisma from "../lib/prisma.js";
 import { requirePermission, requireAnyPermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+
+/** Generate a 6-character alphanumeric join code */
+function generateJoinCode(): string {
+  return crypto.randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+}
 
 // ─── Schemas ────────────────────────────────────────────────────────
 
@@ -50,6 +56,8 @@ const LocationShareUpdateBody = Type.Object({
   publisherId: Type.String({ format: "uuid" }),
   latitude: Type.Number(),
   longitude: Type.Number(),
+  heading: Type.Optional(Type.Number({ minimum: 0, maximum: 360 })),
+  accuracy: Type.Optional(Type.Number({ minimum: 0 })),
 });
 type LocationShareUpdateBodyType = Static<typeof LocationShareUpdateBody>;
 
@@ -57,6 +65,12 @@ const LocationShareStopBody = Type.Object({
   publisherId: Type.String({ format: "uuid" }),
 });
 type LocationShareStopBodyType = Static<typeof LocationShareStopBody>;
+
+const JoinByCodeBody = Type.Object({
+  code: Type.String({ minLength: 6, maxLength: 6 }),
+  publisherId: Type.String({ format: "uuid" }),
+});
+type JoinByCodeBodyType = Static<typeof JoinByCodeBody>;
 
 // Duration map in milliseconds
 const DURATION_MS: Record<string, number> = {
@@ -68,6 +82,66 @@ const DURATION_MS: Record<string, number> = {
 // ─── Routes ─────────────────────────────────────────────────────────
 
 export async function fieldGroupRoutes(app: FastifyInstance): Promise<void> {
+  // ─── Active locations for overseer dashboard ─────────────────────
+  app.get(
+    "/field-groups/active-locations",
+    {
+      preHandler: requirePermission(PERMISSIONS.FIELD_WORK_OVERSEER),
+    },
+    async (_request, reply) => {
+      const now = new Date();
+      const activeShares = await prisma.locationShare.findMany({
+        where: { isActive: true, expiresAt: { gt: now } },
+        include: {
+          publisher: { select: { id: true, firstName: true, lastName: true } },
+          fieldGroup: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              territoryIds: true,
+              meetingPointId: true,
+            },
+          },
+        },
+      });
+      return reply.send(activeShares);
+    },
+  );
+
+  // ─── Join field group by code ────────────────────────────────────
+  app.post<{ Body: JoinByCodeBodyType }>(
+    "/field-groups/join",
+    {
+      preHandler: requireAnyPermission(
+        PERMISSIONS.CAMPAIGNS_ASSIST,
+        PERMISSIONS.CAMPAIGNS_CONDUCT,
+      ),
+      schema: { body: JoinByCodeBody },
+    },
+    async (request, reply) => {
+      const fg = await prisma.campaignFieldGroup.findFirst({
+        where: {
+          joinCode: request.body.code.toUpperCase(),
+          status: { not: "closed" },
+        },
+      });
+      if (!fg) {
+        return reply.code(404).send({ error: "Invalid or expired join code" });
+      }
+
+      const memberIds = fg.memberIds ?? [];
+      if (!memberIds.includes(request.body.publisherId)) {
+        await prisma.campaignFieldGroup.update({
+          where: { id: fg.id },
+          data: { memberIds: [...memberIds, request.body.publisherId] },
+        });
+      }
+
+      return reply.send(fg);
+    },
+  );
+
   // Create field group within a meeting point — CAMPAIGNS_CONDUCT
   app.post<{ Params: MeetingPointIdParamsType; Body: FieldGroupBodyType }>(
     "/meeting-points/:id/field-groups",
@@ -320,6 +394,8 @@ export async function fieldGroupRoutes(app: FastifyInstance): Promise<void> {
         data: {
           lastLatitude: request.body.latitude,
           lastLongitude: request.body.longitude,
+          heading: request.body.heading ?? null,
+          accuracy: request.body.accuracy ?? null,
           lastUpdatedAt: new Date(),
         },
       });
@@ -368,4 +444,75 @@ export async function fieldGroupRoutes(app: FastifyInstance): Promise<void> {
       return updated;
     },
   );
+
+  // ─── Generate join code ──────────────────────────────────────────
+  app.post<{ Params: FieldGroupIdParamsType }>(
+    "/field-groups/:id/generate-code",
+    {
+      preHandler: requirePermission(PERMISSIONS.CAMPAIGNS_CONDUCT),
+      schema: { params: FieldGroupIdParams },
+    },
+    async (request, reply) => {
+      const fg = await prisma.campaignFieldGroup.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!fg) {
+        return reply.code(404).send({ error: "Field group not found" });
+      }
+      if (fg.status === "closed") {
+        return reply.code(409).send({
+          error: "Conflict",
+          message: "Cannot generate code for closed group",
+        });
+      }
+
+      let code: string;
+      let attempts = 0;
+      do {
+        code = generateJoinCode();
+        const existing = await prisma.campaignFieldGroup.findFirst({
+          where: { joinCode: code, status: { not: "closed" } },
+        });
+        if (!existing) break;
+        attempts++;
+      } while (attempts < 5);
+
+      const updated = await prisma.campaignFieldGroup.update({
+        where: { id: request.params.id },
+        data: { joinCode: code },
+      });
+      return reply.send({ joinCode: updated.joinCode });
+    },
+  );
+
+  // ─── Auto-close stale field groups (in_field > 4 hours) ──────────
+  const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+  const MAX_FIELD_DURATION_MS = 4 * 60 * 60 * 1000;
+
+  const cleanupTimer = setInterval(async () => {
+    try {
+      const cutoff = new Date(Date.now() - MAX_FIELD_DURATION_MS);
+      const stale = await prisma.campaignFieldGroup.findMany({
+        where: { status: "in_field", startedAt: { lt: cutoff } },
+      });
+
+      for (const fg of stale) {
+        await prisma.$transaction(async (tx) => {
+          await tx.locationShare.updateMany({
+            where: { fieldGroupId: fg.id, isActive: true },
+            data: { isActive: false, lastLatitude: null, lastLongitude: null },
+          });
+          await tx.campaignFieldGroup.update({
+            where: { id: fg.id },
+            data: { status: "closed", closedAt: new Date() },
+          });
+        });
+        app.log.info(`Auto-closed stale field group ${fg.id}`);
+      }
+    } catch (err) {
+      app.log.error(err, "Field group cleanup failed");
+    }
+  }, CLEANUP_INTERVAL_MS);
+
+  app.addHook("onClose", () => clearInterval(cleanupTimer));
 }

@@ -347,15 +347,39 @@ export function getOsmQueue(token: string): Promise<OsmRefreshJob[]> {
 
 // ─── Gap Detection endpoints ────────────────────────────────────
 
-export function runGapDetection(token: string, territoryIds?: string[]): Promise<GapDetectionRun[]> {
+// ─── OSM Populate ──────────────────────────────────────────────
+
+export interface OsmPopulateResult {
+  totalBuildings: number;
+  addressableBuildings: number;
+  territoriesProcessed: number;
+  addressesCreated: number;
+  addressesUpdated: number;
+  unassigned: number;
+}
+
+export function populateAddressesFromOsm(token: string): Promise<OsmPopulateResult> {
+  return apiFetch("/territories/osm-populate", token, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function runGapDetection(token: string): Promise<GapDetectionRun> {
   return apiFetch("/territories/gap-detection/run", token, {
     method: "POST",
-    body: JSON.stringify(territoryIds ? { territoryIds } : {}),
+    body: JSON.stringify({}),
   });
 }
 
 export function getGapRuns(token: string): Promise<GapDetectionRun[]> {
   return apiFetch("/territories/gap-detection/runs", token);
+}
+
+export function deleteGapRun(runId: string, token: string): Promise<void> {
+  return apiFetch(`/territories/gap-detection/runs/${runId}`, token, {
+    method: "DELETE",
+  });
 }
 
 export function ignoreBuildings(
@@ -484,4 +508,66 @@ export function getSnapContext(
   token: string,
 ): Promise<SnapContext> {
   return apiFetch(`/territories/snap-context?bbox=${encodeURIComponent(bbox)}`, token);
+}
+
+// ─── Field Work / Location Sharing API ─────────────────────────────
+
+export interface LocationShareData {
+  id: string;
+  fieldGroupId: string;
+  publisherId: string;
+  lastLatitude: number | null;
+  lastLongitude: number | null;
+  heading: number | null;
+  accuracy: number | null;
+  isActive: boolean;
+  expiresAt: string;
+  publisher?: { id: string; firstName: string; lastName: string };
+  fieldGroup?: {
+    id: string;
+    name: string | null;
+    status: string;
+    territoryIds: string[];
+  };
+}
+
+export function updateLocationShare(
+  fieldGroupId: string,
+  data: {
+    publisherId: string;
+    latitude: number;
+    longitude: number;
+    heading?: number | null;
+    accuracy?: number | null;
+  },
+  token: string,
+): Promise<LocationShareData> {
+  return apiFetch(`/field-groups/${fieldGroupId}/location-share/update`, token, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function getActiveLocations(token: string): Promise<LocationShareData[]> {
+  return apiFetch("/field-groups/active-locations", token);
+}
+
+export function generateJoinCode(
+  fieldGroupId: string,
+  token: string,
+): Promise<{ joinCode: string }> {
+  return apiFetch(`/field-groups/${fieldGroupId}/generate-code`, token, {
+    method: "POST",
+  });
+}
+
+export function joinFieldGroupByCode(
+  code: string,
+  publisherId: string,
+  token: string,
+): Promise<unknown> {
+  return apiFetch("/field-groups/join", token, {
+    method: "POST",
+    body: JSON.stringify({ code, publisherId }),
+  });
 }

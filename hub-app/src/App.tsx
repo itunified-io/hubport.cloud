@@ -23,6 +23,8 @@ import { ServiceGroupPlanning } from "./pages/field-service/ServiceGroupPlanning
 import { ServiceMeetingDetail } from "./pages/field-service/ServiceMeetingDetail";
 import { GapDetection } from "./pages/territories/GapDetection";
 import ShareRedeemPage from "./pages/territories/ShareRedeemPage";
+import FieldWorkMode from "./pages/territories/FieldWorkMode";
+import FieldWorkDashboard from "./pages/territories/FieldWorkDashboard";
 import { MeetingList } from "./pages/meetings/MeetingList";
 import { MeetingForm } from "./pages/meetings/MeetingForm";
 import { MidweekPlanner } from "./pages/meetings/planner/MidweekPlanner";
@@ -175,6 +177,22 @@ export function App() {
           element={
             <PermissionGuard requires="app:territories.view">
               <GapDetection />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/field-work"
+          element={
+            <PermissionGuard requires="app:field_work.overseer">
+              <FieldWorkDashboard />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/territories/:id/field-work"
+          element={
+            <PermissionGuard requires="app:field_work.gps">
+              <FieldWorkMode />
             </PermissionGuard>
           }
         />

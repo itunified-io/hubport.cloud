@@ -13,60 +13,11 @@ import { Worker, type Job } from "bullmq";
 import { Redis } from "ioredis";
 import prisma from "../lib/prisma.js";
 import { queryBuildingsInBBox, type OverpassBuilding } from "../lib/osm-overpass.js";
+import { bboxFromGeoJSON } from "../lib/geo.js";
 
 export interface OsmRefreshJobData {
   territoryId: string;
   queueRecordId: string;
-}
-
-/**
- * Compute bounding box from GeoJSON polygon boundaries.
- */
-function bboxFromGeoJSON(boundaries: unknown): {
-  south: number;
-  west: number;
-  north: number;
-  east: number;
-} | null {
-  if (!boundaries || typeof boundaries !== "object") return null;
-
-  const geo = boundaries as { type?: string; coordinates?: number[][][] | number[][][][] };
-  if (!geo.coordinates) return null;
-
-  let allCoords: number[][] = [];
-
-  if (geo.type === "Polygon") {
-    const rings = geo.coordinates as number[][][];
-    for (const ring of rings) {
-      allCoords = allCoords.concat(ring);
-    }
-  } else if (geo.type === "MultiPolygon") {
-    const polys = geo.coordinates as number[][][][];
-    for (const poly of polys) {
-      for (const ring of poly) {
-        allCoords = allCoords.concat(ring);
-      }
-    }
-  } else {
-    return null;
-  }
-
-  if (allCoords.length === 0) return null;
-
-  let south = Infinity;
-  let north = -Infinity;
-  let west = Infinity;
-  let east = -Infinity;
-
-  for (const coord of allCoords) {
-    const [lng, lat] = coord as [number, number];
-    if (lat < south) south = lat;
-    if (lat > north) north = lat;
-    if (lng < west) west = lng;
-    if (lng > east) east = lng;
-  }
-
-  return { south, west, north, east };
 }
 
 /**
