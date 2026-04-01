@@ -80,7 +80,7 @@ export function GapDetection() {
 
   useEffect(() => {
     if (!token) return;
-    listTerritories(token, {}).then(setTerritories).catch(() => {});
+    listTerritories(token, { type: "all" }).then(setTerritories).catch(() => {});
   }, [token]);
 
   // ─── Fetch runs ──────────────────────────────────────────────
@@ -253,10 +253,10 @@ export function GapDetection() {
   }, [onStyleReady, addMapLayers, showGapsOnMap, runs, selectedRunId]);
 
   useEffect(() => {
-    if (!isLoaded || layersAdded.current) return;
+    if (!isLoaded || !territories.length) return;
     addMapLayers();
     layersAdded.current = true;
-  }, [isLoaded, addMapLayers]);
+  }, [isLoaded, territories, addMapLayers]);
 
   // When selectedRunId changes, update gap markers
   const selectedRun = runs.find((r) => r.id === selectedRunId);
