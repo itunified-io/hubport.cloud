@@ -161,8 +161,10 @@ model Publisher {
   onboardingToken   String?         /// Hashed JWT — cleared on completion
   termsVersion      String?         /// Version of accepted terms
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  syncVersion Int       @default(0)
+  deletedAt   DateTime?
 
   // Relations
   assignments     TerritoryAssignment[]
@@ -256,6 +258,8 @@ model Territory {
   shareExcluded  Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  syncVersion    Int      @default(0)
+  deletedAt      DateTime?
 
   assignments      TerritoryAssignment[]
   addresses        Address[]
@@ -295,6 +299,11 @@ model TerritoryAssignment {
   isSuspended Boolean   @default(false)
   groupId     String?   /// field group ID (deliberately unlinked)
   notes       String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  syncVersion Int       @default(0)
+  deletedAt   DateTime?
 
   territory Territory @relation(fields: [territoryId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
@@ -897,6 +906,9 @@ model CampaignMeetingPoint {
   time         String?
   createdAt    DateTime @default(now())
 
+  syncVersion  Int       @default(0)
+  deletedAt    DateTime?
+
   fieldServiceMeetingPointId String?  /// Optional link to permanent meeting point
   fieldServiceMeetingPoint   FieldServiceMeetingPoint? @relation(fields: [fieldServiceMeetingPointId], references: [id])
 
@@ -985,8 +997,10 @@ model FieldServiceMeetingPoint {
   isActive        Boolean  @default(true)
   notes           String?
   createdBy       String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  syncVersion     Int       @default(0)
+  deletedAt       DateTime?
 
   serviceMeetings       ServiceGroupMeeting[]
   campaignMeetingPoints CampaignMeetingPoint[]
@@ -1012,6 +1026,8 @@ model ServiceGroupMeeting {
   createdBy       String
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+  syncVersion     Int                  @default(0)
+  deletedAt       DateTime?
 
   signups         ServiceMeetingSignup[]
   fieldGroups     ServiceMeetingFieldGroup[]
@@ -1107,6 +1123,8 @@ model TerritoryShare {
   isActive    Boolean   @default(true)
   createdBy   String    /// publisherId
   createdAt   DateTime  @default(now())
+  syncVersion Int       @default(0)
+  deletedAt   DateTime?
 
   accessLogs ShareAccessLog[]
 
@@ -1156,6 +1174,8 @@ model Address {
   sortOrder    Int           @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  syncVersion  Int           @default(0)
+  deletedAt    DateTime?
 
   visits AddressVisit[]
 
@@ -1173,6 +1193,8 @@ model AddressVisit {
   outcome     VisitOutcome
   notes       String?
   visitedAt   DateTime     @default(now())
+  syncVersion Int          @default(0)
+  deletedAt   DateTime?
 
   @@index([addressId])
   @@index([publisherId])
@@ -1344,6 +1366,48 @@ model SharingApproval {
 
   @@unique([requesterId, approverId])
   @@ignore
+}
+
+// ─── Device Registration & Push Subscriptions ───────────────────────
+
+model Device {
+  id            String    @id @default(uuid())
+  tenantId      String
+  userId        String
+  deviceUuid    String
+  userAgent     String
+  platform      String
+  screenSize    String
+  displayName   String
+  encSalt       String
+  status        String    @default("active")
+  revokedAt     DateTime?
+  revokedBy     String?
+  revokeReason  String?
+  lastSyncAt    DateTime?
+  lastIp        String?
+  registeredAt  DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  pushSubscription PushSubscription?
+
+  @@unique([userId, deviceUuid])
+  @@index([tenantId, userId])
+}
+
+model PushSubscription {
+  id          String   @id @default(uuid())
+  tenantId    String
+  deviceId    String   @unique
+  endpoint    String
+  p256dh      String
+  auth        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }
 
 model SharedTerritory {
