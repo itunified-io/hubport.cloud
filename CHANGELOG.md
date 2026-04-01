@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.16
+
+### Map fixes + upgrade instructions (#275)
+- fix: Gap Detection page not displaying territory polygons or congregation boundary
+  - Fetch territories with `type=all` to include congregation_boundary records
+  - Fix race condition: `layersAdded.current` prevented layer re-add when territories arrived after map load
+- fix: ViolationBadges — use dynamic maplibre-gl import for Marker (same fix as TerritoryDetail)
+- feat: add upgrade instructions to Settings page with copy-to-clipboard commands
+
 ## v2026.04.01.14
 
 ### Inline Polygon Editing Fix (#273)
