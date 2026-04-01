@@ -409,3 +409,32 @@ export async function seedSystemRoles(): Promise<void> {
     });
   }
 }
+
+/**
+ * Bootstrap v1 boundary snapshots for existing territories.
+ * Creates a version record for each territory that has boundaries but no version records.
+ * Idempotent — safe to re-run on every deploy.
+ */
+export async function bootstrapBoundaryVersions(): Promise<void> {
+  const territories = await prisma.territory.findMany({
+    where: { boundaries: { not: { equals: null } } },
+    select: { id: true, boundaries: true },
+  });
+
+  for (const territory of territories) {
+    const existing = await prisma.territoryBoundaryVersion.findFirst({
+      where: { territoryId: territory.id },
+    });
+    if (existing) continue;
+
+    await prisma.territoryBoundaryVersion.create({
+      data: {
+        territoryId: territory.id,
+        version: 1,
+        boundaries: territory.boundaries as any,
+        changeType: "import",
+        changeSummary: "Initial snapshot from existing boundary",
+      },
+    });
+  }
+}
