@@ -25,6 +25,12 @@ const IdParams = Type.Object({
 
 type IdParamsType = Static<typeof IdParams>;
 
+/** Check if an error is a missing PostGIS extension */
+function isPostgisMissing(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("does not exist") && (msg.includes("st_") || msg.includes("postgis"));
+}
+
 const AssignBody = Type.Object({
   publisherId: Type.String({ format: "uuid" }),
 });
@@ -107,60 +113,69 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
     "/territories/violations",
     { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_VIEW)] },
     async (_request, reply) => {
-      const territories = await prisma.territory.findMany({
-        where: { type: "territory", boundaries: { not: { equals: null } } },
-        select: { id: true, number: true, name: true, boundaries: true },
-      });
+      try {
+        const territories = await prisma.territory.findMany({
+          where: { type: "territory", boundaries: { not: { equals: null } } },
+          select: { id: true, number: true, name: true, boundaries: true },
+        });
 
-      const congregation = await prisma.territory.findFirst({
-        where: { type: "congregation_boundary", boundaries: { not: { equals: null } } },
-        select: { boundaries: true },
-      });
+        const congregation = await prisma.territory.findFirst({
+          where: { type: "congregation_boundary", boundaries: { not: { equals: null } } },
+          select: { boundaries: true },
+        });
 
-      const violations: Array<{
-        territoryId: string;
-        number: string;
-        name: string;
-        violations: string[];
-      }> = [];
+        const violations: Array<{
+          territoryId: string;
+          number: string;
+          name: string;
+          violations: string[];
+        }> = [];
 
-      for (const territory of territories) {
-        const territoryViolations: string[] = [];
+        for (const territory of territories) {
+          const territoryViolations: string[] = [];
 
-        // Check congregation boundary violation
-        if (congregation?.boundaries) {
-          const exceedsResult = await prisma.$queryRaw<Array<{ exceeds: boolean }>>`
-            SELECT NOT ST_CoveredBy(
-              ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)})),
-              ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(congregation.boundaries)}))
-            ) as exceeds
-          `;
-          if (exceedsResult[0]?.exceeds) {
-            territoryViolations.push("exceeds_boundary");
+          // Check congregation boundary violation
+          if (congregation?.boundaries) {
+            const exceedsResult = await prisma.$queryRaw<Array<{ exceeds: boolean }>>`
+              SELECT NOT ST_CoveredBy(
+                ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)})),
+                ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(congregation.boundaries)}))
+              ) as exceeds
+            `;
+            if (exceedsResult[0]?.exceeds) {
+              territoryViolations.push("exceeds_boundary");
+            }
+          }
+
+          // Check neighbor overlaps
+          const overlaps = await detectOverlaps(
+            prisma,
+            territory.boundaries as object,
+            territory.id
+          );
+          for (const overlap of overlaps) {
+            territoryViolations.push(`overlaps_${overlap.number}`);
+          }
+
+          if (territoryViolations.length > 0) {
+            violations.push({
+              territoryId: territory.id,
+              number: territory.number,
+              name: territory.name,
+              violations: territoryViolations,
+            });
           }
         }
 
-        // Check neighbor overlaps
-        const overlaps = await detectOverlaps(
-          prisma,
-          territory.boundaries as object,
-          territory.id
-        );
-        for (const overlap of overlaps) {
-          territoryViolations.push(`overlaps_${overlap.number}`);
+        return reply.send(violations);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("does not exist") || msg.includes("postgis")) {
+          _request.log.warn("PostGIS not available — skipping violation detection");
+          return reply.send([]);
         }
-
-        if (territoryViolations.length > 0) {
-          violations.push({
-            territoryId: territory.id,
-            number: territory.number,
-            name: territory.name,
-            violations: territoryViolations,
-          });
-        }
+        throw err;
       }
-
-      return reply.send(violations);
     }
   );
 
@@ -179,6 +194,9 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       } catch (err: any) {
         if (err.statusCode === 422) {
           return reply.code(422).send({ error: err.message });
+        }
+        if (isPostgisMissing(err)) {
+          return reply.send({ original: boundaries, clipped: boundaries, applied: [], overlaps: [], geometryModified: false });
         }
         throw err;
       }
@@ -228,7 +246,8 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
           if (err.statusCode === 422) {
             return reply.code(422).send({ error: err.message });
           }
-          throw err;
+          if (!isPostgisMissing(err)) throw err;
+          // PostGIS not available — save boundaries as-is
         }
       }
 
@@ -269,6 +288,9 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       } catch (err: any) {
         if (err.statusCode === 422) {
           return reply.code(422).send({ error: err.message });
+        }
+        if (isPostgisMissing(err)) {
+          return reply.send({ original: boundaries, clipped: boundaries, applied: [], overlaps: [], geometryModified: false });
         }
         throw err;
       }
@@ -320,6 +342,9 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         if (err.statusCode === 422) {
           return reply.code(422).send({ error: err.message });
         }
+        if (isPostgisMissing(err)) {
+          return reply.send({ original: version.boundaries, clipped: version.boundaries, applied: [], overlaps: [], geometryModified: false });
+        }
         throw err;
       }
     }
@@ -367,6 +392,15 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         } catch (err: any) {
           if (err.statusCode === 422) {
             return reply.code(422).send({ error: err.message });
+          }
+          if (isPostgisMissing(err)) {
+            // PostGIS not available — save boundaries as-is
+            const territory = await prisma.territory.update({
+              where: { id },
+              data: data as any,
+            });
+            await createBoundaryVersion(id, data.boundaries as object, "manual_edit");
+            return reply.send(territory);
           }
           throw err;
         }

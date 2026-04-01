@@ -340,7 +340,7 @@ export function TerritoryMap() {
 
         {/* Violation warning badges */}
         <ViolationBadges
-          map={mapRef.current}
+          map={isLoaded ? mapRef.current : null}
           token={token}
           territories={territories}
         />

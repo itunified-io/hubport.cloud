@@ -143,6 +143,14 @@ async function start(): Promise<void> {
     await prisma.$connect();
     app.log.info("Database connected");
 
+    // Ensure PostGIS extension is available (idempotent)
+    try {
+      await prisma.$executeRawUnsafe("CREATE EXTENSION IF NOT EXISTS postgis");
+      app.log.info("PostGIS extension ready");
+    } catch {
+      app.log.warn("PostGIS extension not available — spatial features disabled");
+    }
+
     // Upsert system roles on every startup (idempotent — adds new roles, updates existing)
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
