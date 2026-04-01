@@ -1,0 +1,242 @@
+<h2>Feature C: GPS Location + Heading + Privacy</h2>
+<p class="subtitle">Polished mockup — your position on the territory map</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Territory Map — My Location</div>
+    <div class="mockup-body" style="background:#0f1923;color:#e0e0e0;padding:0;position:relative;min-height:440px;overflow:hidden;">
+      <!-- Map background with realistic tile feel -->
+      <div style="width:100%;height:320px;position:relative;overflow:hidden;background:linear-gradient(160deg,#1e3a2a 0%,#243d30 30%,#1b3528 60%,#1e3a2a 100%);">
+
+        <!-- Road grid -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 400 320">
+          <!-- Main roads -->
+          <line x1="0" y1="130" x2="400" y2="130" stroke="rgba(255,255,255,0.12)" stroke-width="6"/>
+          <line x1="0" y1="230" x2="400" y2="230" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+          <line x1="160" y1="0" x2="160" y2="320" stroke="rgba(255,255,255,0.12)" stroke-width="6"/>
+          <line x1="310" y1="0" x2="310" y2="320" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+
+          <!-- Road labels -->
+          <text x="60" y="125" fill="rgba(255,255,255,0.25)" font-size="8" font-family="system-ui">Sindelsdorfer Straße</text>
+          <text x="60" y="225" fill="rgba(255,255,255,0.2)" font-size="7" font-family="system-ui">Wiesenstraße</text>
+
+          <!-- Territory boundary -->
+          <rect x="25" y="15" width="350" height="290" rx="4" fill="none" stroke="#c8a832" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.5"/>
+
+          <!-- Buildings -->
+          <!-- Row 1 -->
+          <rect x="40" y="40" width="50" height="35" rx="2" fill="rgba(80,130,100,0.4)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+          <text x="65" y="62" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle" font-family="system-ui">2</text>
+
+          <rect x="40" y="85" width="50" height="30" rx="2" fill="rgba(80,130,100,0.4)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+          <text x="65" y="104" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle" font-family="system-ui">4</text>
+
+          <!-- Visited building (green) -->
+          <rect x="180" y="40" width="55" height="35" rx="2" fill="rgba(34,197,94,0.2)" stroke="rgba(34,197,94,0.5)" stroke-width="1"/>
+          <text x="207" y="62" fill="rgba(34,197,94,0.7)" font-size="7" text-anchor="middle" font-family="system-ui">8 ✓</text>
+
+          <!-- DNC building (red) -->
+          <rect x="40" y="145" width="50" height="35" rx="2" fill="rgba(239,68,68,0.15)" stroke="rgba(239,68,68,0.4)" stroke-width="1"/>
+          <text x="65" y="167" fill="rgba(239,68,68,0.6)" font-size="7" text-anchor="middle" font-family="system-ui">10</text>
+          <circle cx="85" cy="148" r="4" fill="#ef4444" opacity="0.7"/>
+
+          <!-- Not home (amber) -->
+          <rect x="180" y="145" width="55" height="35" rx="2" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.4)" stroke-width="1"/>
+          <text x="207" y="167" fill="rgba(245,158,11,0.6)" font-size="7" text-anchor="middle" font-family="system-ui">12</text>
+
+          <!-- Unvisited buildings -->
+          <rect x="180" y="85" width="55" height="30" rx="2" fill="rgba(80,130,100,0.4)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+          <text x="207" y="104" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle" font-family="system-ui">6a</text>
+
+          <rect x="40" y="245" width="50" height="30" rx="2" fill="rgba(80,130,100,0.4)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+          <text x="65" y="264" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle" font-family="system-ui">14</text>
+
+          <rect x="180" y="245" width="55" height="30" rx="2" fill="rgba(80,130,100,0.4)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+          <text x="207" y="264" fill="rgba(255,255,255,0.4)" font-size="7" text-anchor="middle" font-family="system-ui">16</text>
+
+          <!-- === MY LOCATION === -->
+          <!-- Accuracy circle (pulsing feel) -->
+          <circle cx="270" cy="170" r="28" fill="rgba(59,130,246,0.06)" stroke="rgba(59,130,246,0.12)" stroke-width="1">
+            <animate attributeName="r" values="26;30;26" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="1;0.5;1" dur="3s" repeatCount="indefinite"/>
+          </circle>
+
+          <!-- Heading cone / field of view -->
+          <path d="M270,170 L240,110 A60,60 0 0,1 300,110 Z" fill="rgba(59,130,246,0.1)" stroke="none"/>
+          <path d="M270,170 L245,115 A50,50 0 0,1 295,115 Z" fill="rgba(59,130,246,0.08)" stroke="none"/>
+
+          <!-- Dot shadow -->
+          <circle cx="270" cy="171" r="7" fill="rgba(0,0,0,0.3)"/>
+          <!-- White border -->
+          <circle cx="270" cy="170" r="7" fill="white"/>
+          <!-- Blue dot -->
+          <circle cx="270" cy="170" r="5.5" fill="#3b82f6"/>
+          <!-- Inner highlight -->
+          <circle cx="268" cy="168" r="2" fill="rgba(255,255,255,0.3)"/>
+
+          <!-- Glow -->
+          <circle cx="270" cy="170" r="12" fill="none" stroke="rgba(59,130,246,0.25)" stroke-width="1">
+            <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+
+        <!-- "You" label -->
+        <div style="position:absolute;top:155px;left:285px;">
+          <div style="font-size:10px;color:white;background:rgba(15,25,35,0.85);padding:2px 8px;border-radius:4px;font-weight:500;backdrop-filter:blur(4px);border:1px solid rgba(59,130,246,0.3);white-space:nowrap;">
+            You
+          </div>
+        </div>
+
+        <!-- Map controls (top right) -->
+        <div style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;">
+          <div style="width:28px;height:28px;background:rgba(15,25,35,0.8);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.1);cursor:pointer;">+</div>
+          <div style="width:28px;height:28px;background:rgba(15,25,35,0.8);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.1);cursor:pointer;">−</div>
+        </div>
+
+        <!-- Recenter button (bottom right) -->
+        <div style="position:absolute;bottom:8px;right:8px;">
+          <div style="width:32px;height:32px;background:rgba(15,25,35,0.85);border-radius:8px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);border:1px solid rgba(59,130,246,0.3);cursor:pointer;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="3" stroke="#3b82f6" stroke-width="1.5" fill="none"/>
+              <line x1="8" y1="1" x2="8" y2="4" stroke="#3b82f6" stroke-width="1.5"/>
+              <line x1="8" y1="12" x2="8" y2="15" stroke="#3b82f6" stroke-width="1.5"/>
+              <line x1="1" y1="8" x2="4" y2="8" stroke="#3b82f6" stroke-width="1.5"/>
+              <line x1="12" y1="8" x2="15" y2="8" stroke="#3b82f6" stroke-width="1.5"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Territory label -->
+        <div style="position:absolute;top:8px;left:8px;">
+          <div style="font-size:11px;color:#c8a832;background:rgba(15,25,35,0.8);padding:3px 10px;border-radius:4px;font-weight:600;backdrop-filter:blur(4px);border:1px solid rgba(200,168,50,0.2);">
+            Territory 104
+          </div>
+        </div>
+      </div>
+
+      <!-- Status bar -->
+      <div style="padding:10px 14px;background:#161b2e;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="position:relative;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;"></div>
+            <div style="position:absolute;inset:-2px;border-radius:50%;border:1px solid rgba(34,197,94,0.3);animation:pulse 2s infinite;">
+            </div>
+          </div>
+          <span style="font-size:11px;color:#94a3b8;">GPS active</span>
+          <span style="font-size:10px;color:#475569;">&bull;</span>
+          <span style="font-size:11px;color:#64748b;">±3m</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#94a3b8;">Share location</span>
+          <div style="width:40px;height:22px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:11px;position:relative;cursor:pointer;box-shadow:0 0 8px rgba(59,130,246,0.3);">
+            <div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;top:2px;right:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Service Work Group — Leader View</div>
+    <div class="mockup-body" style="background:#0f1923;color:#e0e0e0;padding:0;min-height:440px;">
+      <!-- Header -->
+      <div style="padding:12px 14px;background:linear-gradient(135deg,rgba(245,180,60,0.08),rgba(245,180,60,0.03));border-bottom:1px solid rgba(245,180,60,0.15);">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;background:rgba(245,180,60,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="#f5b43c">
+                <circle cx="8" cy="5" r="3"/>
+                <circle cx="3" cy="7" r="2"/>
+                <circle cx="13" cy="7" r="2"/>
+                <path d="M4,14 Q8,10 12,14" stroke="#f5b43c" fill="none" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#f5b43c;">Service Work Group</div>
+              <div style="font-size:10px;color:#64748b;">Bahnhofstr. 5 &bull; seit 09:32</div>
+            </div>
+          </div>
+          <div style="padding:5px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;font-size:11px;color:#f87171;cursor:pointer;font-weight:500;">Beenden</div>
+        </div>
+      </div>
+
+      <!-- Mini map with all members -->
+      <div style="margin:12px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);">
+        <div style="background:linear-gradient(160deg,#1e3a2a,#243d30);height:120px;position:relative;">
+          <!-- Territory outlines -->
+          <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 300 120">
+            <rect x="20" y="10" width="120" height="100" rx="3" fill="none" stroke="rgba(200,168,50,0.25)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="80" y="25" fill="rgba(200,168,50,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">104</text>
+            <rect x="155" y="10" width="130" height="100" rx="3" fill="none" stroke="rgba(200,168,50,0.25)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="220" y="25" fill="rgba(200,168,50,0.3)" font-size="8" text-anchor="middle" font-family="system-ui">105</text>
+
+            <!-- Member dots -->
+            <!-- Benjamin (blue) -->
+            <circle cx="75" cy="60" r="6" fill="#3b82f6" stroke="white" stroke-width="1.5"/>
+            <text x="75" y="63" fill="white" font-size="7" text-anchor="middle" font-weight="bold" font-family="system-ui">B</text>
+            <!-- Heading -->
+            <path d="M75,60 L65,42 A15,15 0 0,1 85,42 Z" fill="rgba(59,130,246,0.15)"/>
+
+            <!-- Maria (purple) -->
+            <circle cx="110" cy="75" r="6" fill="#a855f7" stroke="white" stroke-width="1.5"/>
+            <text x="110" y="78" fill="white" font-size="7" text-anchor="middle" font-weight="bold" font-family="system-ui">M</text>
+            <!-- Heading -->
+            <path d="M110,75 L100,57 A15,15 0 0,1 120,57 Z" fill="rgba(168,85,247,0.15)"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Member list -->
+      <div style="padding:0 12px;">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px;font-weight:600;">3 Teilnehmer</div>
+
+        <!-- Benjamin (you, leader) -->
+        <div style="padding:10px 12px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.12);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(59,130,246,0.3),rgba(59,130,246,0.15));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#93c5fd;border:2px solid rgba(59,130,246,0.4);">B</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;">Benjamin B. <span style="font-size:9px;color:#3b82f6;background:rgba(59,130,246,0.1);padding:1px 5px;border-radius:3px;margin-left:2px;">Leiter</span></div>
+            <div style="font-size:10px;color:#64748b;margin-top:1px;">Gebiet 104 &bull; Sindelsdorfer Str.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 6px rgba(34,197,94,0.4);"></div>
+            <span style="font-size:8px;color:#22c55e;">live</span>
+          </div>
+        </div>
+
+        <!-- Maria (sharing) -->
+        <div style="padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(168,85,247,0.3),rgba(168,85,247,0.15));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#d8b4fe;border:2px solid rgba(168,85,247,0.4);">M</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;">Maria S.</div>
+            <div style="font-size:10px;color:#64748b;margin-top:1px;">Gebiet 104 &bull; Wiesenstraße</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 6px rgba(34,197,94,0.4);"></div>
+            <span style="font-size:8px;color:#22c55e;">live</span>
+          </div>
+        </div>
+
+        <!-- Thomas (not sharing) -->
+        <div style="padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(100,116,139,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#94a3b8;border:2px solid rgba(100,116,139,0.3);">T</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;color:#94a3b8;">Thomas K.</div>
+            <div style="font-size:10px;color:#475569;margin-top:1px;">Gebiet 105 &bull; Hauptstraße</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+            <div style="width:8px;height:8px;background:#475569;border-radius:50%;"></div>
+            <span style="font-size:8px;color:#475569;">privat</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+</style>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Treffpunkt-Management — Scope</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 40px; }
+  h1 { font-size: 22px; color: #f5a623; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 32px; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .card { background: #1a1a1a; border-radius: 12px; border: 2px solid #2a2a2a; padding: 24px; }
+  .card.highlight { border-color: #f5a623; }
+  .card-icon { font-size: 28px; margin-bottom: 12px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .card-desc { font-size: 13px; color: #888; margin-bottom: 16px; line-height: 1.5; }
+  .card-features { list-style: none; }
+  .card-features li { font-size: 13px; padding: 4px 0; color: #bbb; display: flex; align-items: center; gap: 8px; }
+  .card-features li::before { content: "✓"; color: #4ade80; font-weight: bold; }
+  .card-features li.future::before { content: "◯"; color: #666; }
+  .card-features li.future { color: #666; }
+
+  .flow { background: #1a1a1a; border-radius: 12px; padding: 24px; margin-bottom: 32px; }
+  .flow-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #f5a623; }
+  .flow-steps { display: flex; align-items: center; gap: 0; justify-content: center; flex-wrap: wrap; }
+  .flow-step { background: #222; border-radius: 8px; padding: 12px 16px; font-size: 12px; text-align: center; min-width: 120px; }
+  .flow-step .step-title { font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+  .flow-step .step-desc { color: #888; font-size: 11px; }
+  .flow-arrow { color: #f5a623; font-size: 20px; padding: 0 8px; }
+  .flow-step.new { border: 1px solid #4ade80; }
+  .flow-step.existing { border: 1px solid #555; }
+
+  .question { margin-top: 24px; background: #1a1a1a; border-radius: 12px; padding: 20px; border-left: 3px solid #f5a623; }
+  .question-label { font-size: 11px; color: #f5a623; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .question-text { font-size: 15px; line-height: 1.5; }
+
+  .tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; margin-left: 8px; }
+  .tag.exists { background: #333; color: #888; }
+  .tag.new { background: rgba(74,222,128,0.15); color: #4ade80; }
+</style>
+</head>
+<body>
+
+<h1>Frage 2: Scope — Treffpunkte & Dienstplanung</h1>
+<p class="subtitle">Was genau soll unter „Treffpunkte" und „Dienstplanung" möglich sein?</p>
+
+<div class="cards">
+  <div class="card highlight">
+    <div class="card-icon">📍</div>
+    <div class="card-title">Treffpunkte <span class="tag new">NEU</span></div>
+    <div class="card-desc">Zentrale Verwaltung aller Treffpunkte für den Predigtdienst — unabhängig von Aktionen.</div>
+    <ul class="card-features">
+      <li>Name, Adresse, Koordinaten (Karte)</li>
+      <li>Wochentag + Uhrzeit</li>
+      <li>Zugewiesene Gebiete</li>
+      <li>Dienstleiter + Gehilfen</li>
+      <li>Wiederholend (z.B. jeden Samstag 10:00)</li>
+      <li class="future">Kapazitätslimit (max. Teilnehmer)</li>
+    </ul>
+  </div>
+
+  <div class="card highlight">
+    <div class="card-icon">📅</div>
+    <div class="card-title">Dienstplanung <span class="tag new">NEU</span></div>
+    <div class="card-desc">Wochenplanung: welcher Treffpunkt, wann, mit wem. Publisher können sich anmelden.</div>
+    <ul class="card-features">
+      <li>Wochenansicht aller Treffpunkte</li>
+      <li>Publisher-Anmeldung / Abmeldung</li>
+      <li>Dienstleiter-Zuweisung pro Termin</li>
+      <li>Gebietszuordnung pro Termin</li>
+      <li class="future">Push-Benachrichtigungen</li>
+      <li class="future">Automatische Erinnerung</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-icon">📢</div>
+    <div class="card-title">Aktionen <span class="tag exists">BESTEHT</span></div>
+    <div class="card-desc">Kampagnen (Gedächtnismahl, Kongress, Sonderaktionen) mit zeitbegrenztem Scope.</div>
+    <ul class="card-features">
+      <li>Kampagne erstellen (Draft → Active → Closed)</li>
+      <li>Kampagnen-Treffpunkte (zeitbegrenzt)</li>
+      <li>Dienstgruppen + Location Sharing</li>
+      <li>Berichte + CSV Export</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-icon">🔗</div>
+    <div class="card-title">Integration <span class="tag new">NEU</span></div>
+    <div class="card-desc">Wie Treffpunkte und Aktionen zusammenarbeiten.</div>
+    <ul class="card-features">
+      <li>Aktionen erben reguläre Treffpunkte</li>
+      <li>Kampagnen-Treffpunkte überschreiben temporär</li>
+      <li>Dienstleiter aus Publisher-Pool</li>
+      <li>Gebietszuordnung aus Territory-Modul</li>
+    </ul>
+  </div>
+</div>
+
+<div class="flow">
+  <div class="flow-title">Datenfluss: Treffpunkte → Dienstplanung → Aktionen</div>
+  <div class="flow-steps">
+    <div class="flow-step new">
+      <div class="step-title">Treffpunkt</div>
+      <div class="step-desc">Ort + Wochentag + Leiter</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step new">
+      <div class="step-title">Diensttermin</div>
+      <div class="step-desc">Konkretes Datum + Anmeldungen</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step existing">
+      <div class="step-title">Dienstgruppe</div>
+      <div class="step-desc">Im Feld + Location Share</div>
+    </div>
+    <div class="flow-arrow">↔</div>
+    <div class="flow-step existing">
+      <div class="step-title">Aktion</div>
+      <div class="step-desc">Kampagne nutzt Treffpunkte</div>
+    </div>
+  </div>
+</div>
+
+<div class="question">
+  <div class="question-label">Frage 2 von ~5</div>
+  <div class="question-text">
+    Sind reguläre Treffpunkte (wiederkehrend, z.B. „Samstag 10:00 am Königreichssaal") <strong>unabhängig</strong> von Kampagnen?<br><br>
+    Das heißt: Treffpunkte existieren als eigene Entität, und Kampagnen können sie <em>übernehmen</em> oder eigene temporäre anlegen?
+  </div>
+</div>
+
+</body>
+</html>
