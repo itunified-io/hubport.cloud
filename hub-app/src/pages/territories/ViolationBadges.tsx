@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
-import { Marker } from "maplibre-gl";
 import { getViolations, type TerritoryViolation } from "@/lib/territory-api";
 
 interface ViolationBadgesProps {
@@ -36,40 +35,43 @@ export function ViolationBadges({ map, token, territories }: ViolationBadgesProp
 
     if (violations.length === 0) return;
 
-    for (const v of violations) {
-      const territory = territories.find((t) => t.id === v.territoryId);
-      if (!territory?.boundaries) continue;
+    import("maplibre-gl").then((maplibregl) => {
+      const MarkerClass = maplibregl.Marker;
+      for (const v of violations) {
+        const territory = territories.find((t) => t.id === v.territoryId);
+        if (!territory?.boundaries) continue;
 
-      const bounds = territory.boundaries as { type?: string; coordinates?: number[][][] };
-      const coords = bounds.coordinates?.[0];
-      if (!coords || coords.length < 2) continue;
+        const bounds = territory.boundaries as { type?: string; coordinates?: number[][][] };
+        const coords = bounds.coordinates?.[0];
+        if (!coords || coords.length < 2) continue;
 
-      const ring = coords.slice(0, -1);
-      let cx = 0, cy = 0;
-      for (const coord of ring) { cx += (coord[0] ?? 0); cy += (coord[1] ?? 0); }
-      cx /= ring.length;
-      cy /= ring.length;
+        const ring = coords.slice(0, -1);
+        let cx = 0, cy = 0;
+        for (const coord of ring) { cx += (coord[0] ?? 0); cy += (coord[1] ?? 0); }
+        cx /= ring.length;
+        cy /= ring.length;
 
-      const hasExceedsBoundary = v.violations.some((vv) => vv === "exceeds_boundary");
-      const color = hasExceedsBoundary ? "#ef4444" : "#f59e0b";
+        const hasExceedsBoundary = v.violations.some((vv) => vv === "exceeds_boundary");
+        const color = hasExceedsBoundary ? "#ef4444" : "#f59e0b";
 
-      const el = document.createElement("div");
-      el.className = "violation-badge";
-      el.style.cssText = `
-        width: 22px; height: 22px; border-radius: 50%;
-        background: ${color}; color: ${hasExceedsBoundary ? "white" : "black"};
-        display: flex; align-items: center; justify-content: center;
-        font-size: 12px; font-weight: 700; cursor: pointer;
-        box-shadow: 0 2px 8px ${color}66;
-      `;
-      el.textContent = "!";
-      el.onclick = () => navigate(`/territories/${v.territoryId}`);
+        const el = document.createElement("div");
+        el.className = "violation-badge";
+        el.style.cssText = `
+          width: 22px; height: 22px; border-radius: 50%;
+          background: ${color}; color: ${hasExceedsBoundary ? "white" : "black"};
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700; cursor: pointer;
+          box-shadow: 0 2px 8px ${color}66;
+        `;
+        el.textContent = "!";
+        el.onclick = () => navigate(`/territories/${v.territoryId}`);
 
-      const marker = new Marker({ element: el })
-        .setLngLat([cx, cy])
-        .addTo(map);
-      markersRef.current.push(marker);
-    }
+        const marker = new MarkerClass({ element: el })
+          .setLngLat([cx, cy])
+          .addTo(map);
+        markersRef.current.push(marker);
+      }
+    });
 
     return () => {
       markersRef.current.forEach((m) => m.remove());
