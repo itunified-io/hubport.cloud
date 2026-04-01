@@ -6,7 +6,7 @@ import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLib
 import { useAuth } from "@/auth/useAuth";
 import { listTerritories, type TerritoryListItem } from "@/lib/territory-api";
 
-/** Compute GeoJSON features from territories (reused after style switch) */
+/** Compute GeoJSON features from territories */
 function buildFeatures(territories: TerritoryListItem[]) {
   return territories
     .filter((t) => t.boundaries)
@@ -22,7 +22,7 @@ function buildFeatures(territories: TerritoryListItem[]) {
     }));
 }
 
-/** Compute bounding box from GeoJSON features */
+/** Compute bounding box */
 function computeBounds(features: ReturnType<typeof buildFeatures>) {
   let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
   const flatten = (c: unknown): void => {
@@ -53,87 +53,121 @@ export function TerritoryMap() {
   });
 
   const [territories, setTerritories] = useState<TerritoryListItem[]>([]);
+  const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
+  const congBoundaryRef = useRef<TerritoryListItem | null>(null);
 
-  // Fetch territories (full, with boundaries for map rendering)
+  // Fetch territories + congregation boundary in parallel
   useEffect(() => {
     if (!token) return;
-    listTerritories(token)
-      .then((data) => {
-        setTerritories(data);
-        territoriesRef.current = data;
+    Promise.all([
+      listTerritories(token),
+      listTerritories(token, { type: "congregation_boundary" }),
+    ])
+      .then(([terrs, bounds]) => {
+        setTerritories(terrs);
+        territoriesRef.current = terrs;
+        const cb = bounds[0] ?? null;
+        setCongBoundary(cb);
+        congBoundaryRef.current = cb;
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
 
-  /** Add territory layers to the map */
-  const addTerritoryLayers = useCallback(() => {
+  /** Add all map layers */
+  const addAllLayers = useCallback(() => {
     const data = territoriesRef.current;
-    if (data.length === 0) return;
+    const cb = congBoundaryRef.current;
 
-    const features = buildFeatures(data);
-    if (features.length === 0) return;
-
-    addSource("territories", { type: "FeatureCollection", features });
-
-    addLayer({
-      id: "territories-fill",
-      type: "fill",
-      source: "territories",
-      paint: {
-        "fill-color": [
-          "case",
-          ["get", "assigned"],
-          "rgba(217, 119, 6, 0.25)",
-          "rgba(22, 163, 74, 0.18)",
-        ],
-        "fill-opacity": 0.8,
-      },
-    });
-
-    addLayer({
-      id: "territories-outline",
-      type: "line",
-      source: "territories",
-      paint: {
-        "line-color": ["case", ["get", "assigned"], "#b45309", "#15803d"],
-        "line-width": 2,
-      },
-    });
-
-    addLayer({
-      id: "territories-labels",
-      type: "symbol",
-      source: "territories",
-      layout: {
-        "text-field": ["get", "number"],
-        "text-size": 13,
-        "text-font": ["Open Sans Bold"],
-        "text-allow-overlap": false,
-      },
-      paint: {
-        "text-color": "#1e293b",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 1.5,
-      },
-    });
-
-    // Click → navigate to detail
-    const map = mapRef.current;
-    if (map) {
-      map.on("click", "territories-fill", (e: { features?: Array<{ properties?: { id?: string } }> }) => {
-        const tid = e.features?.[0]?.properties?.id;
-        if (tid) navigate(`/territories/${tid}`);
+    // Congregation boundary — red dashed line (add first so it's below territory fills)
+    if (cb?.boundaries) {
+      addSource("cong-boundary", {
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          properties: { name: cb.name },
+          geometry: cb.boundaries,
+        }],
       });
-      map.on("mouseenter", "territories-fill", () => {
-        if (map.getCanvas()) map.getCanvas().style.cursor = "pointer";
+
+      addLayer({
+        id: "cong-boundary-line",
+        type: "line",
+        source: "cong-boundary",
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 3,
+          "line-dasharray": [4, 3],
+        },
       });
-      map.on("mouseleave", "territories-fill", () => {
-        if (map.getCanvas()) map.getCanvas().style.cursor = "";
+    }
+
+    // Territory polygons
+    if (data.length > 0) {
+      const features = buildFeatures(data);
+      if (features.length === 0) return;
+
+      addSource("territories", { type: "FeatureCollection", features });
+
+      addLayer({
+        id: "territories-fill",
+        type: "fill",
+        source: "territories",
+        paint: {
+          "fill-color": [
+            "case",
+            ["get", "assigned"],
+            "rgba(217, 119, 6, 0.25)",
+            "rgba(22, 163, 74, 0.18)",
+          ],
+          "fill-opacity": 0.8,
+        },
       });
+
+      addLayer({
+        id: "territories-outline",
+        type: "line",
+        source: "territories",
+        paint: {
+          "line-color": ["case", ["get", "assigned"], "#b45309", "#15803d"],
+          "line-width": 2,
+        },
+      });
+
+      addLayer({
+        id: "territories-labels",
+        type: "symbol",
+        source: "territories",
+        layout: {
+          "text-field": ["get", "number"],
+          "text-size": 13,
+          "text-font": ["Open Sans Bold"],
+          "text-allow-overlap": false,
+        },
+        paint: {
+          "text-color": "#1e293b",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+      });
+
+      // Click → navigate to detail
+      const map = mapRef.current;
+      if (map) {
+        map.on("click", "territories-fill", (e: { features?: Array<{ properties?: { id?: string } }> }) => {
+          const tid = e.features?.[0]?.properties?.id;
+          if (tid) navigate(`/territories/${tid}`);
+        });
+        map.on("mouseenter", "territories-fill", () => {
+          if (map.getCanvas()) map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", "territories-fill", () => {
+          if (map.getCanvas()) map.getCanvas().style.cursor = "";
+        });
+      }
     }
   }, [addSource, addLayer, mapRef, navigate]);
 
@@ -141,23 +175,30 @@ export function TerritoryMap() {
   useEffect(() => {
     onStyleReady(() => {
       layersAdded.current = false;
-      addTerritoryLayers();
+      addAllLayers();
       layersAdded.current = true;
     });
-  }, [onStyleReady, addTerritoryLayers]);
+  }, [onStyleReady, addAllLayers]);
 
   // Initial layer add when map + data ready
   useEffect(() => {
-    if (!isLoaded || territories.length === 0 || layersAdded.current) return;
+    if (!isLoaded || layersAdded.current) return;
+    if (territories.length === 0 && !congBoundary) return;
 
-    addTerritoryLayers();
+    addAllLayers();
     layersAdded.current = true;
 
-    // Fit bounds
-    const features = buildFeatures(territories);
-    const bounds = computeBounds(features);
-    if (bounds) fitBounds(bounds);
-  }, [isLoaded, territories, addTerritoryLayers, fitBounds]);
+    // Fit bounds — prefer congregation boundary, fallback to territory extent
+    if (congBoundary?.boundaries) {
+      const cbFeatures = buildFeatures([congBoundary]);
+      const bounds = computeBounds(cbFeatures);
+      if (bounds) fitBounds(bounds);
+    } else {
+      const features = buildFeatures(territories);
+      const bounds = computeBounds(features);
+      if (bounds) fitBounds(bounds);
+    }
+  }, [isLoaded, territories, congBoundary, addAllLayers, fitBounds]);
 
   return (
     <div className="space-y-6">
@@ -203,6 +244,24 @@ export function TerritoryMap() {
                 {MAP_STYLES[key].label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Legend — bottom left */}
+        {isLoaded && (
+          <div className="absolute bottom-3 left-3 z-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-lg px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+              <span className="w-4 h-0.5 bg-red-500 block" style={{ borderTop: "2px dashed #ef4444" }} />
+              <FormattedMessage id="territories.congBoundary" defaultMessage="Congregation Boundary" />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+              <span className="w-4 h-3 rounded-sm block" style={{ background: "rgba(22, 163, 74, 0.3)", border: "1px solid #15803d" }} />
+              <FormattedMessage id="territories.available" defaultMessage="Available" />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+              <span className="w-4 h-3 rounded-sm block" style={{ background: "rgba(217, 119, 6, 0.3)", border: "1px solid #b45309" }} />
+              <FormattedMessage id="territories.assigned" defaultMessage="Assigned" />
+            </div>
           </div>
         )}
 

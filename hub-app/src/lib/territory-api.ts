@@ -230,6 +230,7 @@ export interface TerritoryListItem {
   number: string;
   name: string;
   description: string | null;
+  type?: string; // "territory" | "congregation_boundary"
   boundaries: unknown | null;
   createdAt: string;
   updatedAt: string;
@@ -242,9 +243,12 @@ export interface TerritoryListItem {
   }>;
 }
 
-export function listTerritories(token: string, opts?: { lite?: boolean }): Promise<TerritoryListItem[]> {
-  const q = opts?.lite ? "?lite=true" : "";
-  return apiFetch(`/territories${q}`, token);
+export function listTerritories(token: string, opts?: { lite?: boolean; type?: string }): Promise<TerritoryListItem[]> {
+  const params = new URLSearchParams();
+  if (opts?.lite) params.set("lite", "true");
+  if (opts?.type) params.set("type", opts.type);
+  const q = params.toString();
+  return apiFetch(`/territories${q ? `?${q}` : ""}`, token);
 }
 
 export function getTerritory(id: string, token: string): Promise<TerritoryListItem> {

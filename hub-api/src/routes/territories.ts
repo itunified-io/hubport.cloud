@@ -33,12 +33,19 @@ type AssignBodyType = Static<typeof AssignBody>;
 export async function territoryRoutes(app: FastifyInstance): Promise<void> {
   // List all territories — requires territories.view
   // ?lite=true excludes boundaries for faster loading (list/board views)
-  app.get<{ Querystring: { lite?: string } }>(
+  // ?type=all includes congregation_boundary records (default: territory only)
+  app.get<{ Querystring: { lite?: string; type?: string } }>(
     "/territories",
     { preHandler: requirePermission(PERMISSIONS.TERRITORIES_VIEW) },
     async (request) => {
       const lite = request.query.lite === "true";
+      const typeFilter = request.query.type === "all"
+        ? undefined
+        : request.query.type === "congregation_boundary"
+          ? "congregation_boundary"
+          : "territory";
       const territories = await prisma.territory.findMany({
+        where: typeFilter ? { type: typeFilter } : undefined,
         orderBy: { number: "asc" },
         select: lite
           ? {
@@ -46,6 +53,7 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
               number: true,
               name: true,
               description: true,
+              type: true,
               createdAt: true,
               updatedAt: true,
               assignments: {

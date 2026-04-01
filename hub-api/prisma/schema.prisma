@@ -250,6 +250,7 @@ model Territory {
   number      String   @unique
   name        String
   description String?
+  type           String   @default("territory") // "territory" | "congregation_boundary"
   boundaries     Json? // GeoJSON for map display
   shareExcluded  Boolean  @default(false)
   createdAt      DateTime @default(now())

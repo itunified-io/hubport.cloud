@@ -273,6 +273,7 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
           data: {
             number: String(nextNum).padStart(3, "0"),
             name,
+            type: "congregation_boundary",
             boundaries,
           },
         });

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * MapLibre GL JS map instance lifecycle hook.
  *
  * Manages map creation, load state, and cleanup.
- * Provides helper methods for common operations including style switching.
+ * Uses a callback ref pattern so the map initializes correctly
+ * even when the container element appears after initial render.
  */
 
 export interface MapInstance {
@@ -103,7 +104,7 @@ export interface UseMapLibreReturn {
     bounds: [[number, number], [number, number]],
     options?: object,
   ) => void;
-  /** Switch map style — layers must be re-added after switch via onStyleReady */
+  /** Switch map style */
   changeStyle: (key: MapStyleKey) => void;
   /** Register a callback that fires when the style is loaded (after changeStyle) */
   onStyleReady: (cb: () => void) => void;
@@ -119,19 +120,25 @@ export function useMapLibre({
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeStyle, setActiveStyle] = useState<MapStyleKey>("street");
   const styleReadyCb = useRef<(() => void) | null>(null);
+  const initAttempted = useRef(false);
 
+  // Poll for container availability — handles late-appearing containers
+  // (e.g., when parent component shows loading state first)
   useEffect(() => {
-    if (!container.current) return;
+    if (mapRef.current) return; // Already initialized
+    if (initAttempted.current && !container.current) return;
 
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-    async function initMap() {
+    async function initMap(el: HTMLElement) {
+      initAttempted.current = true;
       try {
         const maplibregl = await import("maplibre-gl");
-        if (cancelled || !container.current) return;
+        if (cancelled) return;
 
         const map = new maplibregl.Map({
-          container: container.current,
+          container: el,
           style,
           center,
           zoom,
@@ -140,53 +147,57 @@ export function useMapLibre({
         mapRef.current = map;
 
         map.on("load", () => {
-          if (!cancelled) {
-            setIsLoaded(true);
-          }
+          if (!cancelled) setIsLoaded(true);
         });
       } catch {
-        console.warn(
-          "maplibre-gl not available. Install with: npm install maplibre-gl",
-        );
+        console.warn("maplibre-gl not available");
       }
     }
 
-    initMap();
+    // Try immediately
+    if (container.current) {
+      initMap(container.current);
+    } else {
+      // Poll every 100ms for container to appear (max 5s)
+      let attempts = 0;
+      pollTimer = setInterval(() => {
+        attempts++;
+        if (container.current) {
+          clearInterval(pollTimer!);
+          pollTimer = null;
+          initMap(container.current);
+        } else if (attempts > 50) {
+          clearInterval(pollTimer!);
+          pollTimer = null;
+        }
+      }, 100);
+    }
 
     return () => {
       cancelled = true;
+      if (pollTimer) clearInterval(pollTimer);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
       setIsLoaded(false);
+      initAttempted.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [container.current]);
+  }, []);
 
   const addSource = useCallback((id: string, data: object) => {
     const map = mapRef.current;
     if (!map) return;
-
-    if (map.getSource(id)) {
-      map.removeSource(id);
-    }
-
-    map.addSource(id, {
-      type: "geojson",
-      data,
-    });
+    if (map.getSource(id)) map.removeSource(id);
+    map.addSource(id, { type: "geojson", data });
   }, []);
 
   const addLayer = useCallback((layer: object, beforeId?: string) => {
     const map = mapRef.current;
     if (!map) return;
-
     const layerDef = layer as { id?: string };
-    if (layerDef.id && map.getLayer(layerDef.id)) {
-      map.removeLayer(layerDef.id);
-    }
-
+    if (layerDef.id && map.getLayer(layerDef.id)) map.removeLayer(layerDef.id);
     map.addLayer(layer, beforeId);
   }, []);
 
@@ -202,21 +213,12 @@ export function useMapLibre({
   const changeStyle = useCallback((key: MapStyleKey) => {
     const map = mapRef.current;
     if (!map) return;
-
-    const styleDef = MAP_STYLES[key];
     setActiveStyle(key);
-
-    map.setStyle(styleDef.url);
-
-    // After style loads, notify consumers to re-add layers
+    map.setStyle(MAP_STYLES[key].url);
     const handler = () => {
-      if (styleReadyCb.current) {
-        styleReadyCb.current();
-      }
+      if (styleReadyCb.current) styleReadyCb.current();
     };
-    // "styledata" fires when style is fully loaded
     map.on("styledata", handler);
-    // Clean up after one fire
     setTimeout(() => map.off("styledata", handler), 5000);
   }, []);
 

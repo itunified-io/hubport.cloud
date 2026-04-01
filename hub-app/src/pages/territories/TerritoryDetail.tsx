@@ -17,7 +17,7 @@ export function TerritoryDetail() {
   const [error, setError] = useState<string | null>(null);
   const [mapExpanded, setMapExpanded] = useState(false);
 
-  // Mini map
+  // Map — hook polls for container so it works even when initially hidden
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { isLoaded, mapRef, addSource, addLayer, fitBounds, activeStyle, changeStyle, onStyleReady } = useMapLibre({
     container: mapContainerRef,
@@ -38,53 +38,33 @@ export function TerritoryDetail() {
       .finally(() => setLoading(false));
   }, [token, id]);
 
-  /** Add territory boundary layers to map */
   const addBoundaryLayers = useCallback(() => {
     const t = territoryRef.current;
     if (!t?.boundaries) return;
 
     addSource("territory", {
       type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          properties: { number: t.number },
-          geometry: t.boundaries,
-        },
-      ],
+      features: [{
+        type: "Feature",
+        properties: { number: t.number },
+        geometry: t.boundaries,
+      }],
     });
 
     addLayer({
-      id: "territory-fill",
-      type: "fill",
-      source: "territory",
+      id: "territory-fill", type: "fill", source: "territory",
       paint: { "fill-color": "rgba(217, 119, 6, 0.25)", "fill-opacity": 0.8 },
     });
-
     addLayer({
-      id: "territory-outline",
-      type: "line",
-      source: "territory",
+      id: "territory-outline", type: "line", source: "territory",
       paint: { "line-color": "#b45309", "line-width": 3 },
     });
-
     addLayer({
-      id: "territory-label",
-      type: "symbol",
-      source: "territory",
-      layout: {
-        "text-field": ["get", "number"],
-        "text-size": 16,
-        "text-font": ["Open Sans Bold"],
-      },
-      paint: {
-        "text-color": "#1e293b",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 2,
-      },
+      id: "territory-label", type: "symbol", source: "territory",
+      layout: { "text-field": ["get", "number"], "text-size": 16, "text-font": ["Open Sans Bold"] },
+      paint: { "text-color": "#1e293b", "text-halo-color": "#ffffff", "text-halo-width": 2 },
     });
 
-    // Fit bounds
     let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
     const flatten = (c: unknown): void => {
       if (Array.isArray(c) && typeof c[0] === "number") {
@@ -98,12 +78,9 @@ export function TerritoryDetail() {
       }
     };
     flatten((t.boundaries as { coordinates: unknown }).coordinates);
-    if (minLng < 180) {
-      fitBounds([[minLng, minLat], [maxLng, maxLat]]);
-    }
+    if (minLng < 180) fitBounds([[minLng, minLat], [maxLng, maxLat]]);
   }, [addSource, addLayer, fitBounds]);
 
-  // Register style-change callback
   useEffect(() => {
     onStyleReady(() => {
       layerAdded.current = false;
@@ -112,24 +89,25 @@ export function TerritoryDetail() {
     });
   }, [onStyleReady, addBoundaryLayers]);
 
-  // Render boundary on mini map
   useEffect(() => {
     if (!isLoaded || !territory?.boundaries || layerAdded.current) return;
-
     addBoundaryLayers();
     layerAdded.current = true;
   }, [isLoaded, territory, addBoundaryLayers]);
 
-  // Resize map when expanded/collapsed
   useEffect(() => {
     const map = mapRef.current;
     if (map && isLoaded) {
-      // Small delay to let CSS transition finish
       const timer = setTimeout(() => map.resize(), 350);
       return () => clearTimeout(timer);
     }
   }, [mapExpanded, mapRef, isLoaded]);
 
+  const hasBoundary = !!territory?.boundaries;
+  const activeAssignment = territory?.assignments.find((a) => !a.returnedAt);
+  const pastAssignments = territory?.assignments.filter((a) => a.returnedAt) ?? [];
+
+  // Loading state — simple, no complex layout
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -148,10 +126,6 @@ export function TerritoryDetail() {
       </div>
     );
   }
-
-  const activeAssignment = territory.assignments.find((a) => !a.returnedAt);
-  const pastAssignments = territory.assignments.filter((a) => a.returnedAt);
-  const hasBoundary = !!territory.boundaries;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -182,36 +156,33 @@ export function TerritoryDetail() {
         </button>
       </div>
 
-      {/* Main content grid */}
+      {/* Content grid */}
       <div className={mapExpanded ? "space-y-6" : "grid grid-cols-1 lg:grid-cols-3 gap-6"}>
-        {/* Map — takes 2 cols on large, or full width when expanded */}
+        {/* Map panel */}
         <div className={`${mapExpanded ? "" : "lg:col-span-2"} border border-[var(--border)] rounded-[var(--radius)] overflow-hidden bg-[var(--bg-1)] relative`}>
-          {hasBoundary ? (
-            <div
-              ref={mapContainerRef}
-              className={`w-full transition-[height] duration-300 ${mapExpanded ? "h-[70vh]" : "h-80"}`}
-            />
-          ) : (
-            <>
-              <div ref={mapContainerRef} className="hidden" />
-              <div className="h-80 flex items-center justify-center">
-                <div className="text-center">
-                  <MapPin size={36} className="text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
-                  <p className="text-sm text-[var(--text-muted)]">
-                    <FormattedMessage id="territories.noBoundary" defaultMessage="No boundary defined" />
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1 opacity-60">
-                    <FormattedMessage id="territories.importBoundary" defaultMessage="Import via CSV or draw on map" />
-                  </p>
-                </div>
+          {/* Map container — always rendered for MapLibre init via polling */}
+          <div
+            ref={mapContainerRef}
+            className={`w-full transition-[height] duration-300 ${
+              hasBoundary
+                ? mapExpanded ? "h-[70vh]" : "h-80"
+                : "h-0 overflow-hidden"
+            }`}
+          />
+
+          {!hasBoundary && (
+            <div className="h-80 flex items-center justify-center">
+              <div className="text-center">
+                <MapPin size={36} className="text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
+                <p className="text-sm text-[var(--text-muted)]">
+                  <FormattedMessage id="territories.noBoundary" defaultMessage="No boundary defined" />
+                </p>
               </div>
-            </>
+            </div>
           )}
 
-          {/* Map controls overlay */}
           {hasBoundary && isLoaded && (
             <>
-              {/* Style switcher — top left */}
               <div className="absolute top-3 left-3 z-10 flex rounded-[var(--radius-sm)] overflow-hidden shadow-lg border border-[var(--border)]">
                 {(Object.keys(MAP_STYLES) as MapStyleKey[]).map((key) => (
                   <button
@@ -227,12 +198,9 @@ export function TerritoryDetail() {
                   </button>
                 ))}
               </div>
-
-              {/* Expand/collapse — top right */}
               <button
                 onClick={() => setMapExpanded((v) => !v)}
                 className="absolute top-3 right-3 z-10 p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
-                title={mapExpanded ? "Collapse" : "Expand"}
               >
                 {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
@@ -242,7 +210,6 @@ export function TerritoryDetail() {
 
         {/* Info sidebar */}
         <div className={`space-y-4 ${mapExpanded ? "grid grid-cols-1 sm:grid-cols-3 gap-4 space-y-0" : ""}`}>
-          {/* Current assignment card */}
           <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-4">
             <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3 flex items-center gap-2">
               <User size={12} />
@@ -272,8 +239,7 @@ export function TerritoryDetail() {
             )}
           </div>
 
-          {/* Stats */}
-          <div className={`${mapExpanded ? "" : "grid grid-cols-2 gap-3"} ${mapExpanded ? "flex gap-3" : ""}`}>
+          <div className={`${mapExpanded ? "flex gap-3" : "grid grid-cols-2 gap-3"}`}>
             <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-3 text-center flex-1">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <Hash size={12} className="text-[var(--text-muted)]" />
@@ -296,31 +262,19 @@ export function TerritoryDetail() {
             </div>
           </div>
 
-          {/* Dates */}
           <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] p-4 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--text-muted)] flex items-center gap-1.5">
-                <Clock size={11} />
-                <FormattedMessage id="territories.created" defaultMessage="Created" />
-              </span>
-              <span className="text-[var(--text)]">
-                <FormattedDate value={territory.createdAt} />
-              </span>
+              <span className="text-[var(--text-muted)] flex items-center gap-1.5"><Clock size={11} /><FormattedMessage id="territories.created" defaultMessage="Created" /></span>
+              <span className="text-[var(--text)]"><FormattedDate value={territory.createdAt} /></span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--text-muted)] flex items-center gap-1.5">
-                <Clock size={11} />
-                <FormattedMessage id="territories.updated" defaultMessage="Updated" />
-              </span>
-              <span className="text-[var(--text)]">
-                <FormattedDate value={territory.updatedAt} />
-              </span>
+              <span className="text-[var(--text-muted)] flex items-center gap-1.5"><Clock size={11} /><FormattedMessage id="territories.updated" defaultMessage="Updated" /></span>
+              <span className="text-[var(--text)]"><FormattedDate value={territory.updatedAt} /></span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Assignment history */}
       {pastAssignments.length > 0 && (
         <div className="border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
           <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-2">
