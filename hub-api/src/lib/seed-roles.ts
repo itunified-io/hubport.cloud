@@ -251,6 +251,22 @@ const SYSTEM_ROLES: SeedRole[] = [
     ],
   },
   {
+    name: "Territory Servant",
+    description: "Territory management — draw, edit, assign, import boundaries",
+    scope: "all",
+    permissions: [
+      P.TERRITORIES_VIEW, P.TERRITORIES_EDIT, P.TERRITORIES_ASSIGN,
+      P.TERRITORIES_IMPORT, P.TERRITORIES_SHARE,
+      P.ADDRESSES_VIEW, P.ADDRESSES_EDIT, P.ADDRESSES_IMPORT,
+      P.OSM_REFRESH, P.OSM_EDIT,
+      P.GAP_DETECTION_VIEW, P.GAP_DETECTION_RUN,
+      P.ASSIGNMENTS_VIEW, P.ASSIGNMENTS_MANAGE,
+      P.PUBLISHERS_VIEW, P.CAMPAIGNS_VIEW,
+      P.MEETINGS_VIEW, P.FIELD_SERVICE_VIEW,
+      P.CHAT_VIEW, P.CHAT_SEND,
+    ],
+  },
+  {
     name: "Service Overseer Assistant",
     description: "Assists with territories and publisher records",
     scope: "all",
@@ -389,6 +405,35 @@ export async function seedSystemRoles(): Promise<void> {
         permissions: role.permissions,
         scope: role.scope,
         isSystem: true,
+      },
+    });
+  }
+}
+
+/**
+ * Bootstrap v1 boundary snapshots for existing territories.
+ * Creates a version record for each territory that has boundaries but no version records.
+ * Idempotent — safe to re-run on every deploy.
+ */
+export async function bootstrapBoundaryVersions(): Promise<void> {
+  const territories = await prisma.territory.findMany({
+    where: { boundaries: { not: { equals: null } } },
+    select: { id: true, boundaries: true },
+  });
+
+  for (const territory of territories) {
+    const existing = await prisma.territoryBoundaryVersion.findFirst({
+      where: { territoryId: territory.id },
+    });
+    if (existing) continue;
+
+    await prisma.territoryBoundaryVersion.create({
+      data: {
+        territoryId: territory.id,
+        version: 1,
+        boundaries: territory.boundaries as any,
+        changeType: "import",
+        changeSummary: "Initial snapshot from existing boundary",
       },
     });
   }

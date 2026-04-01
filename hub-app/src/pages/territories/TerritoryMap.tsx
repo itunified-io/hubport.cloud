@@ -4,7 +4,10 @@ import { useNavigate } from "react-router";
 import { ArrowLeft, Map, Plus, Loader2 } from "lucide-react";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLibre";
 import { useAuth } from "@/auth/useAuth";
-import { listTerritories, type TerritoryListItem } from "@/lib/territory-api";
+import { usePermissions } from "@/auth/PermissionProvider";
+import { listTerritories, createTerritory, type TerritoryListItem } from "@/lib/territory-api";
+import { NewTerritoryModal } from "./NewTerritoryModal";
+import { ViolationBadges } from "./ViolationBadges";
 
 /** Color palette for territory groups (by number prefix) */
 const GROUP_COLORS: Record<string, { fill: string; border: string; label: string }> = {
@@ -94,10 +97,12 @@ export function TerritoryMap() {
     zoom: 13,
   });
 
+  const { can } = usePermissions();
   const [territories, setTerritories] = useState<TerritoryListItem[]>([]);
   const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [groupInfo, setGroupInfo] = useState<Record<string, string>>({});
+  const [showNewModal, setShowNewModal] = useState(false);
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
   const congBoundaryRef = useRef<TerritoryListItem | null>(null);
@@ -323,14 +328,40 @@ export function TerritoryMap() {
         )}
 
         {/* New territory button — top right */}
-        <button
-          onClick={() => navigate("/territories/map?draw=true")}
-          className="absolute top-3 right-3 z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer shadow-lg"
-        >
-          <Plus size={16} />
-          <FormattedMessage id="territories.newTerritory" defaultMessage="New Territory" />
-        </button>
+        {can("app:territories.edit") && (
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="absolute top-3 right-3 z-10 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer shadow-lg"
+          >
+            <Plus size={16} />
+            <FormattedMessage id="territories.newTerritory" defaultMessage="New Territory" />
+          </button>
+        )}
+
+        {/* Violation warning badges */}
+        <ViolationBadges
+          map={mapRef.current}
+          token={token}
+          territories={territories}
+        />
       </div>
+
+      {/* New Territory modal */}
+      {showNewModal && (
+        <NewTerritoryModal
+          onCancel={() => setShowNewModal(false)}
+          onSubmit={async (number, name) => {
+            if (!token) return;
+            try {
+              const territory = await createTerritory(token, { number, name });
+              setShowNewModal(false);
+              navigate(`/territories/${territory.id}`);
+            } catch (err) {
+              console.error("Create territory failed:", err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

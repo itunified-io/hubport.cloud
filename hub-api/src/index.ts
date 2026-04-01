@@ -45,7 +45,7 @@ import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
 import { startAssignmentOverdueCheck } from './jobs/assignment-overdue-check.js';
 import { startCampaignAutoClose } from './jobs/campaign-auto-close.js';
-import { seedSystemRoles } from "./lib/seed-roles.js";
+import { seedSystemRoles, bootstrapBoundaryVersions } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
 
 
@@ -147,6 +147,10 @@ async function start(): Promise<void> {
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
     app.log.info("System roles up to date");
+
+    app.log.info("Bootstrapping boundary version snapshots...");
+    await bootstrapBoundaryVersions();
+    app.log.info("Boundary versions up to date");
 
     app.log.info("Upserting meeting slot templates...");
     await seedSlotTemplates();

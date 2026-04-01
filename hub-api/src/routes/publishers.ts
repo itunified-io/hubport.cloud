@@ -3,7 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { maskFields, audit } from "../lib/policy-engine.js";
-import { PERMISSIONS } from "../lib/permissions.js";
+import { PERMISSIONS, FLAG_TO_APP_ROLE } from "../lib/permissions.js";
 import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
 import { deleteKeycloakUser, assignKeycloakRole, removeKeycloakRole } from "../lib/keycloak-admin.js";
 
@@ -230,6 +230,54 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
       );
 
       return reply.code(204).send();
+    },
+  );
+
+  // Get roles assigned to a publisher (auto-mapped + manual split)
+  app.get<{ Params: IdParamsType }>(
+    "/publishers/:id/roles",
+    {
+      preHandler: requirePermission(PERMISSIONS.PUBLISHERS_VIEW),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+
+      const publisher = await prisma.publisher.findUnique({
+        where: { id },
+        select: {
+          congregationRole: true,
+          congregationFlags: true,
+          appRoles: {
+            include: { role: { select: { id: true, name: true, description: true, scope: true } } },
+          },
+        },
+      });
+
+      if (!publisher) {
+        return reply.code(404).send({ error: "Publisher not found" });
+      }
+
+      // Derive auto-mapped roles from congregation flags (stored as String[])
+      const flags = (publisher.congregationFlags as string[]) || [];
+      const autoMapped: Array<{ roleName: string; fromFlag: string }> = [];
+      for (const [flag, roleName] of Object.entries(FLAG_TO_APP_ROLE)) {
+        if (flags.includes(flag)) {
+          autoMapped.push({ roleName, fromFlag: flag });
+        }
+      }
+
+      // Manual roles = AppRoleMember records
+      const manual = publisher.appRoles.map((arm: any) => ({
+        id: arm.role.id,
+        name: arm.role.name,
+        description: arm.role.description,
+        scope: arm.role.scope,
+        validFrom: arm.validFrom,
+        validTo: arm.validTo,
+      }));
+
+      return reply.send({ autoMapped, manual });
     },
   );
 }

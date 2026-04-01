@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle, Lock } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
@@ -223,6 +223,7 @@ export function PublisherForm() {
   // ─── Role state ─────────────────────────────────────────────────
   const [assignedRoleIds, setAssignedRoleIds] = useState<Set<string>>(new Set());
   const [allRoles, setAllRoles] = useState<AppRole[]>([]);
+  const [autoMappedRoles, setAutoMappedRoles] = useState<Array<{ roleName: string; fromFlag: string }>>([]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
@@ -269,6 +270,12 @@ export function PublisherForm() {
           setNotes(p.notes ?? "");
           setSystemRole(p.role ?? "publisher");
           setAssignedRoleIds(new Set(p.appRoles.map((ar) => ar.roleId)));
+
+          // Fetch auto-mapped roles for the roles tab split view
+          fetch(`${apiUrl}/publishers/${id}/roles`, { headers })
+            .then((r) => r.json())
+            .then((data: any) => setAutoMappedRoles(data.autoMapped || []))
+            .catch(console.error);
         }
       } finally {
         setLoading(false);
@@ -941,9 +948,37 @@ export function PublisherForm() {
             </select>
           </div>
 
-          {/* App Roles */}
+          {/* Auto-Mapped Roles (from congregation flags) */}
+          {autoMappedRoles.length > 0 && (
+            <div className={sectionCls}>
+              <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                <FormattedMessage id="publishers.roles.autoMapped" defaultMessage="Auto-Mapped (from congregation flags)" />
+              </div>
+              <div className="space-y-1">
+                {autoMappedRoles.map((r) => (
+                  <div key={r.fromFlag} className="flex items-center gap-2 px-4 py-2.5 bg-green-500/5 border border-green-500/10 rounded-lg">
+                    <Lock size={12} className="text-green-500" />
+                    <span className="text-sm">{r.roleName}</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      (<FormattedMessage id="publishers.roles.fromFlag" defaultMessage="from flag" />)
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                <FormattedMessage
+                  id="publishers.roles.autoMappedHint"
+                  defaultMessage="These roles are set by congregation record flags and cannot be removed here."
+                />
+              </p>
+            </div>
+          )}
+
+          {/* Manual App Roles */}
           <div className={sectionCls}>
-            <SectionHeader id="publishers.allRoles" />
+            <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
+              <FormattedMessage id="publishers.roles.manual" defaultMessage="Manual Roles" />
+            </div>
             <div className="border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg)] divide-y divide-[var(--border)]">
               {allRoles.filter((r) => assignedRoleIds.has(r.id)).length === 0 ? (
                 <p className="px-4 py-3 text-sm text-[var(--text-muted)]">

@@ -264,6 +264,21 @@ model Territory {
   osmRefreshJobs   OsmRefreshQueue[]
   gapDetectionRuns GapDetectionRun[]
   shares           TerritoryShare[]
+  boundaryVersions TerritoryBoundaryVersion[]
+}
+
+model TerritoryBoundaryVersion {
+  id            String   @id @default(uuid())
+  territoryId   String
+  version       Int
+  boundaries    Json
+  changeType    String   // "creation" | "manual_edit" | "auto_clip" | "import" | "restore"
+  changeSummary String?
+  createdAt     DateTime @default(now())
+
+  territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+
+  @@index([territoryId, version])
 }
 
 model TerritoryAssignment {
