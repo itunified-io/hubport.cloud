@@ -283,9 +283,8 @@ export function TerritoryDetail() {
   };
 
   const handleCreationComplete = (coords: [number, number][]) => {
-    // Convert coords to GeoJSON Polygon
-    const closed = [...coords, coords[0]];
-    const geojson = { type: "Polygon", coordinates: [closed] };
+    // coords is already a closed ring from CreationFlow
+    const geojson = { type: "Polygon", coordinates: [coords] };
     handleBoundarySave(geojson);
   };
   const activeAssignment = territory?.assignments?.find((a) => !a.returnedAt);
@@ -371,7 +370,7 @@ export function TerritoryDetail() {
           <div
             ref={mapContainerRef}
             className={`w-full transition-[height] duration-300 ${
-              hasBoundary
+              hasBoundary || creationMode
                 ? mapExpanded ? "h-[70vh]" : "h-80"
                 : "h-0 overflow-hidden"
             }`}
@@ -397,13 +396,12 @@ export function TerritoryDetail() {
             </div>
           )}
 
-          {creationMode && !hasBoundary && (
-            <div className="h-80 relative">
-              <CreationFlow
-                onComplete={handleCreationComplete}
-                onCancel={() => setCreationMode(false)}
-              />
-            </div>
+          {creationMode && !hasBoundary && isLoaded && (
+            <CreationFlow
+              map={mapRef.current}
+              onComplete={handleCreationComplete}
+              onCancel={() => setCreationMode(false)}
+            />
           )}
 
           {hasBoundary && isLoaded && (
