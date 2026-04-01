@@ -12,7 +12,9 @@ import { queryBuildingsInBBox, type OverpassBuilding } from "../lib/osm-overpass
 // ─── Schemas ────────────────────────────────────────────────────────
 
 const RunBody = Type.Object({
-  territoryIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 20 }),
+  territoryIds: Type.Optional(
+    Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 20 }),
+  ),
 });
 type RunBodyType = Static<typeof RunBody>;
 
@@ -123,7 +125,21 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         gaps: { osmId: string; lat: number; lng: number; buildingType?: string; streetAddress?: string }[];
       }[] = [];
 
-      for (const territoryId of request.body.territoryIds) {
+      // If no territoryIds provided, run on all territories with boundaries
+      let ids = request.body.territoryIds;
+      if (!ids || ids.length === 0) {
+        const allTerritories = await prisma.territory.findMany({
+          where: { type: "territory", boundaries: { not: null } },
+          select: { id: true },
+          take: 20,
+        });
+        ids = allTerritories.map((t) => t.id);
+      }
+      if (ids.length === 0) {
+        return reply.code(400).send({ error: "No territories with boundaries found" });
+      }
+
+      for (const territoryId of ids) {
         const territory = await prisma.territory.findUnique({
           where: { id: territoryId },
         });

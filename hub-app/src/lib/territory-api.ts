@@ -345,8 +345,11 @@ export function getOsmQueue(token: string): Promise<OsmRefreshJob[]> {
 
 // ─── Gap Detection endpoints ────────────────────────────────────
 
-export function runGapDetection(token: string): Promise<GapDetectionRun> {
-  return apiFetch("/territories/gap-detection/run", token, { method: "POST" });
+export function runGapDetection(token: string, territoryIds?: string[]): Promise<GapDetectionRun> {
+  return apiFetch("/territories/gap-detection/run", token, {
+    method: "POST",
+    body: JSON.stringify(territoryIds ? { territoryIds } : {}),
+  });
 }
 
 export function getGapRuns(token: string): Promise<GapDetectionRun[]> {
