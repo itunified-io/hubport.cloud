@@ -10,10 +10,10 @@ Enhance the hubport.cloud PWA with secure offline capabilities: encrypted local 
 
 ## Requirements
 
-- Full offline mirror of all user-visible data (territories, addresses, visits, assignments, meetings)
+- Full offline mirror of all user-visible data (territories, addresses, visits, assignments, meetings, publishers)
 - Hybrid sync: auto on app open + manual "Sync now" button
 - Auto-push offline changes on reconnect with conflict resolution UI
-- AES-256-GCM encryption of all PII in IndexedDB, key derived from OIDC token
+- AES-256-GCM encryption of all PII in IndexedDB, key derived from stable OIDC `sub` claim
 - Persistent storage request + graceful re-sync fallback for iOS eviction
 - Online-first bootstrap (login once, then offline works)
 - Device registration: max 3 per user, self-service + admin visibility/revoke
@@ -32,20 +32,23 @@ Alternatives considered:
 
 ### Dexie Database Schema
 
-Database name: `hubportOffline`
+Database name: `hubportOffline-{tenantId}` (tenant-scoped to prevent data leakage between tenants)
 
-**Tables:**
+**Tables and Prisma model mapping:**
 
-| Table | Primary Key | Indexes | Encrypted Fields |
-|-------|------------|---------|-----------------|
-| territories | id | number, type | name, description, boundaries (GeoJSON) |
-| addresses | addressId | territoryId | streetAddress, city, postalCode, notes |
-| visits | visitId | addressId | notes |
-| assignments | id | territoryId | — |
-| meetingPoints | id | — | name, address |
-| meetings | id | meetingPointId, date | notes |
-| pendingChanges | id (auto) | table, status | payload |
-| syncMeta | key | — | — |
+| Dexie Table | Prisma Model | Primary Key | Indexes | Encrypted Fields |
+|-------------|-------------|------------|---------|-----------------|
+| territories | Territory | id | number, type | name, description, boundaries (GeoJSON) |
+| addresses | Address | id | territoryId | streetAddress, city, postalCode, notes |
+| visits | AddressVisit | id | addressId | notes |
+| assignments | TerritoryAssignment | id | territoryId | — |
+| meetingPoints | FieldServiceMeetingPoint | id | — | name, address |
+| campaignMeetingPoints | CampaignMeetingPoint | id | campaignId | name, address |
+| meetings | ServiceGroupMeeting | id | meetingPointId, date | notes |
+| publishers | Publisher | id | — | firstName, lastName (encrypted) |
+| territoryShares | TerritoryShare | id | territoryId | — |
+| pendingChanges | (client-only) | id (auto) | table, status | payload |
+| syncMeta | (client-only) | key | — | — |
 
 All syncable tables include: `version` (Int), `updatedAt` (DateTime), `syncedAt` (DateTime).
 
@@ -54,10 +57,11 @@ All syncable tables include: `version` (Int), `updatedAt` (DateTime), `syncedAt`
 **Algorithm:** AES-256-GCM via Web Crypto API (SubtleCrypto)
 
 **Key derivation:**
-1. OIDC `access_token` + `deviceId` → HMAC-SHA256 → seed
+1. OIDC `sub` claim (stable user ID, does not rotate) + `deviceId` → HMAC-SHA256 → seed
 2. seed → PBKDF2 (100K iterations, random salt) → AES-256 key
-3. Salt stored in `syncMeta` (not encrypted)
+3. Salt stored in `syncMeta` (not encrypted), generated once per device on first registration
 4. Key held in **memory only** — never persisted to storage
+5. The `/devices/encryption-key` endpoint returns the per-device salt (stored server-side). On app open, client fetches salt, then derives key locally using `sub + deviceId + salt`. No encryption key is ever transmitted over the wire.
 
 **What gets encrypted:**
 - PII fields: names, addresses, notes, phone numbers
@@ -72,13 +76,13 @@ All syncable tables include: `version` (Int), `updatedAt` (DateTime), `syncedAt`
 
 ### Storage Budget
 
-- Typical congregation (50 territories, 3000 addresses, 10K visits): ~5 MB
-- With encryption overhead (IV + padding, ~60%): ~8 MB
+- Typical congregation (50 territories, 3000 addresses, 10K visits): ~5 MB raw
+- With encryption overhead (12-byte IV + 16-byte auth tag per field + Base64 ~33%): ~8 MB estimated (overhead varies by field size — short name fields have higher relative overhead than large notes fields)
 - iOS Safari quota: 50-500 MB (~50% free disk), `navigator.storage.persist()` extends
 
 ### Storage Eviction Protection
 
-1. Request `navigator.storage.persist()` on first sync — iOS shows permission prompt
+1. Request `navigator.storage.persist()` on first sync — on iOS this resolves silently based on engagement heuristics (no user-facing prompt, unlike Chrome). Persistence is more likely granted for installed PWAs (Add to Home Screen).
 2. On every app open: check if Dexie tables exist and have data
 3. If data was evicted: trigger transparent re-sync from server
 4. Show brief "Refreshing offline data..." indicator during re-sync
@@ -89,11 +93,22 @@ All syncable tables include: `version` (Int), `updatedAt` (DateTime), `syncedAt`
 
 **Pull (Server → Client):**
 ```
-GET /sync/pull?since=<ISO-timestamp>
+GET /sync/pull?since=<ISO-timestamp>&cursor=<opaque-cursor>
 ```
 - Server queries all syncable tables for `updatedAt > since`
-- Returns delta payload grouped by table: `{ tables: { territories: { upserts: [...], deletes: ["id1"] }, ... }, hasMore: false }`
-- Pagination: if delta > 500 records, `hasMore: true` — client calls again with cursor
+- Returns delta payload grouped by table:
+```json
+{
+  "serverTime": "2026-04-01T12:30:00Z",
+  "cursor": "eyJ0IjoiYWRkcmVzc2VzIiwib2Zmc2V0Ijo1MDB9",
+  "tables": {
+    "territories": { "upserts": [...], "deletes": ["id1"] },
+    "addresses": { "upserts": [...], "deletes": [] }
+  },
+  "hasMore": false
+}
+```
+- Pagination: if delta > 500 records, `hasMore: true` + opaque `cursor` — client passes cursor on next request
 - Initial sync (no `since`): full dump of all user-visible data
 
 **Push (Client → Server):**
@@ -115,16 +130,33 @@ POST /sync/push
 }
 ```
 
+### Pending Changes Lifecycle
+
+The `pendingChanges.status` field tracks each mutation through its lifecycle:
+
+| Status | Meaning | Next Action |
+|--------|---------|-------------|
+| `pending` | Queued, not yet pushed | Include in next push |
+| `pushing` | Currently being sent to server | Wait for response |
+| `accepted` | Server accepted | Delete from pendingChanges |
+| `conflict` | Version mismatch | Show conflict UI, user resolves |
+| `failed` | Network error during push | Retry on next sync cycle |
+| `rejected` | Server validation error | Show error to user, discard or let user fix |
+
+On network failure mid-push: all `pushing` entries revert to `pending` for retry. On `rejected`: show inline error notification, keep in pendingChanges until user dismisses (acknowledges the error) — then discard.
+
 ### Sync Triggers (iOS-Safe)
 
 | Trigger | Event | Behavior |
 |---------|-------|----------|
 | App open / resume | `visibilitychange` → `"visible"` | Auto-pull if lastSync > 5 min ago, auto-push pending |
 | Manual sync | User taps "Sync Now" button | Full pull + push cycle with progress indicator |
-| Reconnect | `navigator.onLine` → `true` | Push pending first, then pull updates |
+| Reconnect | `navigator.onLine` → `true` | Verify connectivity first (see below), then push + pull |
 | **NOT used** | Background Sync API, Periodic Background Sync | Not available on iOS Safari |
 
 All sync is foreground-only.
+
+**iOS `navigator.onLine` mitigation:** On iOS, `navigator.onLine` can return `true` when connected to WiFi without internet, and the `online` event can be delayed 10-30 seconds. Before attempting sync on reconnect, the sync engine performs a lightweight `HEAD /sync/status` request with a 5-second timeout. If it fails, sync is deferred and retried on next `visibilitychange` or manual trigger.
 
 ### Conflict Resolution
 
@@ -133,7 +165,10 @@ All sync is foreground-only.
 **Client-side conflict UI:** When push returns `status: "conflict"`:
 1. Show conflict dialog: "Address #42 was updated by another user"
 2. Side-by-side comparison of local vs server values
-3. Three actions: **Keep Mine** (force-push with server version) | **Use Theirs** (discard local change) | **Review Both** (field-by-field merge)
+3. Three actions:
+   - **Keep Mine** — client re-sends with `force: true` flag. Server bypasses version check and overwrites with client data, incrementing version. This is intentional data override, not a race-prone retry.
+   - **Use Theirs** — discard local change, update Dexie with server data, delete from pendingChanges.
+   - **Review Both** — field-by-field merge UI, user picks values per field, result pushed as new version.
 
 ### Backend Schema Changes
 
@@ -146,6 +181,8 @@ deletedAt  DateTime? // soft-delete for sync propagation
 
 Soft-delete (`deletedAt`) instead of hard delete — sync needs to propagate removals to all devices.
 
+**Migration strategy:** Adding `version Int @default(0)` and `deletedAt DateTime?` is non-destructive — both have defaults/are nullable. `Prisma db push` handles this safely. The version auto-increment middleware (`hub-api/src/middleware/version-middleware.ts`) must be registered in `app.ts` before any sync endpoint testing. Existing records start at version 0; first sync from any client will pull them with version 0.
+
 ## Section 3: Device Management
 
 ### Device Model
@@ -157,9 +194,10 @@ model Device {
   userId        String    // Keycloak sub
   deviceUuid    String    // client-generated UUID (localStorage)
   userAgent     String    // navigator.userAgent
-  platform      String    // navigator.platform (e.g. "iPhone", "Win32")
+  platform      String    // parsed from userAgentData or user-agent string
   screenSize    String    // e.g. "390x844"
   displayName   String    // auto-generated: "iPhone · Safari"
+  encSalt       String    // per-device PBKDF2 salt for encryption key derivation
   status        String    @default("active")  // active | revoked
   revokedAt     DateTime?
   revokedBy     String?   // admin userId who revoked
@@ -180,16 +218,17 @@ model Device {
 
 1. User logs in via Keycloak OIDC → token received
 2. Check `localStorage` for existing `hubport-device-id`
-3. If exists: `GET /devices/me` to verify status (active/revoked)
-4. If not exists: generate UUID, collect metadata (userAgent, platform, screenSize), `POST /devices/register`
-5. Server checks: user has < 3 active devices? Yes → 201 Created. No → 409 Conflict with list of existing devices
-6. On 409: show dialog "You have 3 registered devices. Remove one to use this device." User picks one → `DELETE /devices/:id` → retry register
-7. After registration: `POST /devices/encryption-key` → derive key → initial sync
+3. If exists: `GET /devices/me?deviceUuid=<uuid>` to verify status (active/revoked)
+4. If not exists: generate UUID, collect metadata, `POST /devices/register`
+5. Server checks: user has < 3 active devices? Yes → generate salt, 201 Created (returns salt). No → 409 Conflict with list of existing devices
+6. On 409: show dialog "You have 3 registered devices. Remove one to use this device." User picks one → `DELETE /devices/:id` (server verifies `device.userId === req.user.sub`) → retry register
+7. After registration: client derives encryption key locally (`sub + deviceId + salt` → HMAC → PBKDF2) → initial sync
 
 ### Device Identification
 
 - **UUID** generated via `crypto.randomUUID()`, stored in `localStorage` as `hubport-device-id`
-- **Metadata** collected automatically: `navigator.userAgent`, `navigator.platform`, `${screen.width}x${screen.height}`
+- **Platform** collected via `navigator.userAgentData?.platform` with fallback to user-agent string parsing (since `navigator.platform` is deprecated and returns generic values on modern browsers)
+- **Screen size:** `${screen.width}x${screen.height}`
 - **Display name** auto-generated server-side by parsing user-agent: e.g., "iPhone · Safari", "macOS · Chrome", "Android · Chrome"
 - Clearing browser data = new device registration (UUID lost)
 
@@ -211,7 +250,7 @@ Profile → Meine Geräte / My Devices:
 ### Revocation Flow
 
 1. Admin clicks "Revoke" → confirmation dialog with optional reason → `DELETE /admin/devices/:id`
-2. Server: status → "revoked", encryption key deleted, `revokedAt` + `revokeReason` stored
+2. Server: status → "revoked", `encSalt` cleared (key can no longer be derived), `revokedAt` + `revokeReason` stored
 3. Revoked device on next app open: `GET /devices/me` returns `{ status: "revoked", reason: "Lost device" }`
 4. App shows message: "Your device [iPad · Safari] was removed by admin. Reason: Lost device"
 5. Wipe all Dexie data, clear `localStorage` device ID, force re-login
@@ -221,26 +260,33 @@ Profile → Meine Geräte / My Devices:
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| POST | `/devices/register` | User | Register new device (checks limit) |
-| GET | `/devices/me` | User | Check this device status |
+| POST | `/devices/register` | User | Register new device (checks limit, rate-limited: 10/hour) |
+| GET | `/devices/me` | User | Check this device status (requires `deviceUuid` query param) |
 | GET | `/devices` | User | List own devices |
-| DELETE | `/devices/:id` | User | Remove own device |
+| DELETE | `/devices/:id` | User | Remove own device (server verifies `device.userId === req.user.sub`) |
 | GET | `/admin/devices` | Admin | List all devices (all users) |
 | DELETE | `/admin/devices/:id` | Admin | Revoke any device (with reason) |
-| POST | `/devices/encryption-key` | User | Get encryption key for this device |
+| GET | `/devices/encryption-salt` | User | Get per-device salt for key derivation |
+
+**Security notes:**
+- `POST /devices/register` is rate-limited to 10 requests per hour per user to prevent registration/deletion spam
+- `DELETE /devices/:id` (user endpoint) verifies `device.userId === req.user.sub` — users cannot delete other users' devices
+- `GET /devices/encryption-salt` requires valid device UUID matching the authenticated user
 
 ## Section 4: PWA Update Flow
 
 ### Current State
 
-- `registerType: "autoUpdate"` + `skipWaiting: true` — SW auto-activates without user consent
+- `registerType: "autoUpdate"` + `skipWaiting: true` (inside `workbox` block) + `clientsClaim: true` — SW auto-activates without user consent
 - Risky with offline data: new SW could activate during sync or break Dexie schema
 
 ### New Approach
 
-- `registerType: "prompt"` + `skipWaiting: false` — SW stays in "waiting" until app explicitly calls `skipWaiting()`
+- `registerType: "prompt"` at VitePWA plugin level
+- Remove `skipWaiting: true` and `clientsClaim: true` from `workbox` block — SW stays in "waiting" until app explicitly calls `skipWaiting()`
 - `useRegisterSW()` hook provides `needRefresh` boolean + `updateServiceWorker()` function
-- Build injects `__APP_VERSION__` from `package.json`
+- Build injects `__APP_VERSION__` from `package.json` via Vite `define`
+- Exclude sync/device endpoints from Workbox `api-cache` rule (see Modified Files)
 
 ### Version Enforcement
 
@@ -265,7 +311,7 @@ GET /sync/status → { "minClientVersion": "2026.4.0-1.23", "lastSync": "...", .
 
 ### Update Sequence
 
-1. Check `navigator.onLine` — if offline, show "connect first" and abort
+1. Check `navigator.onLine` + `HEAD /sync/status` — if offline, show "connect first" and abort
 2. Push all `pendingChanges` to server (`POST /sync/push`)
 3. Resolve any conflicts (conflict UI if needed)
 4. If Dexie schema version changed: `db.delete()` + recreate with new schema
@@ -316,9 +362,11 @@ model PushSubscription {
 | Type | Priority | Trigger | Deep Link | Can Disable |
 |------|----------|---------|-----------|-------------|
 | Territory assignment | High | Territory assigned/returned | `/territories/:id` | Yes |
-| Meeting update | Normal | Meeting created/changed/cancelled | `/field-service/meetings/:id` | Yes |
+| Meeting update | Normal | Meeting created/changed/cancelled | `/field-service` | Yes |
 | Sync conflict | Normal | Push returns conflict status | `/sync/conflicts` | Yes |
 | Device revoked | Critical | Admin revokes device | `/profile/devices` | No (always on) |
+
+Note: Deep link paths must be validated against the actual router configuration during implementation.
 
 ### iOS-Specific Requirements
 
@@ -355,7 +403,7 @@ Settings → Benachrichtigungen / Notifications:
 | `hub-app/src/pages/settings/NotificationSettings.tsx` | Per-type notification toggles |
 | `hub-app/src/pages/sync/ConflictsPage.tsx` | List of unresolved sync conflicts |
 | `hub-api/src/routes/sync.ts` | Sync endpoints: pull, push, status |
-| `hub-api/src/routes/devices.ts` | Device endpoints: register, list, revoke, encryption-key |
+| `hub-api/src/routes/devices.ts` | Device endpoints: register, list, revoke, encryption-salt |
 | `hub-api/src/routes/push.ts` | Push subscription endpoint + send notification helper |
 | `hub-api/src/lib/push-service.ts` | web-push wrapper, VAPID config, notification dispatch |
 | `hub-api/src/middleware/version-middleware.ts` | Prisma middleware: auto-increment version on mutations |
@@ -364,11 +412,11 @@ Settings → Benachrichtigungen / Notifications:
 
 | File | Changes |
 |------|---------|
-| `hub-app/vite.config.ts` | `registerType: "prompt"`, `skipWaiting: false`, `__APP_VERSION__` define |
+| `hub-app/vite.config.ts` | `registerType: "prompt"`, remove `skipWaiting`/`clientsClaim` from workbox, add `__APP_VERSION__` define, exclude `/api/sync/*` and `/api/devices/*` from `api-cache` runtimeCaching rule |
 | `hub-app/src/App.tsx` | Add `SyncStatusBar`, `UpdateBanner`, offline detection context |
 | `hub-app/package.json` | Add `dexie` dependency |
 | `hub-api/prisma/schema.prisma` | Add `Device`, `PushSubscription` models; add `version`, `deletedAt` to syncable models |
-| `hub-api/src/app.ts` | Register sync, devices, push route modules |
+| `hub-api/src/app.ts` | Register sync, devices, push route modules; register version-middleware |
 
 ## Dependencies
 
@@ -379,14 +427,19 @@ Settings → Benachrichtigungen / Notifications:
 
 ## Security Considerations
 
-- Encryption keys never persisted to disk — memory only, re-derived on each app open
-- Device revocation immediately invalidates encryption key server-side
+- Encryption key derived from stable `sub` claim (not rotating access token) — key remains consistent across token refreshes
+- Encryption salt stored per-device server-side; cleared on revocation making key re-derivation impossible
+- Keys never persisted to disk — memory only, re-derived on each app open from `sub + deviceId + salt`
 - PBKDF2 with 100K iterations makes brute-force key derivation impractical
 - Soft-delete ensures sync propagates data removal to all devices
 - Push subscription secrets (`p256dh`, `auth`) encrypted at rest per ADR-0082
 - VAPID private key stored in Vault per ADR-0083
 - Admin revoke wipes all local data on next app open — no residual plaintext
 - Device limit (3) bounds the attack surface of lost/stolen devices
+- `POST /devices/register` rate-limited to 10/hour per user
+- `DELETE /devices/:id` verifies ownership (`device.userId === req.user.sub`)
+- Dexie database tenant-scoped (`hubportOffline-{tenantId}`) to prevent cross-tenant data leakage
+- "Keep Mine" conflict resolution uses server-side `force: true` flag — intentional override, not race-prone retry
 
 ## iOS Compatibility Matrix
 
@@ -395,10 +448,11 @@ Settings → Benachrichtigungen / Notifications:
 | IndexedDB | 10+ | ✅ Fully supported |
 | Web Crypto (SubtleCrypto) | 15+ | ✅ AES-256-GCM, PBKDF2, HMAC |
 | Service Worker | 11.3+ | ✅ Caching, offline support |
-| `navigator.storage.persist()` | 15.2+ | ✅ Prevents eviction |
+| `navigator.storage.persist()` | 15.2+ | ✅ Silent heuristic (no prompt on iOS) |
 | Web Push (notifications) | 16.4+ | ⚠️ Installed PWA only |
 | `visibilitychange` event | 10+ | ✅ Reliable sync trigger |
-| `navigator.onLine` | 10+ | ⚠️ Can be delayed on iOS |
+| `navigator.onLine` | 10+ | ⚠️ Unreliable — mitigated with HEAD request probe |
 | `crypto.randomUUID()` | 15.4+ | ✅ Device ID generation |
+| `navigator.userAgentData` | ❌ | Not on iOS — fallback to UA string parsing |
 
 **Minimum supported:** iOS 15+ (full offline + encryption). Push notifications require iOS 16.4+.
