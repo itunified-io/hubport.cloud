@@ -50,12 +50,12 @@ function parseKmlPolygons(kml: string): ParsedPolygon[] {
   while ((placemarkMatch = placemarkRegex.exec(kml)) !== null) {
     const content = placemarkMatch[1]!;
 
-    // Extract name
-    const nameMatch = content.match(/<name>([^<]*)<\/name>/i);
+    // Extract name (handle xmlns="" attributes)
+    const nameMatch = content.match(/<name[^>]*>([^<]*)<\/name>/i);
     const name = nameMatch ? nameMatch[1]!.trim() : null;
 
-    // Extract coordinates from Polygon elements
-    const coordsRegex = /<coordinates>\s*([\s\S]*?)\s*<\/coordinates>/gi;
+    // Extract coordinates from Polygon elements (handle xmlns="" attributes)
+    const coordsRegex = /<coordinates[^>]*>\s*([\s\S]*?)\s*<\/coordinates>/gi;
     let coordsMatch: RegExpExecArray | null;
     const rings: number[][][] = [];
 
