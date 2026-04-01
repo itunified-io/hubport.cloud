@@ -1,7 +1,7 @@
 {
   "name": "@itunified-io/hubport.cloud",
   "private": true,
-  "version": "2026.04.01.7",
+  "version": "2026.04.01.8",
   "license": "MIT",
   "workspaces": [
     "central-api",
