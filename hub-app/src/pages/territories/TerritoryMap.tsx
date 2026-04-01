@@ -59,10 +59,10 @@ export function TerritoryMap() {
         "fill-color": [
           "case",
           ["get", "assigned"],
-          "#f59e0b33", // amber for assigned
-          "#22c55e22", // green for available
+          "rgba(217, 119, 6, 0.25)", // amber for assigned
+          "rgba(22, 163, 74, 0.18)", // green for available
         ],
-        "fill-opacity": 0.5,
+        "fill-opacity": 0.8,
       },
     });
 
@@ -75,8 +75,8 @@ export function TerritoryMap() {
         "line-color": [
           "case",
           ["get", "assigned"],
-          "#f59e0b",
-          "#22c55e",
+          "#b45309",
+          "#15803d",
         ],
         "line-width": 2,
       },
@@ -89,13 +89,13 @@ export function TerritoryMap() {
       source: "territories",
       layout: {
         "text-field": ["get", "number"],
-        "text-size": 14,
+        "text-size": 13,
         "text-font": ["Open Sans Bold"],
         "text-allow-overlap": false,
       },
       paint: {
-        "text-color": "#ffffff",
-        "text-halo-color": "#000000",
+        "text-color": "#1e293b",
+        "text-halo-color": "#ffffff",
         "text-halo-width": 1.5,
       },
     });

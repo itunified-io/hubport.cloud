@@ -72,7 +72,7 @@ export function useMapLibre({
   container,
   center = [10.0, 48.0],
   zoom = 13,
-  style = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  style = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
 }: UseMapLibreOptions): UseMapLibreReturn {
   const mapRef = useRef<MapInstance | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
