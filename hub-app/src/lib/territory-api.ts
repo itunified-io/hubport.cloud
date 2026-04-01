@@ -509,3 +509,65 @@ export function getSnapContext(
 ): Promise<SnapContext> {
   return apiFetch(`/territories/snap-context?bbox=${encodeURIComponent(bbox)}`, token);
 }
+
+// ─── Field Work / Location Sharing API ─────────────────────────────
+
+export interface LocationShareData {
+  id: string;
+  fieldGroupId: string;
+  publisherId: string;
+  lastLatitude: number | null;
+  lastLongitude: number | null;
+  heading: number | null;
+  accuracy: number | null;
+  isActive: boolean;
+  expiresAt: string;
+  publisher?: { id: string; firstName: string; lastName: string };
+  fieldGroup?: {
+    id: string;
+    name: string | null;
+    status: string;
+    territoryIds: string[];
+  };
+}
+
+export function updateLocationShare(
+  fieldGroupId: string,
+  data: {
+    publisherId: string;
+    latitude: number;
+    longitude: number;
+    heading?: number | null;
+    accuracy?: number | null;
+  },
+  token: string,
+): Promise<LocationShareData> {
+  return apiFetch(`/field-groups/${fieldGroupId}/location-share/update`, token, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function getActiveLocations(token: string): Promise<LocationShareData[]> {
+  return apiFetch("/field-groups/active-locations", token);
+}
+
+export function generateJoinCode(
+  fieldGroupId: string,
+  token: string,
+): Promise<{ joinCode: string }> {
+  return apiFetch(`/field-groups/${fieldGroupId}/generate-code`, token, {
+    method: "POST",
+  });
+}
+
+export function joinFieldGroupByCode(
+  code: string,
+  publisherId: string,
+  token: string,
+): Promise<unknown> {
+  return apiFetch("/field-groups/join", token, {
+    method: "POST",
+    body: JSON.stringify({ code, publisherId }),
+  });
+}
