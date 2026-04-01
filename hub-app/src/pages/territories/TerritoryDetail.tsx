@@ -5,8 +5,9 @@ import {
   ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash,
   Layers, Maximize2, Minimize2, Home, Building, Trees,
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
-  ChevronDown, Check, X, Edit3,
+  ChevronDown, Check, X, Edit3, Save,
 } from "lucide-react";
+import { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import {
@@ -67,6 +68,9 @@ export function TerritoryDetail() {
 
   // Edit / creation state
   const [editMode, setEditMode] = useState(false);
+  const [editCoords, setEditCoords] = useState<[number, number][]>([]);
+  const [saving, setSaving] = useState(false);
+  const vertexMarkersRef = useRef<Marker[]>([]);
   const [creationMode, setCreationMode] = useState(false);
   const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
   const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
@@ -205,6 +209,142 @@ export function TerritoryDetail() {
     }
   }, [mapExpanded, mapRef, isLoaded]);
 
+  // ─── Polygon edit mode — vertex markers ─────────────────────
+
+  /** Extract ring coordinates from territory boundaries */
+  const extractRing = useCallback((boundaries: unknown): [number, number][] => {
+    const b = boundaries as { type?: string; coordinates?: number[][][] };
+    const ring = b?.coordinates?.[0];
+    if (!ring || ring.length < 3) return [];
+    return ring.map((c) => [c[0]!, c[1]!] as [number, number]);
+  }, []);
+
+  /** Enter edit mode — extract vertices and show markers */
+  const enterEditMode = useCallback(() => {
+    if (!territory?.boundaries) return;
+    const ring = extractRing(territory.boundaries);
+    if (ring.length < 3) return;
+    setEditCoords(ring);
+    setEditMode(true);
+    setMapExpanded(true);
+  }, [territory, extractRing]);
+
+  /** Update the map polygon source with current editCoords */
+  const updateMapPolygon = useCallback((coords: [number, number][]) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const src = map.getSource("territory") as { setData?: (d: unknown) => void } | undefined;
+    if (src?.setData) {
+      src.setData({
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          properties: { number: territory?.number ?? "" },
+          geometry: { type: "Polygon", coordinates: [coords] },
+        }],
+      });
+    }
+  }, [mapRef, territory?.number]);
+
+  /** Create draggable vertex markers */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !editMode || editCoords.length < 3) return;
+
+    // Clean old markers
+    vertexMarkersRef.current.forEach((m) => m.remove());
+    vertexMarkersRef.current = [];
+
+    // Skip closing vertex (last = first)
+    const uniqueCount = editCoords.length > 1 &&
+      editCoords[0]![0] === editCoords[editCoords.length - 1]![0] &&
+      editCoords[0]![1] === editCoords[editCoords.length - 1]![1]
+      ? editCoords.length - 1
+      : editCoords.length;
+
+    for (let i = 0; i < uniqueCount; i++) {
+      const coord = editCoords[i]!;
+      const el = document.createElement("div");
+      el.style.cssText = `
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #f59e0b; border: 2px solid white;
+        cursor: grab; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      `;
+
+      const marker = new Marker({ element: el, draggable: true })
+        .setLngLat([coord[0], coord[1]])
+        .addTo(map as any);
+
+      const idx = i;
+      marker.on("drag", () => {
+        const lngLat = marker.getLngLat();
+        setEditCoords((prev) => {
+          const next = [...prev];
+          next[idx] = [lngLat.lng, lngLat.lat];
+          // Keep ring closed
+          if (idx === 0 && next.length > 1) {
+            next[next.length - 1] = [lngLat.lng, lngLat.lat];
+          }
+          return next;
+        });
+      });
+
+      vertexMarkersRef.current.push(marker);
+    }
+
+    return () => {
+      vertexMarkersRef.current.forEach((m) => m.remove());
+      vertexMarkersRef.current = [];
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, editCoords.length, mapRef]);
+
+  /** Live-update polygon on map as vertices are dragged */
+  useEffect(() => {
+    if (!editMode || editCoords.length < 3) return;
+    updateMapPolygon(editCoords);
+  }, [editMode, editCoords, updateMapPolygon]);
+
+  /** Save edited polygon — calls preview-fix then saves */
+  const handleEditSave = useCallback(async () => {
+    if (!token || !territory || editCoords.length < 4) return;
+    setSaving(true);
+    try {
+      const boundaries = { type: "Polygon", coordinates: [editCoords] };
+      const result = await previewFix(token, territory.id, boundaries);
+      if (result.geometryModified) {
+        // Show auto-fix preview dialog
+        setAutoFixResult(result);
+        setPendingBoundaries(result.clipped);
+      } else {
+        // No clipping needed — save directly
+        await updateTerritoryBoundaries(token, territory.id, result.clipped);
+        setEditMode(false);
+        vertexMarkersRef.current.forEach((m) => m.remove());
+        vertexMarkersRef.current = [];
+        const refreshed = await getTerritory(territory.id, token);
+        setTerritory(refreshed);
+        territoryRef.current = refreshed;
+        layerAdded.current = false;
+      }
+    } catch (err) {
+      console.error("Edit save failed:", err);
+    } finally {
+      setSaving(false);
+    }
+  }, [token, territory, editCoords]);
+
+  /** Cancel edit — restore original polygon */
+  const cancelEdit = useCallback(() => {
+    setEditMode(false);
+    vertexMarkersRef.current.forEach((m) => m.remove());
+    vertexMarkersRef.current = [];
+    // Restore original polygon on map
+    if (territory?.boundaries) {
+      updateMapPolygon(extractRing(territory.boundaries));
+    }
+  }, [territory, updateMapPolygon, extractRing]);
+
   // ─── Inline edit handlers ────────────────────────────────────
 
   const handleSaveBellCount = async (addr: Address) => {
@@ -271,12 +411,16 @@ export function TerritoryDetail() {
     try {
       await updateTerritoryBoundaries(token, territory.id, boundaries);
       setEditMode(false);
+      vertexMarkersRef.current.forEach((m) => m.remove());
+      vertexMarkersRef.current = [];
       setCreationMode(false);
       setAutoFixResult(null);
       setPendingBoundaries(null);
       const refreshed = await getTerritory(territory.id, token);
       setTerritory(refreshed);
       territoryRef.current = refreshed;
+      // Force map to re-render the updated polygon
+      layerAdded.current = false;
     } catch (err) {
       console.error("Save boundary failed:", err);
     }
@@ -439,27 +583,47 @@ export function TerritoryDetail() {
                 >
                   Field Work
                 </button>
-                {!editMode && (
-                  <button
-                    onClick={() => {
-                      if (can("app:territories.edit")) setEditMode(true);
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors shadow-lg ${
-                      can("app:territories.edit")
-                        ? "bg-amber-500/80 text-black hover:bg-amber-400 cursor-pointer"
-                        : "bg-[var(--bg-1)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
-                    }`}
-                  >
-                    <Edit3 size={13} />
-                    <FormattedMessage id="territories.edit" defaultMessage="Edit" />
-                  </button>
+                {!editMode ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        if (can("app:territories.edit")) enterEditMode();
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors shadow-lg ${
+                        can("app:territories.edit")
+                          ? "bg-amber-500/80 text-black hover:bg-amber-400 cursor-pointer"
+                          : "bg-[var(--bg-1)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
+                      }`}
+                    >
+                      <Edit3 size={13} />
+                      <FormattedMessage id="territories.edit" defaultMessage="Edit" />
+                    </button>
+                    <button
+                      onClick={() => setMapExpanded((v) => !v)}
+                      className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                    >
+                      {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleEditSave}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--green)] text-black rounded-[var(--radius-sm)] hover:opacity-90 transition-opacity cursor-pointer shadow-lg disabled:opacity-50"
+                    >
+                      <Save size={13} />
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                    >
+                      <X size={13} />
+                      Cancel
+                    </button>
+                  </>
                 )}
-                <button
-                  onClick={() => setMapExpanded((v) => !v)}
-                  className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
-                >
-                  {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                </button>
               </div>
               <MyLocationMarker
                 map={mapRef.current}
