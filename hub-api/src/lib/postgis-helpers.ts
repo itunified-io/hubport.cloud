@@ -1,4 +1,7 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaLike = any;
 
 /**
  * PostGIS helper functions wrapping raw SQL for geometry operations.
@@ -9,7 +12,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
  *  When waterMaskGeoJson is provided, subtracts water bodies via ST_Difference.
  */
 export async function upsertBoundary(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   territoryId: string,
   geojson: object,
   tenantId: string,
@@ -52,7 +55,7 @@ export async function upsertBoundary(
 
 /** Clear a territory boundary. */
 export async function clearBoundary(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   territoryId: string,
 ): Promise<void> {
   await prisma.$executeRaw`
@@ -65,7 +68,7 @@ export async function clearBoundary(
 
 /** Get a territory boundary as GeoJSON. */
 export async function getBoundaryAsGeoJSON(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   territoryId: string,
 ): Promise<object | null> {
   const result = await prisma.$queryRaw<{ boundaries: object }[]>`
@@ -79,7 +82,7 @@ export async function getBoundaryAsGeoJSON(
 
 /** Get all territory boundaries as a GeoJSON FeatureCollection. */
 export async function getAllBoundariesAsFeatureCollection(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
 ): Promise<object> {
   const rows = await prisma.$queryRaw<
     { id: string; number: string; name: string; boundaries: object }[]
@@ -91,7 +94,7 @@ export async function getAllBoundariesAsFeatureCollection(
 
   return {
     type: "FeatureCollection",
-    features: rows.map((r) => ({
+    features: rows.map((r: any) => ({
       type: "Feature",
       properties: {
         territoryId: r.id,
@@ -139,7 +142,7 @@ export function validateGeoJSONPolygon(
  * Throws 422 if result is empty (territory entirely outside congregation).
  */
 export async function clipToCongregation(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   geojson: object
 ): Promise<{ clipped: object; wasModified: boolean } | null> {
   // Find congregation boundary
@@ -184,7 +187,7 @@ export async function clipToCongregation(
  * Returns the clipped geometry and list of territories that were clipped from.
  */
 export async function clipToNeighbors(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   geojson: object,
   excludeTerritoryId: string | null
 ): Promise<{ clipped: object; removedFrom: Array<{ id: string; number: string; name: string }> }> {
@@ -246,7 +249,7 @@ export interface OverlapInfo {
  * Detect remaining overlaps with other territories (informational only).
  */
 export async function detectOverlaps(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   geojson: object,
   excludeTerritoryId: string | null
 ): Promise<OverlapInfo[]> {
@@ -288,7 +291,7 @@ export interface AutoFixResult {
  * Run the full auto-fix pipeline: validate → congregation clip → neighbor clip → overlap detect.
  */
 export async function runAutoFixPipeline(
-  prisma: PrismaClient,
+  prisma: PrismaLike,
   geojson: object,
   excludeTerritoryId: string | null
 ): Promise<AutoFixResult> {

@@ -3,6 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission, requireAnyPermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+import { runAutoFixPipeline, detectOverlaps, type AutoFixResult, type OverlapInfo } from "../lib/postgis-helpers.js";
 import {
   queryRoadsInBBox,
   queryBuildingsInBBox,
@@ -29,6 +30,32 @@ const AssignBody = Type.Object({
 });
 
 type AssignBodyType = Static<typeof AssignBody>;
+
+async function createBoundaryVersion(
+  territoryId: string,
+  boundaries: object,
+  changeType: string,
+  changeSummary?: string
+) {
+  const lastVersion = await prisma.territoryBoundaryVersion.findFirst({
+    where: { territoryId },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+  const nextVersion = (lastVersion?.version ?? 0) + 1;
+
+  await prisma.territoryBoundaryVersion.create({
+    data: {
+      territoryId,
+      version: nextVersion,
+      boundaries: boundaries as any,
+      changeType,
+      changeSummary,
+    },
+  });
+
+  return nextVersion;
+}
 
 export async function territoryRoutes(app: FastifyInstance): Promise<void> {
   // List all territories — requires territories.view
@@ -75,6 +102,89 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Detect violations across all territories for map badges
+  app.get(
+    "/territories/violations",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_VIEW)] },
+    async (_request, reply) => {
+      const territories = await prisma.territory.findMany({
+        where: { type: "territory", boundaries: { not: { equals: null } } },
+        select: { id: true, number: true, name: true, boundaries: true },
+      });
+
+      const congregation = await prisma.territory.findFirst({
+        where: { type: "congregation_boundary", boundaries: { not: { equals: null } } },
+        select: { boundaries: true },
+      });
+
+      const violations: Array<{
+        territoryId: string;
+        number: string;
+        name: string;
+        violations: string[];
+      }> = [];
+
+      for (const territory of territories) {
+        const territoryViolations: string[] = [];
+
+        // Check congregation boundary violation
+        if (congregation?.boundaries) {
+          const exceedsResult = await prisma.$queryRaw<Array<{ exceeds: boolean }>>`
+            SELECT NOT ST_CoveredBy(
+              ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)})),
+              ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(congregation.boundaries)}))
+            ) as exceeds
+          `;
+          if (exceedsResult[0]?.exceeds) {
+            territoryViolations.push("exceeds_boundary");
+          }
+        }
+
+        // Check neighbor overlaps
+        const overlaps = await detectOverlaps(
+          prisma,
+          territory.boundaries as object,
+          territory.id
+        );
+        for (const overlap of overlaps) {
+          territoryViolations.push(`overlaps_${overlap.number}`);
+        }
+
+        if (territoryViolations.length > 0) {
+          violations.push({
+            territoryId: territory.id,
+            number: territory.number,
+            name: territory.name,
+            violations: territoryViolations,
+          });
+        }
+      }
+
+      return reply.send(violations);
+    }
+  );
+
+  // Preview auto-fix for new territory (no ID to exclude)
+  app.post<{ Body: { boundaries: unknown } }>(
+    "/territories/preview-fix",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_EDIT)] },
+    async (request, reply) => {
+      const { boundaries } = request.body;
+      if (!boundaries) {
+        return reply.code(400).send({ error: "boundaries required" });
+      }
+      try {
+        const result = await runAutoFixPipeline(prisma, boundaries as object, null);
+        return reply.send(result);
+      } catch (err: any) {
+        if (err.statusCode === 422) {
+          return reply.code(422).send({ error: err.message });
+        }
+        throw err;
+      }
+    }
+  );
+
   // Get one territory with full assignment history — requires territories.view
   app.get<{ Params: IdParamsType }>(
     "/territories/:id",
@@ -107,11 +217,112 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       schema: { body: TerritoryBody },
     },
     async (request, reply) => {
+      const data = request.body;
+      let autoFix: AutoFixResult | undefined;
+
+      if (data.boundaries) {
+        try {
+          autoFix = await runAutoFixPipeline(prisma, data.boundaries as object, null);
+          data.boundaries = autoFix.clipped;
+        } catch (err: any) {
+          if (err.statusCode === 422) {
+            return reply.code(422).send({ error: err.message });
+          }
+          throw err;
+        }
+      }
+
       const territory = await prisma.territory.create({
-        data: request.body,
+        data: data as any,
       });
-      return reply.code(201).send(territory);
+
+      // Create v1 if boundaries were provided
+      if (data.boundaries) {
+        const changeSummary = autoFix?.applied.length
+          ? autoFix.applied.join("; ")
+          : undefined;
+        await createBoundaryVersion(
+          territory.id,
+          data.boundaries as object,
+          "creation",
+          changeSummary
+        );
+      }
+
+      return reply.code(201).send({ ...territory, autoFix });
     },
+  );
+
+  // Preview auto-fix without saving (dry run)
+  app.post<{ Params: { id: string }; Body: { boundaries: unknown } }>(
+    "/territories/:id/preview-fix",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_EDIT)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { boundaries } = request.body;
+      if (!boundaries) {
+        return reply.code(400).send({ error: "boundaries required" });
+      }
+      try {
+        const result = await runAutoFixPipeline(prisma, boundaries as object, id);
+        return reply.send(result);
+      } catch (err: any) {
+        if (err.statusCode === 422) {
+          return reply.code(422).send({ error: err.message });
+        }
+        throw err;
+      }
+    }
+  );
+
+  // List boundary versions (without full boundaries JSON)
+  app.get<{ Params: { id: string } }>(
+    "/territories/:id/versions",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_VIEW)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const versions = await prisma.territoryBoundaryVersion.findMany({
+        where: { territoryId: id },
+        select: {
+          id: true,
+          version: true,
+          changeType: true,
+          changeSummary: true,
+          createdAt: true,
+        },
+        orderBy: { version: "desc" },
+      });
+      return reply.send(versions);
+    }
+  );
+
+  // Preview restoring a previous version (dry run — no DB write)
+  app.post<{ Params: { id: string }; Body: { versionId: string } }>(
+    "/territories/:id/restore",
+    { preHandler: [requirePermission(PERMISSIONS.TERRITORIES_EDIT)] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { versionId } = request.body;
+      const version = await prisma.territoryBoundaryVersion.findFirst({
+        where: { id: versionId, territoryId: id },
+      });
+      if (!version) {
+        return reply.code(404).send({ error: "Version not found" });
+      }
+      try {
+        const result = await runAutoFixPipeline(
+          prisma,
+          version.boundaries as object,
+          id
+        );
+        return reply.send(result);
+      } catch (err: any) {
+        if (err.statusCode === 422) {
+          return reply.code(422).send({ error: err.message });
+        }
+        throw err;
+      }
+    }
   );
 
   // Update territory — requires territories.edit
@@ -122,17 +333,50 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: IdParams, body: TerritoryBody },
     },
     async (request, reply) => {
+      const { id } = request.params;
       const existing = await prisma.territory.findUnique({
-        where: { id: request.params.id },
+        where: { id },
       });
       if (!existing) {
         return reply.code(404).send({ error: "Not found" });
       }
-      const territory = await prisma.territory.update({
-        where: { id: request.params.id },
-        data: request.body,
-      });
-      return territory;
+
+      const data = request.body;
+
+      if (data.boundaries) {
+        try {
+          const autoFix = await runAutoFixPipeline(prisma, data.boundaries as object, id);
+          data.boundaries = autoFix.clipped;
+
+          const territory = await prisma.territory.update({
+            where: { id },
+            data: data as any,
+          });
+
+          const changeSummary = autoFix.applied.length > 0
+            ? autoFix.applied.join("; ")
+            : undefined;
+          await createBoundaryVersion(
+            id,
+            autoFix.clipped as object,
+            "manual_edit",
+            changeSummary
+          );
+
+          return reply.send({ ...territory, autoFix });
+        } catch (err: any) {
+          if (err.statusCode === 422) {
+            return reply.code(422).send({ error: err.message });
+          }
+          throw err;
+        }
+      } else {
+        const territory = await prisma.territory.update({
+          where: { id },
+          data: data as any,
+        });
+        return reply.send(territory);
+      }
     },
   );
 
