@@ -297,11 +297,18 @@ export function TerritoryDetail() {
     }
   }, [mapRef, territory?.number]);
 
-  /** Create draggable vertex markers */
+  /** Create draggable vertex markers + midpoint handles */
   useEffect(() => {
     const map = mapRef.current;
     const mgl = maplibreModule.current;
     if (!map || !mgl || !editMode || editCoords.length < 3) return;
+
+    // Hide vertex markers while auto-fix dialog is open
+    if (autoFixResult) {
+      vertexMarkersRef.current.forEach((m) => m.remove());
+      vertexMarkersRef.current = [];
+      return;
+    }
 
     // Clean old markers
     vertexMarkersRef.current.forEach((m) => m.remove());
@@ -321,14 +328,15 @@ export function TerritoryDetail() {
       return;
     }
 
+    // ── Vertex markers (amber circles) ──
     for (let i = 0; i < uniqueCount; i++) {
       const coord = editCoords[i]!;
       const el = document.createElement("div");
       el.style.cssText = `
-        width: 18px; height: 18px; border-radius: 50%;
-        background: #f59e0b; border: 3px solid white;
-        cursor: grab; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        z-index: 100; position: relative;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #f59e0b; border: 2px solid white;
+        cursor: grab; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        z-index: 10;
       `;
 
       const marker = new MarkerClass({ element: el, draggable: true })
@@ -352,18 +360,99 @@ export function TerritoryDetail() {
       vertexMarkersRef.current.push(marker);
     }
 
+    // ── Midpoint handles (small grey "+" circles between vertices) ──
+    for (let i = 0; i < uniqueCount; i++) {
+      const a = editCoords[i]!;
+      const b = editCoords[(i + 1) % uniqueCount]!;
+      const midLng = (a[0] + b[0]) / 2;
+      const midLat = (a[1] + b[1]) / 2;
+
+      const el = document.createElement("div");
+      el.style.cssText = `
+        width: 10px; height: 10px; border-radius: 50%;
+        background: rgba(100,116,139,0.6); border: 1.5px dashed white;
+        cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        z-index: 9; display: flex; align-items: center; justify-content: center;
+        font-size: 8px; color: white; font-weight: 700; line-height: 1;
+      `;
+      el.textContent = "+";
+      el.title = "Drag to add vertex";
+
+      const marker = new MarkerClass({ element: el, draggable: true })
+        .setLngLat([midLng, midLat])
+        .addTo(map as any);
+
+      const insertAfter = i; // insert new point after index i (before i+1)
+      marker.on("dragend", () => {
+        const lngLat = marker.getLngLat();
+        setEditCoords((prev) => {
+          const next = [...prev];
+          // Insert new vertex after the current index (+1 because ring is closed)
+          next.splice(insertAfter + 1, 0, [lngLat.lng, lngLat.lat]);
+          // Update closing vertex
+          if (next.length > 1) {
+            next[next.length - 1] = [next[0]![0], next[0]![1]];
+          }
+          return next;
+        });
+      });
+
+      vertexMarkersRef.current.push(marker);
+    }
+
     return () => {
       vertexMarkersRef.current.forEach((m) => m.remove());
       vertexMarkersRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, editCoords.length, mapRef, maplibreModule]);
+  }, [editMode, editCoords.length, mapRef, maplibreModule, autoFixResult]);
 
   /** Live-update polygon on map as vertices are dragged */
   useEffect(() => {
     if (!editMode || editCoords.length < 3) return;
     updateMapPolygon(editCoords);
   }, [editMode, editCoords, updateMapPolygon]);
+
+  /** Remove clip preview layers safely */
+  const removeClipPreview = useCallback((map: any) => {
+    if (!map) return;
+    if (map.getLayer("clip-preview-fill")) map.removeLayer("clip-preview-fill");
+    if (map.getLayer("clip-preview-outline")) map.removeLayer("clip-preview-outline");
+    if (map.getSource("clip-preview")) map.removeSource("clip-preview");
+  }, []);
+
+  /** Show clipped boundary preview when auto-fix dialog is open */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pendingBoundaries || !autoFixResult) {
+      removeClipPreview(map);
+      return;
+    }
+    // Show the clipped polygon as a green overlay
+    const geo = pendingBoundaries as { type?: string; coordinates?: number[][][] };
+    if (!geo?.coordinates) return;
+
+    removeClipPreview(map);
+
+    map.addSource("clip-preview", {
+      type: "geojson",
+      data: { type: "Feature", properties: {}, geometry: pendingBoundaries },
+    } as object);
+    map.addLayer({
+      id: "clip-preview-fill", type: "fill", source: "clip-preview",
+      paint: { "fill-color": "rgba(34, 197, 94, 0.3)", "fill-opacity": 0.8 },
+    } as object);
+    map.addLayer({
+      id: "clip-preview-outline", type: "line", source: "clip-preview",
+      paint: { "line-color": "#16a34a", "line-width": 3, "line-dasharray": [3, 2] },
+    } as object);
+
+    // Also update the territory polygon to show the original (for comparison)
+    updateMapPolygon(editCoords);
+
+    return () => removeClipPreview(map);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBoundaries, autoFixResult, mapRef, removeClipPreview]);
 
   /** Save edited polygon — calls preview-fix then saves */
   const handleEditSave = useCallback(async () => {
@@ -468,22 +557,18 @@ export function TerritoryDetail() {
 
   const saveBoundary = async (boundaries: unknown) => {
     if (!token || !territory) return;
-    try {
-      await updateTerritoryBoundaries(token, territory.id, boundaries);
-      setEditMode(false);
-      vertexMarkersRef.current.forEach((m) => m.remove());
-      vertexMarkersRef.current = [];
-      setCreationMode(false);
-      setAutoFixResult(null);
-      setPendingBoundaries(null);
-      const refreshed = await getTerritory(territory.id, token);
-      setTerritory(refreshed);
-      territoryRef.current = refreshed;
-      // Force map to re-render the updated polygon
-      layerAdded.current = false;
-    } catch (err) {
-      console.error("Save boundary failed:", err);
-    }
+    await updateTerritoryBoundaries(token, territory.id, boundaries);
+    setEditMode(false);
+    vertexMarkersRef.current.forEach((m) => m.remove());
+    vertexMarkersRef.current = [];
+    setCreationMode(false);
+    setAutoFixResult(null);
+    setPendingBoundaries(null);
+    const refreshed = await getTerritory(territory.id, token);
+    setTerritory(refreshed);
+    territoryRef.current = refreshed;
+    // Force map to re-render the updated polygon
+    layerAdded.current = false;
   };
 
   const handleCreationComplete = (coords: [number, number][]) => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 /**
  * MapLibre GL JS map instance lifecycle hook.
@@ -193,7 +194,18 @@ export function useMapLibre({
   const addSource = useCallback((id: string, data: object) => {
     const map = mapRef.current;
     if (!map) return;
-    if (map.getSource(id)) map.removeSource(id);
+    if (map.getSource(id)) {
+      // Remove all layers using this source before removing the source
+      const style = (map as any).getStyle?.();
+      if (style?.layers) {
+        for (const layer of style.layers) {
+          if ((layer as any).source === id && map.getLayer(layer.id)) {
+            map.removeLayer(layer.id);
+          }
+        }
+      }
+      map.removeSource(id);
+    }
     map.addSource(id, { type: "geojson", data });
   }, []);
 
