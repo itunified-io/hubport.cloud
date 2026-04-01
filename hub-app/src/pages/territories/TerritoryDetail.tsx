@@ -5,15 +5,15 @@ import {
   ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash,
   Layers, Maximize2, Minimize2, Home, Building, Trees,
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
-  ChevronDown, Check, X, Edit3, Save,
+  ChevronDown, Check, X, Edit3, Save, Wand2, AlertTriangle,
 } from "lucide-react";
 import type { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import {
   getTerritory, listTerritories, listAddresses, updateAddress,
-  previewFix, updateTerritoryBoundaries,
-  type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult,
+  previewFix, updateTerritoryBoundaries, getViolations,
+  type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult, type TerritoryViolation,
 } from "@/lib/territory-api";
 import { CreationFlow } from "./CreationFlow";
 import { AutoFixPreview } from "./AutoFixPreview";
@@ -76,6 +76,8 @@ export function TerritoryDetail() {
   const [creationMode, setCreationMode] = useState(false);
   const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
   const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
+  const [editViolations, setEditViolations] = useState<TerritoryViolation | null>(null);
+  const [autoFixing, setAutoFixing] = useState(false);
 
   // Address state
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -270,7 +272,7 @@ export function TerritoryDetail() {
     return ring.map((c) => [c[0]!, c[1]!] as [number, number]);
   }, []);
 
-  /** Enter edit mode — extract vertices and show markers */
+  /** Enter edit mode — extract vertices, show markers, fetch violations */
   const enterEditMode = useCallback(() => {
     if (!territory?.boundaries) return;
     const ring = extractRing(territory.boundaries);
@@ -278,7 +280,16 @@ export function TerritoryDetail() {
     setEditCoords(ring);
     setEditMode(true);
     setMapExpanded(true);
-  }, [territory, extractRing]);
+    // Fetch violations for this territory
+    if (token && territory.id) {
+      getViolations(token)
+        .then((all) => {
+          const mine = all.find((v) => v.territoryId === territory.id);
+          setEditViolations(mine ?? null);
+        })
+        .catch(() => setEditViolations(null));
+    }
+  }, [territory, extractRing, token]);
 
   /** Update the map polygon source with current editCoords */
   const updateMapPolygon = useCallback((coords: [number, number][]) => {
@@ -296,6 +307,30 @@ export function TerritoryDetail() {
       });
     }
   }, [mapRef, territory?.number]);
+
+  /** Auto-fix: run preview-fix on current polygon to resolve violations */
+  const runAutoFix = useCallback(async () => {
+    if (!token || !territory || editCoords.length < 4) return;
+    setAutoFixing(true);
+    try {
+      const boundaries = { type: "Polygon", coordinates: [editCoords] };
+      const result = await previewFix(token, territory.id, boundaries);
+      if (result.geometryModified) {
+        // Update polygon to the clipped version
+        const clipped = result.clipped as { type?: string; coordinates?: number[][][] };
+        if (clipped?.coordinates?.[0]) {
+          const newRing = clipped.coordinates[0].map((c: number[]) => [c[0]!, c[1]!] as [number, number]);
+          setEditCoords(newRing);
+          updateMapPolygon(newRing);
+        }
+        setEditViolations(null); // Violations resolved
+      }
+    } catch (err) {
+      console.error("Auto-fix failed:", err);
+    } finally {
+      setAutoFixing(false);
+    }
+  }, [token, territory, editCoords, updateMapPolygon]);
 
   /** Create draggable vertex markers + midpoint handles */
   useEffect(() => {
@@ -469,6 +504,7 @@ export function TerritoryDetail() {
         // No clipping needed — save directly
         await updateTerritoryBoundaries(token, territory.id, result.clipped);
         setEditMode(false);
+        setEditViolations(null);
         vertexMarkersRef.current.forEach((m) => m.remove());
         vertexMarkersRef.current = [];
         const refreshed = await getTerritory(territory.id, token);
@@ -486,6 +522,7 @@ export function TerritoryDetail() {
   /** Cancel edit — restore original polygon */
   const cancelEdit = useCallback(() => {
     setEditMode(false);
+    setEditViolations(null);
     vertexMarkersRef.current.forEach((m) => m.remove());
     vertexMarkersRef.current = [];
     // Restore original polygon on map
@@ -770,6 +807,34 @@ export function TerritoryDetail() {
                   </>
                 )}
               </div>
+
+              {/* Edit-mode violation panel */}
+              {editMode && editViolations && editViolations.violations.length > 0 && (
+                <div className="absolute bottom-3 left-3 right-3 z-10 bg-[var(--bg-1)]/95 backdrop-blur border border-amber-500/40 rounded-[var(--radius)] p-3 shadow-xl">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-amber-400 mb-1">
+                        <FormattedMessage id="territories.edit.violations" defaultMessage="Boundary issues detected" />
+                      </p>
+                      <ul className="space-y-0.5 mb-2">
+                        {editViolations.violations.map((v, i) => (
+                          <li key={i} className="text-[11px] text-[var(--text-muted)]">• {v}</li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={runAutoFix}
+                        disabled={autoFixing}
+                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-amber-500/80 text-black rounded-[var(--radius-sm)] hover:bg-amber-400 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Wand2 size={12} />
+                        {autoFixing ? "Fixing..." : <FormattedMessage id="territories.edit.autoFix" defaultMessage="Auto-Fix" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <MyLocationMarker
                 map={mapRef.current}
                 lat={gps.lat}

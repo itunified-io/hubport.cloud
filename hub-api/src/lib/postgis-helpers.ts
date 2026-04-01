@@ -273,7 +273,7 @@ export async function detectOverlaps(
       AND ST_Area(ST_Intersection(
         ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(geojson)})),
         ST_MakeValid(ST_GeomFromGeoJSON(t.boundaries::text))
-      )::geography) > 0.1
+      )::geography) > 1.0
   `;
 
   return overlaps;
