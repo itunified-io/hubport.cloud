@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.14
+
+### Inline Polygon Editing Fix (#273)
+- fix: wire up inline polygon editing on TerritoryDetail — edit button was noop
+- feat: draggable MapLibre vertex markers on polygon in edit mode
+- feat: Save/Cancel buttons with live polygon preview during drag
+- feat: auto-fix pipeline (congregation clip, neighbor clip) on save
+
 ## v2026.04.01.13
 
 ### Territory Editor Enhancement (#271)
