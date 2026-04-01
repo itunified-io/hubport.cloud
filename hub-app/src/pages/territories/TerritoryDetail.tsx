@@ -5,13 +5,18 @@ import {
   ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash,
   Layers, Maximize2, Minimize2, Home, Building, Trees,
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
-  ChevronDown, Check, X,
+  ChevronDown, Check, X, Edit3,
 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
+import { usePermissions } from "@/auth/PermissionProvider";
 import {
   getTerritory, listAddresses, updateAddress,
-  type TerritoryListItem, type Address, type AddressStatus,
+  previewFix, updateTerritoryBoundaries,
+  type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult,
 } from "@/lib/territory-api";
+import { CreationFlow } from "./CreationFlow";
+import { AutoFixPreview } from "./AutoFixPreview";
+import { VersionHistory } from "./VersionHistory";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
 import { useGpsTracker } from "@/hooks/useGpsTracker";
 import { MyLocationMarker, MY_LOCATION_MARKER_CSS } from "@/components/map/MyLocationMarker";
@@ -58,6 +63,13 @@ export function TerritoryDetail() {
   const [error, setError] = useState<string | null>(null);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("addresses");
+  const { can } = usePermissions();
+
+  // Edit / creation state
+  const [editMode, setEditMode] = useState(false);
+  const [creationMode, setCreationMode] = useState(false);
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
+  const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
 
   // Address state
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -237,6 +249,45 @@ export function TerritoryDetail() {
   // ─── Derived values ──────────────────────────────────────────
 
   const hasBoundary = !!territory?.boundaries;
+
+  // ─── Boundary save with auto-fix preview ────────────────────
+  const handleBoundarySave = async (boundaries: unknown) => {
+    if (!token || !territory) return;
+    try {
+      const result = await previewFix(token, territory.id, boundaries);
+      if (result.geometryModified) {
+        setAutoFixResult(result);
+        setPendingBoundaries(result.clipped);
+      } else {
+        await saveBoundary(result.clipped);
+      }
+    } catch (err) {
+      console.error("Preview fix failed:", err);
+    }
+  };
+
+  const saveBoundary = async (boundaries: unknown) => {
+    if (!token || !territory) return;
+    try {
+      await updateTerritoryBoundaries(token, territory.id, boundaries);
+      setEditMode(false);
+      setCreationMode(false);
+      setAutoFixResult(null);
+      setPendingBoundaries(null);
+      const refreshed = await getTerritory(territory.id, token);
+      setTerritory(refreshed);
+      territoryRef.current = refreshed;
+    } catch (err) {
+      console.error("Save boundary failed:", err);
+    }
+  };
+
+  const handleCreationComplete = (coords: [number, number][]) => {
+    // Convert coords to GeoJSON Polygon
+    const closed = [...coords, coords[0]];
+    const geojson = { type: "Polygon", coordinates: [closed] };
+    handleBoundarySave(geojson);
+  };
   const activeAssignment = territory?.assignments?.find((a) => !a.returnedAt);
   const pastAssignments = territory?.assignments?.filter((a) => a.returnedAt) ?? [];
 
@@ -326,14 +377,32 @@ export function TerritoryDetail() {
             }`}
           />
 
-          {!hasBoundary && (
+          {!hasBoundary && !creationMode && (
             <div className="h-80 flex items-center justify-center">
               <div className="text-center">
                 <MapPin size={36} className="text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
-                <p className="text-sm text-[var(--text-muted)]">
+                <p className="text-sm text-[var(--text-muted)] mb-3">
                   <FormattedMessage id="territories.noBoundary" defaultMessage="No boundary defined" />
                 </p>
+                {can("app:territories.edit") && (
+                  <button
+                    onClick={() => setCreationMode(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors mx-auto"
+                  >
+                    <MapPin size={16} />
+                    <FormattedMessage id="territories.drawBoundary" defaultMessage="Draw Boundary" />
+                  </button>
+                )}
               </div>
+            </div>
+          )}
+
+          {creationMode && !hasBoundary && (
+            <div className="h-80 relative">
+              <CreationFlow
+                onComplete={handleCreationComplete}
+                onCancel={() => setCreationMode(false)}
+              />
             </div>
           )}
 
@@ -372,6 +441,15 @@ export function TerritoryDetail() {
                 >
                   Field Work
                 </button>
+                {can("app:territories.edit") && !editMode && (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/80 text-black rounded-[var(--radius-sm)] hover:bg-amber-400 transition-colors cursor-pointer shadow-lg"
+                  >
+                    <Edit3 size={13} />
+                    <FormattedMessage id="territories.edit" defaultMessage="Edit" />
+                  </button>
+                )}
                 <button
                   onClick={() => setMapExpanded((v) => !v)}
                   className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
@@ -770,6 +848,35 @@ export function TerritoryDetail() {
           </div>
         )}
       </div>
+
+      {/* Version History */}
+      {hasBoundary && territory && (
+        <VersionHistory
+          territoryId={territory.id}
+          token={token}
+          canEdit={can("app:territories.edit")}
+          onRestore={(result) => {
+            if (result.geometryModified) {
+              setAutoFixResult(result);
+              setPendingBoundaries(result.clipped);
+            } else {
+              saveBoundary(result.clipped);
+            }
+          }}
+        />
+      )}
+
+      {/* Auto-Fix Preview dialog */}
+      {autoFixResult && (
+        <AutoFixPreview
+          result={autoFixResult}
+          onAccept={() => saveBoundary(pendingBoundaries)}
+          onCancel={() => {
+            setAutoFixResult(null);
+            setPendingBoundaries(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -510,6 +510,92 @@ export function getSnapContext(
   return apiFetch(`/territories/snap-context?bbox=${encodeURIComponent(bbox)}`, token);
 }
 
+// ─── Auto-Fix / Violations / Versions ──────────────────────────
+
+export interface OverlapInfo {
+  territoryId: string;
+  number: string;
+  name: string;
+  overlapAreaM2: number;
+}
+
+export interface AutoFixResult {
+  original: unknown;
+  clipped: unknown;
+  applied: string[];
+  overlaps: OverlapInfo[];
+  geometryModified: boolean;
+}
+
+export interface BoundaryVersion {
+  id: string;
+  version: number;
+  changeType: string;
+  changeSummary: string | null;
+  createdAt: string;
+}
+
+export interface TerritoryViolation {
+  territoryId: string;
+  number: string;
+  name: string;
+  violations: string[];
+}
+
+export function createTerritory(
+  token: string,
+  data: { number: string; name: string },
+): Promise<TerritoryListItem> {
+  return apiFetch("/territories", token, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateTerritoryBoundaries(
+  token: string,
+  territoryId: string,
+  boundaries: unknown,
+): Promise<TerritoryListItem & { autoFix?: AutoFixResult }> {
+  return apiFetch(`/territories/${territoryId}`, token, {
+    method: "PUT",
+    body: JSON.stringify({ boundaries }),
+  });
+}
+
+export function previewFix(
+  token: string,
+  territoryId: string | null,
+  boundaries: unknown,
+): Promise<AutoFixResult> {
+  const path = territoryId
+    ? `/territories/${territoryId}/preview-fix`
+    : "/territories/preview-fix";
+  return apiFetch(path, token, {
+    method: "POST",
+    body: JSON.stringify({ boundaries }),
+  });
+}
+
+export function getViolations(token: string): Promise<TerritoryViolation[]> {
+  return apiFetch("/territories/violations", token);
+}
+
+export function getVersions(token: string, territoryId: string): Promise<BoundaryVersion[]> {
+  return apiFetch(`/territories/${territoryId}/versions`, token);
+}
+
+export function restoreVersion(
+  token: string,
+  territoryId: string,
+  versionId: string,
+): Promise<AutoFixResult> {
+  return apiFetch(`/territories/${territoryId}/restore`, token, {
+    method: "POST",
+    body: JSON.stringify({ versionId }),
+  });
+}
+
 // ─── Field Work / Location Sharing API ─────────────────────────────
 
 export interface LocationShareData {
