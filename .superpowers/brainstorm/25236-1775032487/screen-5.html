@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predigtdienstgruppen UI-Ansicht</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 40px; }
+  h1 { font-size: 22px; color: #f5a623; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 32px; }
+
+  .mockups { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+
+  .mockup { background: #1a1a1a; border-radius: 12px; overflow: hidden; border: 2px solid #2a2a2a; }
+  .mockup.recommended { border-color: #f5a623; }
+  .mockup-header { background: #222; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .mockup-title { font-size: 14px; font-weight: 600; }
+  .mockup-badge { font-size: 10px; background: #f5a623; color: #000; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+  .mockup-body { padding: 16px; }
+
+  /* Calendar-style week view */
+  .week-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .day-header { font-size: 10px; text-align: center; color: #666; padding: 4px; font-weight: 600; }
+  .day-header.today { color: #f5a623; }
+  .day-cell { background: #222; border-radius: 6px; min-height: 80px; padding: 6px; }
+  .day-cell.today { border: 1px solid #f5a623; }
+  .day-num { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .day-num.today { color: #f5a623; font-weight: 600; }
+  .meeting-chip { background: rgba(74,222,128,0.15); border-left: 2px solid #4ade80; padding: 3px 6px; border-radius: 3px; font-size: 9px; margin-bottom: 3px; color: #4ade80; }
+  .meeting-chip.campaign { background: rgba(245,166,35,0.15); border-color: #f5a623; color: #f5a623; }
+  .meeting-chip .time { font-weight: 600; }
+  .meeting-chip .name { opacity: 0.8; }
+
+  /* List view */
+  .list-view {}
+  .list-date { font-size: 11px; color: #f5a623; font-weight: 600; padding: 8px 0 4px; border-bottom: 1px solid #333; margin-bottom: 8px; }
+  .list-item { display: flex; gap: 12px; padding: 10px; background: #222; border-radius: 8px; margin-bottom: 6px; }
+  .list-time { font-size: 12px; font-weight: 600; color: #4ade80; width: 45px; flex-shrink: 0; }
+  .list-content { flex: 1; }
+  .list-name { font-size: 13px; font-weight: 500; }
+  .list-meta { font-size: 11px; color: #888; margin-top: 2px; }
+  .list-signup { display: flex; gap: 4px; margin-top: 6px; }
+  .avatar { width: 22px; height: 22px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #999; }
+  .avatar.signed-up { background: rgba(74,222,128,0.2); color: #4ade80; }
+  .btn-small { font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid #444; color: #999; background: transparent; cursor: pointer; }
+  .btn-small.primary { border-color: #4ade80; color: #4ade80; }
+  .btn-small.signed { border-color: #f5a623; color: #f5a623; background: rgba(245,166,35,0.1); }
+
+  .question { margin-top: 24px; background: #1a1a1a; border-radius: 12px; padding: 20px; border-left: 3px solid #f5a623; }
+  .question-label { font-size: 11px; color: #f5a623; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .question-text { font-size: 15px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>Predigtdienstgruppen — UI-Ansicht</h1>
+<p class="subtitle">Wie soll die Hauptansicht für die Dienstgruppen-Planung aussehen?</p>
+
+<div class="mockups">
+  <!-- Option A: Calendar Week View -->
+  <div class="mockup recommended">
+    <div class="mockup-header">
+      <div class="mockup-title">A: Wochenkalender</div>
+      <div class="mockup-badge">EMPFOHLEN</div>
+    </div>
+    <div class="mockup-body">
+      <div class="week-view">
+        <div class="day-header">Mo</div>
+        <div class="day-header">Di</div>
+        <div class="day-header">Mi</div>
+        <div class="day-header today">Do</div>
+        <div class="day-header">Fr</div>
+        <div class="day-header">Sa</div>
+        <div class="day-header">So</div>
+
+        <div class="day-cell">
+          <div class="day-num">31</div>
+        </div>
+        <div class="day-cell">
+          <div class="day-num">1</div>
+          <div class="meeting-chip"><span class="time">09:30</span><br><span class="name">Königreichssaal</span></div>
+        </div>
+        <div class="day-cell">
+          <div class="day-num">2</div>
+        </div>
+        <div class="day-cell today">
+          <div class="day-num today">3</div>
+          <div class="meeting-chip"><span class="time">17:00</span><br><span class="name">Stadtpark</span></div>
+          <div class="meeting-chip campaign"><span class="time">18:30</span><br><span class="name">Gedächtn.</span></div>
+        </div>
+        <div class="day-cell">
+          <div class="day-num">4</div>
+        </div>
+        <div class="day-cell">
+          <div class="day-num">5</div>
+          <div class="meeting-chip"><span class="time">10:00</span><br><span class="name">Königreichssaal</span></div>
+          <div class="meeting-chip"><span class="time">14:00</span><br><span class="name">Bahnhof</span></div>
+        </div>
+        <div class="day-cell">
+          <div class="day-num">6</div>
+          <div class="meeting-chip"><span class="time">10:00</span><br><span class="name">Briefkasten</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: List View -->
+  <div class="mockup">
+    <div class="mockup-header">
+      <div class="mockup-title">B: Listenansicht</div>
+    </div>
+    <div class="mockup-body">
+      <div class="list-view">
+        <div class="list-date">Dienstag, 1. April 2026</div>
+        <div class="list-item">
+          <div class="list-time">09:30</div>
+          <div class="list-content">
+            <div class="list-name">📍 Königreichssaal</div>
+            <div class="list-meta">Leiter: Br. Müller · Gebiet 12, 14</div>
+            <div class="list-signup">
+              <div class="avatar signed-up">SM</div>
+              <div class="avatar signed-up">KL</div>
+              <div class="avatar">+3</div>
+              <button class="btn-small signed">✓ Angemeldet</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="list-date">Donnerstag, 3. April 2026</div>
+        <div class="list-item">
+          <div class="list-time">17:00</div>
+          <div class="list-content">
+            <div class="list-name">📍 Stadtpark-Eingang</div>
+            <div class="list-meta">Leiter: Br. Schmidt · Gebiet 8</div>
+            <div class="list-signup">
+              <div class="avatar signed-up">JP</div>
+              <button class="btn-small primary">Anmelden</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <div class="list-time">18:30</div>
+          <div class="list-content">
+            <div class="list-name">📢 Gedächtnismahl-Einladung</div>
+            <div class="list-meta">Kampagne · Leiter: Br. Weber · Gebiet 1-5</div>
+            <div class="list-signup">
+              <div class="avatar signed-up">SM</div>
+              <div class="avatar signed-up">KL</div>
+              <div class="avatar signed-up">JP</div>
+              <div class="avatar">+8</div>
+              <button class="btn-small signed">✓ Angemeldet</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="question">
+  <div class="question-label">Frage 5 von 5</div>
+  <div class="question-text">
+    Welche Hauptansicht für die Predigtdienstgruppen-Planung?<br><br>
+    <strong>A)</strong> Wochenkalender — kompakter Überblick, Termine als Chips, gut für Planung<br>
+    <strong>B)</strong> Listenansicht — detaillierter, zeigt Anmeldungen + Leiter direkt, gut für Anmeldung<br>
+    <strong>C)</strong> Beides — Kalender als Default, Toggle zu Liste (wie Meeting-Planner)
+  </div>
+</div>
+
+</body>
+</html>

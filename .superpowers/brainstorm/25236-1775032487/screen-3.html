@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predigtdienst — Vollständiger Scope</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 40px; }
+  h1 { font-size: 22px; color: #f5a623; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 32px; }
+
+  .architecture { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 32px; }
+  .layer { background: #1a1a1a; border-radius: 12px; padding: 20px; border: 2px solid #2a2a2a; }
+  .layer.highlight { border-color: #f5a623; }
+  .layer-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #f5a623; margin-bottom: 12px; }
+  .layer-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+  .entity { background: #222; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .entity-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .entity-desc { font-size: 11px; color: #888; line-height: 1.4; }
+  .entity-fields { margin-top: 8px; }
+  .entity-field { font-size: 11px; color: #666; font-family: monospace; }
+  .tag { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 99px; font-weight: 600; margin-left: 6px; }
+  .tag.new { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .tag.exists { background: #333; color: #888; }
+  .tag.extended { background: rgba(96,165,250,0.15); color: #60a5fa; }
+
+  .sidebar-final { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 32px; }
+  .sidebar-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #f5a623; }
+  .sidebar-mock { background: #111; border-radius: 8px; padding: 12px; max-width: 260px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: #999; }
+  .nav-item.active { background: rgba(245,166,35,0.1); color: #f5a623; }
+  .nav-group { margin-left: 16px; border-left: 1px solid #333; padding-left: 8px; }
+  .nav-group .nav-item { font-size: 12px; padding: 5px 8px; }
+
+  .relations { background: #1a1a1a; border-radius: 12px; padding: 24px; margin-bottom: 32px; }
+  .relations-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #f5a623; }
+  .rel-diagram { font-family: monospace; font-size: 12px; line-height: 1.8; color: #bbb; white-space: pre; background: #111; padding: 16px; border-radius: 8px; overflow-x: auto; }
+  .rel-diagram .new { color: #4ade80; }
+  .rel-diagram .exists { color: #888; }
+  .rel-diagram .arrow { color: #f5a623; }
+
+  .question { margin-top: 24px; background: #1a1a1a; border-radius: 12px; padding: 20px; border-left: 3px solid #f5a623; }
+  .question-label { font-size: 11px; color: #f5a623; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .question-text { font-size: 15px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>Predigtdienst — Vollständiger Scope</h1>
+<p class="subtitle">Drei Ebenen: Treffpunkte (dauerhaft) → Dienstgruppen-Planung → Aktionen (zeitbegrenzt)</p>
+
+<div class="architecture">
+  <!-- Layer 1: Meeting Points -->
+  <div class="layer highlight">
+    <div class="layer-label">Stammdaten</div>
+    <div class="layer-title">📍 Treffpunkte</div>
+    <div class="entity">
+      <div class="entity-name">MeetingPoint <span class="tag new">NEU</span></div>
+      <div class="entity-desc">Dauerhafter Treffpunkt für regelmäßigen Predigtdienst</div>
+      <div class="entity-fields">
+        <div class="entity-field">name, address, lat/lng</div>
+        <div class="entity-field">dayOfWeek, time</div>
+        <div class="entity-field">conductorId, assistantIds[]</div>
+        <div class="entity-field">territoryIds[]</div>
+        <div class="entity-field">maxParticipants?</div>
+        <div class="entity-field">isRecurring: true</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 2: Service Group Planning -->
+  <div class="layer highlight">
+    <div class="layer-label">Planung</div>
+    <div class="layer-title">📅 Dienstgruppen-Planung</div>
+    <div class="entity">
+      <div class="entity-name">ServiceGroupMeeting <span class="tag new">NEU</span></div>
+      <div class="entity-desc">Konkreter Diensttermin einer Dienstgruppe an einem Treffpunkt</div>
+      <div class="entity-fields">
+        <div class="entity-field">serviceGroupId → ServiceGroup</div>
+        <div class="entity-field">meetingPointId → MeetingPoint</div>
+        <div class="entity-field">date, time</div>
+        <div class="entity-field">conductorId</div>
+        <div class="entity-field">participants[] (Anmeldungen)</div>
+        <div class="entity-field">status: planned|active|completed</div>
+      </div>
+    </div>
+    <div class="entity">
+      <div class="entity-name">ServiceGroup <span class="tag exists">BESTEHT</span></div>
+      <div class="entity-desc">Bestehende Dienstgruppen aus dem Modul „Verkündiger"</div>
+      <div class="entity-fields">
+        <div class="entity-field">name, leaderId, members[]</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 3: Campaigns -->
+  <div class="layer">
+    <div class="layer-label">Zeitbegrenzt</div>
+    <div class="layer-title">📢 Aktionen</div>
+    <div class="entity">
+      <div class="entity-name">Campaign <span class="tag exists">BESTEHT</span></div>
+      <div class="entity-desc">Kampagne mit Lifecycle (Draft → Active → Closed)</div>
+    </div>
+    <div class="entity">
+      <div class="entity-name">CampaignMeetingPoint <span class="tag extended">ERWEITERT</span></div>
+      <div class="entity-desc">Kann jetzt regulären MeetingPoint referenzieren ODER eigenständig sein</div>
+      <div class="entity-fields">
+        <div class="entity-field">meetingPointId? → MeetingPoint</div>
+        <div class="entity-field">(oder standalone wie bisher)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="relations">
+  <div class="relations-title">Datenmodell-Beziehungen</div>
+  <pre class="rel-diagram"><span class="new">MeetingPoint</span> (dauerhaft, wiederkehrend)
+  <span class="arrow">├──→</span> <span class="new">ServiceGroupMeeting</span> (konkreter Termin)
+  <span class="arrow">│      ├──→</span> <span class="exists">ServiceGroup</span> (Dienstgruppe)
+  <span class="arrow">│      └──→</span> participants[] (Anmeldungen)
+  <span class="arrow">│</span>
+  <span class="arrow">└──→</span> <span class="exists">CampaignMeetingPoint</span> (optional verknüpft)
+         <span class="arrow">└──→</span> <span class="exists">Campaign</span></pre>
+</div>
+
+<div style="display: flex; gap: 24px;">
+  <div class="sidebar-final" style="flex: 0 0 260px;">
+    <div class="sidebar-title">Finales Sidebar-Menü</div>
+    <div class="sidebar-mock">
+      <div class="nav-item">📊 Dashboard</div>
+      <div class="nav-item">👥 Verkündiger</div>
+      <div class="nav-item">🗺️ Gebiete</div>
+      <div class="nav-group">
+        <div class="nav-item">📋 Board</div>
+        <div class="nav-item">🔍 Lückenerkennung</div>
+        <div class="nav-item">📤 Import</div>
+      </div>
+      <div class="nav-item active">📖 Predigtdienst</div>
+      <div class="nav-group">
+        <div class="nav-item">📢 Aktionen</div>
+        <div class="nav-item" style="color:#4ade80;">📍 Treffpunkte</div>
+        <div class="nav-item" style="color:#4ade80;">📅 Dienstgruppen</div>
+      </div>
+      <div class="nav-item">📆 Zusammenkünfte</div>
+      <div class="nav-group">
+        <div class="nav-item">📖 Planner</div>
+        <div class="nav-item">🗓️ Wochenende</div>
+        <div class="nav-item">🎤 Vorträge</div>
+      </div>
+      <div class="nav-item">✨ Reinigung</div>
+      <div class="nav-item">🤝 Sharing</div>
+      <div class="nav-item">📋 Protokoll</div>
+      <div class="nav-item">⚙️ Einstellungen</div>
+    </div>
+  </div>
+
+  <div style="flex: 1;">
+    <div class="question">
+      <div class="question-label">Frage 3 von ~5</div>
+      <div class="question-text">
+        Stimmt diese Struktur?<br><br>
+        <strong>1.</strong> <strong>Treffpunkte</strong> = Stammdaten (Ort, Zeit, Leiter) — dauerhaft, wiederkehrend<br>
+        <strong>2.</strong> <strong>Dienstgruppen-Planung</strong> = Konkreter Termin einer Dienstgruppe an einem Treffpunkt (Datum, Anmeldungen)<br>
+        <strong>3.</strong> <strong>Aktionen</strong> = Kampagnen können Treffpunkte übernehmen oder eigene temporäre anlegen<br><br>
+        Die Dienstgruppen (ServiceGroups) existieren bereits im System — wir verknüpfen sie mit Treffpunkten und konkreten Terminen.
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

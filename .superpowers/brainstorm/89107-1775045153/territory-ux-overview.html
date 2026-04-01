@@ -1,0 +1,252 @@
+<h2>Territory Field Service UX — Proposed Design</h2>
+<p class="subtitle">Two features: Quick-Action Visit Logging + GPS Location with Sharing</p>
+
+<div class="section">
+  <h3>Feature A: Quick-Action Visit Logging</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Map View — Tap Building</div>
+      <div class="mockup-body" style="background:#1a1a2e;color:#e0e0e0;padding:0;position:relative;min-height:350px;">
+        <!-- Map background -->
+        <div style="background:linear-gradient(135deg,#2d4a3e,#1a3a2e);width:100%;height:250px;position:relative;overflow:hidden;">
+          <!-- Streets -->
+          <div style="position:absolute;top:80px;left:0;right:0;height:3px;background:rgba(255,255,255,0.15);"></div>
+          <div style="position:absolute;top:160px;left:0;right:0;height:3px;background:rgba(255,255,255,0.15);"></div>
+          <div style="position:absolute;top:0;bottom:0;left:120px;width:3px;background:rgba(255,255,255,0.15);"></div>
+          <div style="position:absolute;top:0;bottom:0;left:280px;width:3px;background:rgba(255,255,255,0.15);"></div>
+
+          <!-- Buildings -->
+          <div style="position:absolute;top:30px;left:30px;width:70px;height:40px;background:rgba(100,140,120,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);">Str. 2</div>
+          <div style="position:absolute;top:95px;left:30px;width:70px;height:40px;background:rgba(100,140,120,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);">Str. 4</div>
+          <div style="position:absolute;top:95px;left:140px;width:120px;height:50px;background:rgba(245,180,60,0.3);border:2px solid #f5b43c;border-radius:3px;font-size:10px;display:flex;align-items:center;justify-content:center;color:#f5b43c;font-weight:600;">Str. 6a &nbsp;(tapped)</div>
+          <div style="position:absolute;top:170px;left:30px;width:70px;height:40px;background:rgba(220,60,60,0.3);border:1px solid rgba(220,60,60,0.5);border-radius:2px;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(220,100,100,0.8);">DNC</div>
+          <div style="position:absolute;top:170px;left:140px;width:70px;height:40px;background:rgba(60,180,80,0.3);border:1px solid rgba(60,180,80,0.5);border-radius:2px;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(80,200,100,0.8);">visited</div>
+          <div style="position:absolute;top:30px;left:140px;width:70px;height:40px;background:rgba(100,140,120,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;font-size:9px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);">Str. 8</div>
+
+          <!-- My location blue dot with heading -->
+          <div style="position:absolute;top:115px;left:300px;">
+            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid rgba(59,130,246,0.4);position:absolute;top:-18px;left:-2px;transform:rotate(-30deg);"></div>
+            <div style="width:14px;height:14px;background:#3b82f6;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(59,130,246,0.6);"></div>
+          </div>
+        </div>
+
+        <!-- Quick action popup -->
+        <div style="background:#252540;border-top:2px solid #f5b43c;padding:12px 16px;">
+          <div style="font-size:13px;color:#f5b43c;font-weight:600;margin-bottom:4px;">Sindelsdorfer Str. 6a</div>
+          <div style="font-size:11px;color:#888;margin-bottom:10px;">Residential &bull; 1 bell &bull; Last visit: —</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:60px;text-align:center;padding:10px 6px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:8px;cursor:pointer;">
+              <div style="font-size:18px;">&#x2714;</div>
+              <div style="font-size:9px;color:#22c55e;margin-top:2px;">Contacted</div>
+            </div>
+            <div style="flex:1;min-width:60px;text-align:center;padding:10px 6px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:8px;cursor:pointer;">
+              <div style="font-size:18px;">&#x1F3E0;</div>
+              <div style="font-size:9px;color:#f59e0b;margin-top:2px;">Not Home</div>
+            </div>
+            <div style="flex:1;min-width:60px;text-align:center;padding:10px 6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;cursor:pointer;">
+              <div style="font-size:18px;">&#x1F6AB;</div>
+              <div style="font-size:9px;color:#ef4444;margin-top:2px;">DNC</div>
+            </div>
+            <div style="flex:1;min-width:60px;text-align:center;padding:10px 6px;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);border-radius:8px;cursor:pointer;">
+              <div style="font-size:18px;">&#x1F4E8;</div>
+              <div style="font-size:9px;color:#94a3b8;margin-top:2px;">Letter</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">Address List — Sorted by Proximity</div>
+      <div class="mockup-body" style="background:#1a1a2e;color:#e0e0e0;padding:0;min-height:350px;">
+        <!-- GPS sort indicator -->
+        <div style="padding:8px 12px;background:rgba(59,130,246,0.1);border-bottom:1px solid rgba(59,130,246,0.2);display:flex;align-items:center;gap:6px;">
+          <span style="color:#3b82f6;font-size:14px;">&#x1F4CD;</span>
+          <span style="font-size:11px;color:#3b82f6;">Sorted by distance from you</span>
+        </div>
+
+        <!-- Address items -->
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(245,158,11,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#x1F3E0;</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Sindelsdorfer Str. 6a</div>
+            <div style="font-size:10px;color:#888;">12m away &bull; Residential</div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <div style="width:28px;height:28px;background:rgba(34,197,94,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;" title="Contacted">&#x2714;</div>
+            <div style="width:28px;height:28px;background:rgba(245,158,11,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;" title="Not Home">&#x1F3E0;</div>
+            <div style="width:28px;height:28px;background:rgba(239,68,68,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;" title="DNC">&#x1F6AB;</div>
+          </div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(100,140,120,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#x1F3E0;</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Sindelsdorfer Str. 8</div>
+            <div style="font-size:10px;color:#888;">45m away &bull; Residential</div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <div style="width:28px;height:28px;background:rgba(34,197,94,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x2714;</div>
+            <div style="width:28px;height:28px;background:rgba(245,158,11,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x1F3E0;</div>
+            <div style="width:28px;height:28px;background:rgba(239,68,68,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x1F6AB;</div>
+          </div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(34,197,94,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#x2714;</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;text-decoration:line-through;color:#666;">Sindelsdorfer Str. 4</div>
+            <div style="font-size:10px;color:#888;">67m away &bull; Contacted today</div>
+          </div>
+          <div style="font-size:10px;color:#22c55e;">Done</div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;opacity:0.5;">
+          <div style="width:36px;height:36px;background:rgba(239,68,68,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#x1F6AB;</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;color:#666;">Wiesenstraße 12</div>
+            <div style="font-size:10px;color:#888;">130m away &bull; Do Not Call</div>
+          </div>
+          <div style="font-size:10px;color:#ef4444;">DNC</div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;background:rgba(100,140,120,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#x1F3E0;</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Wiesenstraße 14</div>
+            <div style="font-size:10px;color:#888;">142m away &bull; Residential</div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <div style="width:28px;height:28px;background:rgba(34,197,94,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x2714;</div>
+            <div style="width:28px;height:28px;background:rgba(245,158,11,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x1F3E0;</div>
+            <div style="width:28px;height:28px;background:rgba(239,68,68,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">&#x1F6AB;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Feature C: GPS Location + Heading + Privacy</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">My Location on Territory Map</div>
+      <div class="mockup-body" style="background:#1a1a2e;color:#e0e0e0;padding:0;position:relative;min-height:300px;">
+        <div style="background:linear-gradient(135deg,#2d4a3e,#1a3a2e);width:100%;height:220px;position:relative;overflow:hidden;">
+          <!-- Territory boundary -->
+          <div style="position:absolute;top:20px;left:20px;right:20px;bottom:20px;border:2px dashed rgba(245,180,60,0.4);border-radius:4px;"></div>
+
+          <!-- Blue dot with heading cone -->
+          <div style="position:absolute;top:100px;left:150px;">
+            <!-- Heading cone (semi-transparent wedge pointing NW) -->
+            <div style="position:absolute;top:-35px;left:-15px;width:44px;height:40px;background:linear-gradient(to top, transparent, rgba(59,130,246,0.15));clip-path:polygon(50% 0%, 0% 100%, 100% 100%);transform:rotate(-20deg);"></div>
+            <!-- Accuracy circle -->
+            <div style="position:absolute;top:-15px;left:-15px;width:44px;height:44px;border-radius:50%;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.15);"></div>
+            <!-- Blue dot -->
+            <div style="width:14px;height:14px;background:#3b82f6;border-radius:50%;border:2px solid white;box-shadow:0 0 12px rgba(59,130,246,0.6);position:relative;z-index:1;"></div>
+          </div>
+
+          <!-- Label -->
+          <div style="position:absolute;top:85px;left:175px;font-size:10px;color:white;background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:3px;">You</div>
+        </div>
+
+        <!-- Location controls bar -->
+        <div style="padding:10px 12px;background:#252540;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;"></div>
+            <span style="font-size:11px;color:#aaa;">GPS active &bull; 3m accuracy</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;color:#888;">Share</span>
+            <div style="width:36px;height:20px;background:#3b82f6;border-radius:10px;position:relative;cursor:pointer;">
+              <div style="width:16px;height:16px;background:white;border-radius:50%;position:absolute;top:2px;right:2px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">Service Work Group (Leader View)</div>
+      <div class="mockup-body" style="background:#1a1a2e;color:#e0e0e0;padding:0;min-height:300px;">
+        <!-- Header -->
+        <div style="padding:10px 12px;background:rgba(245,180,60,0.1);border-bottom:1px solid rgba(245,180,60,0.2);display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#f5b43c;">Service Work Group</div>
+            <div style="font-size:10px;color:#888;">Meeting Point: Bahnhofstr. 5 &bull; Started 09:32</div>
+          </div>
+          <div style="padding:4px 10px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:10px;color:#ef4444;cursor:pointer;">End Session</div>
+        </div>
+
+        <!-- Member list -->
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:rgba(59,130,246,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #3b82f6;">B</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;">Benjamin B. <span style="font-size:10px;color:#3b82f6;">(you)</span></div>
+            <div style="font-size:10px;color:#888;">Territory 104 &bull; Sindelsdorfer Str.</div>
+          </div>
+          <div style="width:8px;height:8px;background:#22c55e;border-radius:50;"></div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:rgba(168,85,247,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #a855f7;">M</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;">Maria S.</div>
+            <div style="font-size:10px;color:#888;">Territory 104 &bull; Wiesenstraße</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;"></div>
+            <span style="font-size:10px;color:#22c55e;">sharing</span>
+          </div>
+        </div>
+
+        <div style="border-bottom:1px solid rgba(255,255,255,0.05);padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:rgba(245,158,11,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #f59e0b;">T</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;">Thomas K.</div>
+            <div style="font-size:10px;color:#888;">Territory 105 &bull; Hauptstraße</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:8px;height:8px;background:#666;border-radius:50%;"></div>
+            <span style="font-size:10px;color:#888;">not sharing</span>
+          </div>
+        </div>
+
+        <!-- Map preview with multiple dots -->
+        <div style="margin:12px;background:linear-gradient(135deg,#2d4a3e,#1a3a2e);border-radius:8px;height:100px;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:40px;left:80px;width:10px;height:10px;background:#3b82f6;border-radius:50%;border:2px solid white;box-shadow:0 0 8px rgba(59,130,246,0.5);"></div>
+          <div style="position:absolute;top:55px;left:160px;width:10px;height:10px;background:#a855f7;border-radius:50%;border:2px solid white;box-shadow:0 0 8px rgba(168,85,247,0.5);"></div>
+          <div style="position:absolute;top:30px;left:60px;font-size:8px;color:white;background:rgba(0,0,0,0.5);padding:1px 4px;border-radius:2px;">B</div>
+          <div style="position:absolute;top:45px;left:140px;font-size:8px;color:white;background:rgba(0,0,0,0.5);padding:1px 4px;border-radius:2px;">M</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Key Design Decisions</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px;">
+      <div style="font-size:12px;color:#f5b43c;font-weight:600;margin-bottom:8px;">Quick Actions</div>
+      <ul style="font-size:12px;color:#ccc;margin:0;padding-left:16px;line-height:1.8;">
+        <li>One-tap outcomes on map popup + address list</li>
+        <li>Building colors reflect status (green=visited, red=DNC, amber=not home)</li>
+        <li>Address list auto-sorts by GPS proximity</li>
+        <li>Already-visited + DNC addresses dimmed/struck-through</li>
+      </ul>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px;">
+      <div style="font-size:12px;color:#3b82f6;font-weight:600;margin-bottom:8px;">GPS + Privacy</div>
+      <ul style="font-size:12px;color:#ccc;margin:0;padding-left:16px;line-height:1.8;">
+        <li>Blue dot + heading cone + accuracy circle</li>
+        <li>Per-publisher "Share" toggle (independent)</li>
+        <li>Service work group: leader creates, publishers join, leader ends</li>
+        <li>Overseer dashboard: sees all sharing publishers</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</content>
+</invoke>

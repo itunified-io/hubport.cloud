@@ -83,6 +83,8 @@ const AddressUpdateBody = Type.Object({
   doNotVisitUntil: Type.Optional(Type.Union([Type.String({ format: "date-time" }), Type.Null()])),
   notes: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   sortOrder: Type.Optional(Type.Integer()),
+  // Frontend compat aliases
+  languageSpoken: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 type AddressUpdateBodyType = Static<typeof AddressUpdateBody>;
 
@@ -103,6 +105,26 @@ const VisitBody = Type.Object({
   notes: Type.Optional(Type.String()),
 });
 type VisitBodyType = Static<typeof VisitBody>;
+
+// ─── Response mapper ───────────────────────────────────────────
+// Maps Prisma Address fields to the names the frontend expects.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toApiAddress(addr: any) {
+  const { id, lat, lng, street, houseNumber, postcode, osmId, lastVisitAt, languages, ...rest } = addr;
+  return {
+    ...rest,
+    addressId: id,
+    streetAddress: [street, houseNumber].filter(Boolean).join(" ") || null,
+    apartment: rest.floor ?? null,
+    postalCode: postcode ?? null,
+    latitude: lat,
+    longitude: lng,
+    osmNodeId: osmId ?? null,
+    lastVisitDate: lastVisitAt?.toISOString?.() ?? lastVisitAt ?? null,
+    languageSpoken: Array.isArray(languages) && languages.length > 0 ? languages[0] : null,
+  };
+}
 
 export async function addressRoutes(app: FastifyInstance): Promise<void> {
   // ─── List addresses for a territory ──────────────────────────────
@@ -165,7 +187,7 @@ export async function addressRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      return addresses;
+      return addresses.map(toApiAddress);
     },
   );
 
@@ -200,7 +222,7 @@ export async function addressRoutes(app: FastifyInstance): Promise<void> {
         WHERE id = ${address.id}::uuid
       `;
 
-      return reply.code(201).send(address);
+      return reply.code(201).send(toApiAddress(address));
     },
   );
 
@@ -222,16 +244,20 @@ export async function addressRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: "Address not found" });
       }
 
-      const { doNotVisitUntil, ...rest } = request.body;
+      const { doNotVisitUntil, languageSpoken, ...rest } = request.body;
       const updated = await prisma.address.update({
         where: { id: request.params.addrId },
         data: {
           ...rest,
+          // Map frontend languageSpoken → backend languages array
+          ...(languageSpoken !== undefined
+            ? { languages: languageSpoken ? [languageSpoken] : [] }
+            : {}),
           doNotVisitUntil: doNotVisitUntil === null ? null : doNotVisitUntil ? new Date(doNotVisitUntil) : undefined,
         },
       });
 
-      return updated;
+      return toApiAddress(updated);
     },
   );
 
