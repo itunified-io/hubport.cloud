@@ -3,21 +3,30 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { resolve } from "path";
+import { readFileSync } from "fs";
+
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+) as { version: string };
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" mode: the app controls when to activate the waiting SW
+      // (via UpdateBanner + useRegisterSW). This replaces "autoUpdate" so
+      // we can push pending changes before applying the update.
+      registerType: "prompt",
       includeAssets: ["favicon.ico", "icons/*.png"],
       manifest: false,
       workbox: {
         // config.js is generated at container startup (runtime env injection)
         // — must never be cached by the service worker
         navigateFallbackDenylist: [/^\/config\.js$/],
-        skipWaiting: true,
-        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         maximumFileSizeToCacheInBytes: 5_000_000, // 5MB — matrix-js-sdk is large
         runtimeCaching: [
@@ -48,7 +57,12 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            // Cache general API responses but exclude sync and device endpoints
+            // (those must always go to the network for data integrity)
+            urlPattern: ({ url }: { url: URL }) =>
+              url.pathname.startsWith("/api/") &&
+              !url.pathname.startsWith("/api/sync/") &&
+              !url.pathname.startsWith("/api/devices/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",
