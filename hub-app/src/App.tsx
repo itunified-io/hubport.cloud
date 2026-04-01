@@ -5,6 +5,7 @@ import { Layout } from "./components/Layout";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { MyDevices } from "./pages/profile/MyDevices";
 import { DeviceAdmin } from "./pages/settings/DeviceAdmin";
+import { NotificationSettings } from "./pages/settings/NotificationSettings";
 import { Dashboard } from "./pages/Dashboard";
 import { PublisherList } from "./pages/publishers/PublisherList";
 import { PublisherForm } from "./pages/publishers/PublisherForm";
@@ -397,6 +398,15 @@ export function App() {
           element={
             <PermissionGuard requires="app:admin.devices.view">
               <DeviceAdmin />
+            </PermissionGuard>
+          }
+        />
+
+        <Route
+          path="/settings/notifications"
+          element={
+            <PermissionGuard requires="app:devices.view">
+              <NotificationSettings />
             </PermissionGuard>
           }
         />

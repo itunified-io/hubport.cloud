@@ -23,54 +23,15 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["favicon.ico", "icons/*.png"],
       manifest: false,
-      workbox: {
-        // config.js is generated at container startup (runtime env injection)
-        // — must never be cached by the service worker
-        navigateFallbackDenylist: [/^\/config\.js$/],
+      // injectManifest: use a hand-written SW so we can add push event handlers.
+      // The SW source lives at src/sw.ts and includes all workbox routing
+      // logic plus the push/notificationclick event handlers.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         maximumFileSizeToCacheInBytes: 5_000_000, // 5MB — matrix-js-sdk is large
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts",
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "images",
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-          {
-            urlPattern: ({ url }: { url: URL }) =>
-              /\.(?:js|css)$/i.test(url.pathname) &&
-              url.pathname !== "/config.js",
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "static-resources",
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 7 },
-            },
-          },
-          {
-            // Cache general API responses but exclude sync and device endpoints
-            // (those must always go to the network for data integrity)
-            urlPattern: ({ url }: { url: URL }) =>
-              url.pathname.startsWith("/api/") &&
-              !url.pathname.startsWith("/api/sync/") &&
-              !url.pathname.startsWith("/api/devices/"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
-              networkTimeoutSeconds: 10,
-            },
-          },
-        ],
       },
     }),
   ],
