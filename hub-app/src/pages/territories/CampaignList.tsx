@@ -133,7 +133,7 @@ export function CampaignList() {
         </div>
         {canManage && (
           <button
-            onClick={() => navigate("/territories/campaigns/new")}
+            onClick={() => navigate("/field-service/campaigns/new")}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--amber)] text-black text-sm font-semibold rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
           >
             <Plus size={16} /> New Campaign
@@ -175,7 +175,7 @@ export function CampaignList() {
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/territories/campaigns/${c.id}`)}
+                    onClick={() => navigate(`/field-service/campaigns/${c.id}`)}
                     className="text-sm font-semibold text-[var(--text)] hover:text-[var(--amber)] transition-colors cursor-pointer"
                   >
                     {c.title}
@@ -215,7 +215,7 @@ export function CampaignList() {
                 )}
                 {canManage && c.status === "closed" && (
                   <button
-                    onClick={() => navigate(`/territories/campaigns/${c.id}/report`)}
+                    onClick={() => navigate(`/field-service/campaigns/${c.id}/report`)}
                     className="p-2 rounded text-[var(--amber)] hover:bg-[#d9770614] transition-colors cursor-pointer"
                     title="Report"
                   >
@@ -232,7 +232,7 @@ export function CampaignList() {
                   </button>
                 )}
                 <button
-                  onClick={() => navigate(`/territories/campaigns/${c.id}`)}
+                  onClick={() => navigate(`/field-service/campaigns/${c.id}`)}
                   className="p-2 rounded text-[var(--text-muted)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
                 >
                   <ChevronRight size={14} />

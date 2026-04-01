@@ -117,7 +117,7 @@ export function CampaignForm() {
           headers,
           body: JSON.stringify(body),
         });
-        navigate(`/territories/campaigns/${id}`);
+        navigate(`/field-service/campaigns/${id}`);
       } else {
         const res = await fetch(`${apiUrl}/campaigns`, {
           method: "POST",
@@ -126,7 +126,7 @@ export function CampaignForm() {
         });
         if (res.ok) {
           const created = (await res.json()) as Campaign;
-          navigate(`/territories/campaigns/${created.id}`);
+          navigate(`/field-service/campaigns/${created.id}`);
         }
       }
     } catch {
@@ -226,7 +226,7 @@ export function CampaignForm() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate("/territories/campaigns")}
+          onClick={() => navigate("/field-service/campaigns")}
           className="p-2 rounded hover:bg-[var(--glass)] transition-colors cursor-pointer"
         >
           <ArrowLeft size={18} className="text-[var(--text-muted)]" />

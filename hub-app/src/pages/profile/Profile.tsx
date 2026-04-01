@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { FormattedMessage } from "react-intl";
-import { User, Shield, AlertTriangle, Trash2 } from "lucide-react";
+import { User, Shield, AlertTriangle, Trash2, MapPin } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
 import { SecuritySection } from "./SecuritySection";
@@ -22,6 +22,7 @@ interface PublisherProfile {
     addressVisibility: string;
     notesVisibility: string;
   };
+  allowLocationSharing: boolean;
   appRoles: { role: { name: string } }[];
 }
 
@@ -37,6 +38,7 @@ export function Profile() {
     addressVisibility: "elders_only",
     notesVisibility: "elders_only",
   });
+  const [allowLocationSharing, setAllowLocationSharing] = useState(false);
   const apiUrl = getApiUrl();
   const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
 
@@ -50,6 +52,7 @@ export function Profile() {
           if (data.privacySettings) {
             setPrivacy(data.privacySettings);
           }
+          setAllowLocationSharing(data.allowLocationSharing ?? false);
         }
       } finally {
         setLoading(false);
@@ -64,7 +67,7 @@ export function Profile() {
       await fetch(`${apiUrl}/publishers/me/privacy`, {
         method: "PUT",
         headers,
-        body: JSON.stringify(privacy),
+        body: JSON.stringify({ ...privacy, allowLocationSharing }),
       });
     } finally {
       setSaving(false);
@@ -159,6 +162,36 @@ export function Profile() {
               </select>
             </div>
           ))}
+
+          {/* Location sharing toggle */}
+          <div className="pt-3 mt-3 border-t border-[var(--border)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin size={14} className="text-[var(--amber)]" />
+                <div>
+                  <label className="text-sm text-[var(--text)]">
+                    <FormattedMessage id="privacy.allowLocationSharing" />
+                  </label>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                    <FormattedMessage id="privacy.allowLocationSharing.description" />
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAllowLocationSharing((v) => !v)}
+                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                  allowLocationSharing ? "bg-[var(--green)]" : "bg-[var(--glass-2)]"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                    allowLocationSharing ? "translate-x-5" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
 
           <button
             onClick={savePrivacy}

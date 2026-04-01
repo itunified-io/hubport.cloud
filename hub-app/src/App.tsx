@@ -16,6 +16,11 @@ import { CampaignList } from "./pages/territories/CampaignList";
 import { CampaignForm } from "./pages/territories/CampaignForm";
 import { CampaignDetail } from "./pages/territories/CampaignDetail";
 import { CampaignReport } from "./pages/territories/CampaignReport";
+import { MeetingPointList } from "./pages/field-service/MeetingPointList";
+import { MeetingPointForm } from "./pages/field-service/MeetingPointForm";
+import { MeetingPointDetail } from "./pages/field-service/MeetingPointDetail";
+import { ServiceGroupPlanning } from "./pages/field-service/ServiceGroupPlanning";
+import { ServiceMeetingDetail } from "./pages/field-service/ServiceMeetingDetail";
 import { GapDetection } from "./pages/territories/GapDetection";
 import ShareRedeemPage from "./pages/territories/ShareRedeemPage";
 import { MeetingList } from "./pages/meetings/MeetingList";
@@ -160,38 +165,11 @@ export function App() {
             </PermissionGuard>
           }
         />
-        <Route
-          path="/territories/campaigns"
-          element={
-            <PermissionGuard requires="app:territories.view">
-              <CampaignList />
-            </PermissionGuard>
-          }
-        />
-        <Route
-          path="/territories/campaigns/new"
-          element={
-            <PermissionGuard requires="app:territories.view">
-              <CampaignForm />
-            </PermissionGuard>
-          }
-        />
-        <Route
-          path="/territories/campaigns/:id"
-          element={
-            <PermissionGuard requires="app:territories.view">
-              <CampaignDetail />
-            </PermissionGuard>
-          }
-        />
-        <Route
-          path="/territories/campaigns/:id/report"
-          element={
-            <PermissionGuard requires="app:territories.view">
-              <CampaignReport />
-            </PermissionGuard>
-          }
-        />
+        {/* Old campaign routes → redirect to new field-service paths */}
+        <Route path="/territories/campaigns" element={<Navigate to="/field-service/campaigns" replace />} />
+        <Route path="/territories/campaigns/new" element={<Navigate to="/field-service/campaigns/new" replace />} />
+        <Route path="/territories/campaigns/:id" element={<Navigate to="/field-service/campaigns/:id" replace />} />
+
         <Route
           path="/territories/gap-detection"
           element={
@@ -205,6 +183,80 @@ export function App() {
           element={
             <PermissionGuard requires="app:territories.view">
               <TerritoryDetail />
+            </PermissionGuard>
+          }
+        />
+
+        {/* Field Service (Predigtdienst) */}
+        <Route
+          path="/field-service/campaigns"
+          element={
+            <PermissionGuard requires="app:campaigns.view">
+              <CampaignList />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/campaigns/new"
+          element={
+            <PermissionGuard requires="app:campaigns.manage">
+              <CampaignForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/campaigns/:id"
+          element={
+            <PermissionGuard requires="app:campaigns.view">
+              <CampaignDetail />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/campaigns/:id/report"
+          element={
+            <PermissionGuard requires="app:campaigns.view">
+              <CampaignReport />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/meeting-points"
+          element={
+            <PermissionGuard requires="app:meeting_points.view">
+              <MeetingPointList />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/meeting-points/new"
+          element={
+            <PermissionGuard requires="app:meeting_points.manage">
+              <MeetingPointForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/meeting-points/:id"
+          element={
+            <PermissionGuard requires="app:meeting_points.view">
+              <MeetingPointDetail />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/groups"
+          element={
+            <PermissionGuard requires="app:service_meetings.view">
+              <ServiceGroupPlanning />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/field-service/groups/:meetingId"
+          element={
+            <PermissionGuard requires="app:service_meetings.view">
+              <ServiceMeetingDetail />
             </PermissionGuard>
           }
         />

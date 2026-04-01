@@ -144,7 +144,7 @@ export function CampaignDetail() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/territories/campaigns")}
+            onClick={() => navigate("/field-service/campaigns")}
             className="p-2 rounded hover:bg-[var(--glass)] transition-colors cursor-pointer"
           >
             <ArrowLeft size={18} className="text-[var(--text-muted)]" />
@@ -167,7 +167,7 @@ export function CampaignDetail() {
           {canManage && campaign.status === "draft" && (
             <>
               <button
-                onClick={() => navigate(`/territories/campaigns/${id}`, { state: { edit: true } })}
+                onClick={() => navigate(`/field-service/campaigns/${id}`, { state: { edit: true } })}
                 className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
               >
                 <Edit size={14} /> Edit
@@ -190,7 +190,7 @@ export function CampaignDetail() {
           )}
           {(campaign.status === "closed" || campaign.status === "archived") && (
             <button
-              onClick={() => navigate(`/territories/campaigns/${id}/report`)}
+              onClick={() => navigate(`/field-service/campaigns/${id}/report`)}
               className="flex items-center gap-1 px-3 py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
             >
               <BarChart3 size={14} /> View Report
@@ -305,7 +305,7 @@ export function CampaignDetail() {
             </p>
             {(campaign.status === "closed" || campaign.status === "archived") && (
               <button
-                onClick={() => navigate(`/territories/campaigns/${id}/report`)}
+                onClick={() => navigate(`/field-service/campaigns/${id}/report`)}
                 className="mt-3 px-4 py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer"
               >
                 View Report

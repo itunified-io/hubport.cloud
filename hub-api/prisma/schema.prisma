@@ -150,6 +150,7 @@ model Publisher {
   privacyAccepted   Boolean          @default(false)
   privacyAcceptedAt DateTime?
   privacySettings   Json             @default("{\"contactVisibility\":\"elders_only\",\"addressVisibility\":\"elders_only\",\"notesVisibility\":\"elders_only\"}")
+  allowLocationSharing Boolean       @default(false) /// Opt-in for live location sharing during field service
 
   // Onboarding tracking
   invitedBy  String?
@@ -881,6 +882,9 @@ model CampaignMeetingPoint {
   time         String?
   createdAt    DateTime @default(now())
 
+  fieldServiceMeetingPointId String?  /// Optional link to permanent meeting point
+  fieldServiceMeetingPoint   FieldServiceMeetingPoint? @relation(fields: [fieldServiceMeetingPointId], references: [id])
+
   fieldGroups CampaignFieldGroup[]
 
   @@index([campaignId])
@@ -926,6 +930,128 @@ model LocationShare {
   consentedAt    DateTime          @default(now())
   lastUpdatedAt  DateTime?
   expiresAt      DateTime          /// Auto-expire after duration
+
+  @@index([fieldGroupId, isActive])
+  @@index([publisherId])
+}
+
+// ─── Field Service Module ──────────────────────────────────────────���─
+
+enum ServiceMeetingStatus {
+  planned
+  active
+  completed
+  cancelled
+}
+
+enum ServiceFieldGroupStatus {
+  planned
+  in_field
+  completed
+}
+
+/// Permanent, recurring meeting point for regular field service.
+model FieldServiceMeetingPoint {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  dayOfWeek       Int      /// 0=Sun, 1=Mon, ..., 6=Sat
+  time            String   /// "HH:MM" format
+  conductorId     String?  /// Default conductor (Publisher ID)
+  assistantIds    String[] /// Default assistant Publisher IDs
+  territoryIds    String[] /// Default territory IDs to work
+  maxParticipants Int?
+  isActive        Boolean  @default(true)
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  serviceMeetings       ServiceGroupMeeting[]
+  campaignMeetingPoints CampaignMeetingPoint[]
+
+  @@index([tenantId])
+}
+
+/// Concrete, scheduled instance of field service at a meeting point.
+model ServiceGroupMeeting {
+  id              String               @id @default(uuid())
+  tenantId        String
+  meetingPointId  String
+  meetingPoint    FieldServiceMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
+  serviceGroupId  String?              /// Optional link to existing ServiceGroup
+  campaignId      String?              /// If set, this is a campaign-linked meeting
+  date            DateTime             /// Concrete date of meeting
+  time            String               /// "HH:MM" format
+  conductorId     String               /// Conductor for this meeting
+  status          ServiceMeetingStatus @default(planned)
+  notes           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdBy       String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  signups         ServiceMeetingSignup[]
+  fieldGroups     ServiceMeetingFieldGroup[]
+
+  @@index([tenantId])
+  @@index([meetingPointId])
+  @@index([date])
+}
+
+/// Publisher self-enrollment for a service meeting.
+model ServiceMeetingSignup {
+  id          String    @id @default(uuid())
+  tenantId    String
+  meetingId   String
+  meeting     ServiceGroupMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  publisherId String
+  signedUpAt  DateTime  @default(now())
+  cancelledAt DateTime?
+
+  @@unique([meetingId, publisherId])
+  @@index([publisherId])
+}
+
+/// Sub-group within a service meeting — conductor organizes publishers into groups.
+model ServiceMeetingFieldGroup {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  meetingId    String
+  meeting      ServiceGroupMeeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  name         String?                 /// "Gruppe 1", "Gruppe 2"
+  leaderId     String                  /// Group leader Publisher ID
+  memberIds    String[]                /// Publisher IDs in this group
+  territoryIds String[]                /// Assigned territory IDs
+  status       ServiceFieldGroupStatus @default(planned)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  locationShares ServiceLocationShare[]
+
+  @@index([meetingId])
+}
+
+/// Real-time location sharing during field service. Opt-in only.
+model ServiceLocationShare {
+  id            String                   @id @default(uuid())
+  tenantId      String
+  fieldGroupId  String
+  fieldGroup    ServiceMeetingFieldGroup @relation(fields: [fieldGroupId], references: [id], onDelete: Cascade)
+  publisherId   String
+  latitude      Float
+  longitude     Float
+  accuracy      Float?                   /// GPS accuracy in meters
+  isActive      Boolean                  @default(true)
+  startedAt     DateTime                 @default(now())
+  lastUpdatedAt DateTime                 @default(now())
+  stoppedAt     DateTime?
 
   @@index([fieldGroupId, isActive])
   @@index([publisherId])
