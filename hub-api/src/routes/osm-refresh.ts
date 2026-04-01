@@ -8,6 +8,8 @@ import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import { osmRefreshQueue, isRedisAvailable } from "../lib/bull.js";
+import { bboxFromGeoJSON, isInsideBoundaries } from "../lib/geo.js";
+import { queryBuildingsInBBox, type OverpassBuilding } from "../lib/osm-overpass.js";
 
 // ─── Schemas ────────────────────────────────────────────────────────
 
@@ -194,6 +196,128 @@ export async function osmRefreshRoutes(app: FastifyInstance): Promise<void> {
           territory: { select: { id: true, number: true, name: true } },
         },
       });
+    },
+  );
+
+  // ─── Populate addresses from OSM (congregation-level) ────────────
+  //
+  // Single Overpass query for the congregation boundary, then
+  // point-in-polygon distribution to individual territories.
+  // Runs inline (no Redis/BullMQ required).
+  //
+  app.post(
+    "/territories/osm-populate",
+    {
+      preHandler: requirePermission(PERMISSIONS.OSM_REFRESH),
+    },
+    async (request, reply) => {
+      // 1. Find congregation boundary
+      const allTerritories = await prisma.territory.findMany({
+        select: { id: true, number: true, name: true, boundaries: true, type: true },
+      });
+
+      const congBoundary = allTerritories.find(
+        (t) => t.type === "congregation_boundary" && t.boundaries,
+      );
+
+      if (!congBoundary) {
+        return reply.code(400).send({
+          error: "No congregation boundary found. Import a branch territory assignment (KML) first.",
+        });
+      }
+
+      const bbox = bboxFromGeoJSON(congBoundary.boundaries);
+      if (!bbox) {
+        return reply.code(400).send({ error: "Could not compute bounding box from congregation boundary." });
+      }
+
+      const territories = allTerritories.filter(
+        (t) => t.type === "territory" && t.boundaries,
+      );
+
+      // 2. Single Overpass query for entire congregation area
+      const allBuildings = await queryBuildingsInBBox(bbox.south, bbox.west, bbox.north, bbox.east);
+
+      // 3. Filter to buildings inside congregation polygon with addresses
+      const addressableBuildings = allBuildings.filter(
+        (b: OverpassBuilding) =>
+          b.hasAddress && isInsideBoundaries(b.lat, b.lng, congBoundary.boundaries),
+      );
+
+      // 4. Load all existing addresses by osmId for dedup
+      const existingAddresses = await prisma.address.findMany({
+        where: { osmId: { not: null } },
+        select: { id: true, osmId: true, territoryId: true, street: true, houseNumber: true },
+      });
+      const existingByOsmId = new Map(
+        existingAddresses.filter((a) => a.osmId).map((a) => [a.osmId!, a]),
+      );
+
+      let addressesCreated = 0;
+      let addressesUpdated = 0;
+      let unassigned = 0;
+      const territoriesAffected = new Set<string>();
+
+      // 5. Assign each building to its territory via point-in-polygon
+      for (const building of addressableBuildings) {
+        const territory = territories.find((t) =>
+          isInsideBoundaries(building.lat, building.lng, t.boundaries),
+        );
+
+        if (!territory) {
+          unassigned++;
+          continue;
+        }
+
+        territoriesAffected.add(territory.id);
+        const existing = existingByOsmId.get(building.osmId);
+
+        if (existing) {
+          // Update if street/houseNumber changed or territory assignment changed
+          if (
+            existing.street !== building.street ||
+            existing.houseNumber !== building.houseNumber ||
+            existing.territoryId !== territory.id
+          ) {
+            await prisma.address.update({
+              where: { id: existing.id },
+              data: {
+                territoryId: territory.id,
+                street: building.street,
+                houseNumber: building.houseNumber,
+                lat: building.lat,
+                lng: building.lng,
+                buildingType: building.buildingType,
+              },
+            });
+            addressesUpdated++;
+          }
+        } else {
+          // Create new address
+          await prisma.address.create({
+            data: {
+              territoryId: territory.id,
+              osmId: building.osmId,
+              lat: building.lat,
+              lng: building.lng,
+              street: building.street,
+              houseNumber: building.houseNumber,
+              buildingType: building.buildingType,
+              source: "osm",
+            },
+          });
+          addressesCreated++;
+        }
+      }
+
+      return {
+        totalBuildings: allBuildings.length,
+        addressableBuildings: addressableBuildings.length,
+        territoriesProcessed: territoriesAffected.size,
+        addressesCreated,
+        addressesUpdated,
+        unassigned,
+      };
     },
   );
 }

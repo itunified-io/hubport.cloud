@@ -347,15 +347,39 @@ export function getOsmQueue(token: string): Promise<OsmRefreshJob[]> {
 
 // ─── Gap Detection endpoints ────────────────────────────────────
 
-export function runGapDetection(token: string, territoryIds?: string[]): Promise<GapDetectionRun[]> {
+// ─── OSM Populate ──────────────────────────────────────────────
+
+export interface OsmPopulateResult {
+  totalBuildings: number;
+  addressableBuildings: number;
+  territoriesProcessed: number;
+  addressesCreated: number;
+  addressesUpdated: number;
+  unassigned: number;
+}
+
+export function populateAddressesFromOsm(token: string): Promise<OsmPopulateResult> {
+  return apiFetch("/territories/osm-populate", token, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function runGapDetection(token: string): Promise<GapDetectionRun> {
   return apiFetch("/territories/gap-detection/run", token, {
     method: "POST",
-    body: JSON.stringify(territoryIds ? { territoryIds } : {}),
+    body: JSON.stringify({}),
   });
 }
 
 export function getGapRuns(token: string): Promise<GapDetectionRun[]> {
   return apiFetch("/territories/gap-detection/runs", token);
+}
+
+export function deleteGapRun(runId: string, token: string): Promise<void> {
+  return apiFetch(`/territories/gap-detection/runs/${runId}`, token, {
+    method: "DELETE",
+  });
 }
 
 export function ignoreBuildings(
