@@ -1,6 +1,15 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.12
+
+### Bug Fixes (#269)
+- fix: create PostGIS extension on startup (was missing, caused 500 on violations/spatial queries)
+- fix: rewrite CreationFlow to draw on maplibre map (was blank white div with fake coordinates)
+- fix: ViolationBadges reactivity — gate map prop on isLoaded state
+- fix: show map container during creation mode (was h-0 when no boundary)
+- fix: graceful fallback when PostGIS unavailable (skip spatial validation, return empty violations)
+
 ## v2026.04.01.11
 
 ### Territory Polygon Fixes (#267)
