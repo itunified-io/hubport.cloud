@@ -205,7 +205,7 @@ export async function pushChanges(
       pending.map(async (change) => {
         const decrypted = await decryptFromStorage(
           "pendingChanges",
-          change as Record<string, unknown>,
+          change as unknown as Record<string, unknown>,
         ) as unknown as PendingChange;
         return {
           id: String(change.id),

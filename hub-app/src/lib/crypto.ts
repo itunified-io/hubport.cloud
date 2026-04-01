@@ -50,12 +50,17 @@ export async function deriveEncryptionKey(
 
   // Step 3: Decode salt from base64
   const saltBytes = base64ToUint8Array(saltBase64);
+  // Ensure we have a plain ArrayBuffer (not SharedArrayBuffer) for SubtleCrypto
+  const saltBuffer = saltBytes.buffer.slice(
+    saltBytes.byteOffset,
+    saltBytes.byteOffset + saltBytes.byteLength,
+  ) as ArrayBuffer;
 
   // Step 4: Derive AES-256-GCM key via PBKDF2 (100K iterations)
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: saltBytes,
+      salt: saltBuffer,
       iterations: 100_000,
       hash: "SHA-256",
     },
@@ -180,7 +185,7 @@ export async function decryptFields<T extends Record<string, unknown>>(
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    binary += String.fromCharCode(bytes[i] as number);
   }
   return btoa(binary);
 }
