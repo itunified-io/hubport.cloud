@@ -1,6 +1,19 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.01.11
+
+### Territory Polygon Fixes (#267)
+- feat: PostGIS auto-fix pipeline — validate → congregation clip → neighbor clip → overlap detect
+- feat: preview-before-save modal showing original vs clipped boundaries
+- feat: non-destructive boundary versioning with restore capability
+- feat: violation warning badges on territory map (red = exceeds boundary, amber = overlap)
+- fix: Edit polygon — add Edit button in TerritoryDetail (permission-gated)
+- fix: New Territory creation — modal with number + name (replaces broken `?draw=true`)
+- feat: Territory Servant seed role + flag mapping
+- feat: auto-mapped vs manual role display in publisher Roles tab
+- feat: v1 boundary version bootstrap for existing territories on startup
+
 ## v2026.04.01.10
 
 ### Address API response mapper + superpowers docs (#265)
