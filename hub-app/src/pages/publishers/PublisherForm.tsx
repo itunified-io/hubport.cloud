@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle, Lock } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle, Lock, KeyRound, X } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
@@ -231,6 +231,16 @@ export function PublisherForm() {
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
 
+  // ─── Reset password state ────────────────────────────────────────
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{
+    method: string;
+    temporaryPassword?: string;
+    message?: string;
+  } | null>(null);
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+  const canResetPassword = can("app:publishers.reset_password");
+
   // ─── Delete state ──────────────────────────────────────────────
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -392,6 +402,30 @@ export function PublisherForm() {
       setResendError("Netzwerkfehler — bitte erneut versuchen");
     } finally {
       setResending(false);
+    }
+  };
+
+  // ─── Reset password ────────────────────────────────────────────
+  const resetPublisherPassword = async () => {
+    if (!id) return;
+    setResettingPassword(true);
+    setResetPasswordError(null);
+    setResetPasswordResult(null);
+    try {
+      const res = await fetch(`${apiUrl}/publishers/${id}/reset-password`, {
+        method: "POST", headers, body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const data = await res.json() as { method: string; temporaryPassword?: string; message?: string };
+        setResetPasswordResult(data);
+      } else {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        setResetPasswordError(data.error || `Error: ${res.status}`);
+      }
+    } catch {
+      setResetPasswordError("Network error");
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -559,11 +593,79 @@ export function PublisherForm() {
                   <FormattedMessage id="publishers.reactivate" />
                 </button>
               )}
+              {canResetPassword && publisherStatus === "active" && (
+                <button
+                  type="button"
+                  onClick={resetPublisherPassword}
+                  disabled={resettingPassword}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--amber)] border border-[var(--amber)]/30 rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  <KeyRound size={14} className={resettingPassword ? "animate-spin" : ""} />
+                  <FormattedMessage id="publishers.resetPassword" />
+                </button>
+              )}
             </div>
           </div>
           {resendError && (
             <div className="text-xs text-[var(--red)] px-1">{resendError}</div>
           )}
+          {resetPasswordError && (
+            <div className="text-xs text-[var(--red)] px-1">{resetPasswordError}</div>
+          )}
+          {resetPasswordResult?.method === "email" && (
+            <div className="text-xs text-[var(--green)] px-1">
+              <FormattedMessage id="publishers.resetPassword.emailSent" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Temporary Password Dialog ─────────────────────────────── */}
+      {resetPasswordResult?.method === "temporary" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius)] p-6 max-w-md w-full mx-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--amber)]">
+                <FormattedMessage id="publishers.resetPassword.tempTitle" />
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResetPasswordResult(null)}
+                className="p-1 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-3 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--radius-sm)]">
+              <code className="text-sm font-mono text-[var(--text)] select-all">
+                {resetPasswordResult.temporaryPassword}
+              </code>
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">
+              <FormattedMessage id="publishers.resetPassword.tempHint" />
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (resetPasswordResult.temporaryPassword) {
+                    navigator.clipboard.writeText(resetPasswordResult.temporaryPassword);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+              >
+                <Copy size={14} />
+                <FormattedMessage id="common.copy" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetPasswordResult(null)}
+                className="px-3 py-1.5 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+              >
+                <FormattedMessage id="common.close" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
