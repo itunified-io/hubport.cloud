@@ -196,85 +196,77 @@ export function Profile() {
       {activeTab === "devices" && <DevicesSection />}
 
       {activeTab === "privacy" && profile && (
-        <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
-          {(
-            [
-              "contactVisibility",
-              "addressVisibility",
-              "notesVisibility",
-            ] as const
-          ).map((key) => (
-            <div key={key} className="flex items-center justify-between">
-              <label className="text-sm text-[var(--text-muted)]">
-                <FormattedMessage id={`privacy.${key}`} />
-              </label>
-              <select
-                value={privacy[key]}
-                onChange={(e) =>
-                  setPrivacy((prev) => ({ ...prev, [key]: e.target.value }))
-                }
-                className="px-3 py-1.5 text-sm bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-              >
-                {VISIBILITY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-
-          {/* Location sharing toggle */}
-          <div className="pt-3 mt-3 border-t border-[var(--border)]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MapPin size={14} className="text-[var(--amber)]" />
-                <div>
-                  <label className="text-sm text-[var(--text)]">
-                    <FormattedMessage id="privacy.allowLocationSharing" />
-                  </label>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                    <FormattedMessage id="privacy.allowLocationSharing.description" />
-                  </p>
-                </div>
+        <div className="space-y-4">
+          <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+            {(
+              [
+                "contactVisibility",
+                "addressVisibility",
+                "notesVisibility",
+              ] as const
+            ).map((key) => (
+              <div key={key} className="flex items-center justify-between">
+                <label className="text-sm text-[var(--text-muted)]">
+                  <FormattedMessage id={`privacy.${key}`} />
+                </label>
+                <select
+                  value={privacy[key]}
+                  onChange={(e) =>
+                    setPrivacy((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                  className="px-3 py-1.5 text-sm bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
+                >
+                  {VISIBILITY_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt.replace("_", " ")}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <button
-                type="button"
-                onClick={() => setAllowLocationSharing((v) => !v)}
-                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
-                  allowLocationSharing
-                    ? "bg-[var(--green)]"
-                    : "bg-[var(--glass-2)]"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                    allowLocationSharing ? "translate-x-5" : ""
+            ))}
+
+            {/* Location sharing toggle */}
+            <div className="pt-3 mt-3 border-t border-[var(--border)]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin size={14} className="text-[var(--amber)]" />
+                  <div>
+                    <label className="text-sm text-[var(--text)]">
+                      <FormattedMessage id="privacy.allowLocationSharing" />
+                    </label>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                      <FormattedMessage id="privacy.allowLocationSharing.description" />
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAllowLocationSharing((v) => !v)}
+                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                    allowLocationSharing
+                      ? "bg-[var(--green)]"
+                      : "bg-[var(--glass-2)]"
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      allowLocationSharing ? "translate-x-5" : ""
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
+
+            <button
+              onClick={savePrivacy}
+              disabled={saving}
+              className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {saving ? "..." : <FormattedMessage id="common.save" />}
+            </button>
           </div>
 
-          <button
-            onClick={savePrivacy}
-            disabled={saving}
-            className="w-full py-2 text-sm font-semibold bg-[var(--amber)] text-black rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {saving ? "..." : <FormattedMessage id="common.save" />}
-          </button>
-        </div>
-      )}
-
-      {activeTab === "account" && profile && (
-        <div className="space-y-4">
-          {/* Availability */}
-          <AvailabilitySection publisherId={profile.id} />
-
-          {/* Speaker talks */}
-          <SpeakerTalksSection />
-
-          {/* Danger zone */}
+          {/* Danger zone — under privacy */}
           <div className="p-4 border border-[var(--red)] border-opacity-30 rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
             <h2 className="text-sm font-medium text-[var(--red)] flex items-center gap-2">
               <AlertTriangle size={14} />
@@ -296,6 +288,13 @@ export function Profile() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "account" && profile && (
+        <div className="space-y-4">
+          <AvailabilitySection publisherId={profile.id} />
+          <SpeakerTalksSection />
         </div>
       )}
     </div>
