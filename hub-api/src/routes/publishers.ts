@@ -288,6 +288,21 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // ── Password Reset Rate Limiter ─────────────────────────────────
+  const RESET_RATE_LIMIT = 3; // max 3 password resets per publisher per hour
+  const RESET_RATE_WINDOW_MS = 60 * 60 * 1000;
+  const resetTimestamps = new Map<string, number[]>();
+
+  function checkResetRateLimit(publisherId: string): boolean {
+    const now = Date.now();
+    const timestamps = resetTimestamps.get(publisherId) || [];
+    const recent = timestamps.filter(t => now - t < RESET_RATE_WINDOW_MS);
+    resetTimestamps.set(publisherId, recent);
+    if (recent.length >= RESET_RATE_LIMIT) return false;
+    recent.push(now);
+    return true;
+  }
+
   // Admin-initiated password reset (elder-only)
   app.post<{ Params: IdParamsType }>(
     "/publishers/:id/reset-password",
@@ -307,8 +322,13 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "Publisher not found or not linked to Keycloak" });
       }
 
+      if (!checkResetRateLimit(publisher.id)) {
+        return reply.code(429).send({ error: "Rate limit exceeded — max 3 password resets per publisher per hour" });
+      }
+
       try {
-        await sendExecuteActionsEmail(publisher.keycloakSub, ["UPDATE_PASSWORD"], undefined, "hub-app");
+        const redirectUri = process.env.HUB_APP_URL || "/";
+        await sendExecuteActionsEmail(publisher.keycloakSub, ["UPDATE_PASSWORD"], redirectUri, "hub-app");
         await audit(
           "publisher.reset-password",
           request.user.sub,
