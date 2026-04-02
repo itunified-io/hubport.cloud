@@ -265,6 +265,8 @@
   "roles.members": "Members",
   "roles.permissions": "Permissions",
   "profile.title": "My Profile",
+  "profile.tab.devices": "Devices",
+  "profile.tab.account": "Account",
   "profile.danger": "Danger Zone",
   "profile.deactivate": "Deactivate Account",
   "profile.delete": "Delete Account (GDPR)",

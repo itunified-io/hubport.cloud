@@ -267,6 +267,8 @@
   "roles.members": "Mitglieder",
   "roles.permissions": "Berechtigungen",
   "profile.title": "Mein Profil",
+  "profile.tab.devices": "Geräte",
+  "profile.tab.account": "Konto",
   "profile.danger": "Gefahrenzone",
   "profile.deactivate": "Konto deaktivieren",
   "profile.delete": "Konto löschen (DSGVO)",
