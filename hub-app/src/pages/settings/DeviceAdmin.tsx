@@ -19,9 +19,9 @@ interface AdminDevice {
   userAgent: string;
   platform: string;
   screenSize: string;
-  status: "pending" | "approved" | "revoked";
-  lastSeenAt: string | null;
-  createdAt: string;
+  status: "active" | "revoked";
+  lastSyncAt: string | null;
+  registeredAt: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ function statusBadge(status: AdminDevice["status"]): {
   className: string;
 } {
   switch (status) {
-    case "approved":
+    case "active":
       return { label: "Active", className: "bg-[#22c55e20] text-[var(--green)]" };
     case "revoked":
       return { label: "Revoked", className: "bg-[var(--glass)] text-[var(--text-muted)]" };
@@ -238,10 +238,10 @@ export function DeviceAdmin() {
                             <p className="text-xs text-[var(--text-muted)] truncate">
                               {device.deviceUuid}
                             </p>
-                            {device.lastSeenAt && (
+                            {device.lastSyncAt && (
                               <p className="text-xs text-[var(--text-muted)] mt-0.5">
                                 Last seen:{" "}
-                                {new Date(device.lastSeenAt).toLocaleString()}
+                                {new Date(device.lastSyncAt).toLocaleString()}
                               </p>
                             )}
                           </div>

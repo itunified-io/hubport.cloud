@@ -28,7 +28,7 @@ function statusLabel(status: RegisteredDevice["status"]): {
   className: string;
 } {
   switch (status) {
-    case "approved":
+    case "active":
       return {
         label: "Active",
         className: "bg-[#22c55e20] text-[var(--green)]",
@@ -87,7 +87,7 @@ export function MyDevices() {
     }
   }
 
-  const activeCount = devices.filter((d) => d.status === "approved").length;
+  const activeCount = devices.filter((d) => d.status === "active").length;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -157,12 +157,12 @@ export function MyDevices() {
                     )}
                   </div>
                   <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
-                    {device.userAgent}
+                    {device.displayName || device.platform}
                   </p>
-                  {device.lastSeenAt && (
+                  {device.lastSyncAt && (
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       Last seen:{" "}
-                      {new Date(device.lastSeenAt).toLocaleString()}
+                      {new Date(device.lastSyncAt).toLocaleString()}
                     </p>
                   )}
                 </div>

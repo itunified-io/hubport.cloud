@@ -25,7 +25,7 @@ function statusBadge(status: RegisteredDevice["status"]): {
   className: string;
 } {
   switch (status) {
-    case "approved":
+    case "active":
       return { label: "Aktiv", className: "bg-[#22c55e20] text-[var(--green)]" };
     case "revoked":
       return { label: "Widerrufen", className: "bg-[var(--glass)] text-[var(--text-muted)]" };
@@ -72,7 +72,7 @@ export function DevicesSection() {
     }
   }
 
-  const activeCount = devices.filter((d) => d.status === "approved").length;
+  const activeCount = devices.filter((d) => d.status === "active").length;
 
   return (
     <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
@@ -124,7 +124,7 @@ export function DevicesSection() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-[var(--text)] truncate">
-                      {device.platform}
+                      {device.displayName || device.platform}
                     </span>
                     {isCurrent && (
                       <span className="text-[10px] text-[var(--amber)] font-semibold">
@@ -134,8 +134,8 @@ export function DevicesSection() {
                   </div>
                   <p className="text-[10px] text-[var(--text-muted)] truncate">
                     {device.screenSize}
-                    {device.lastSeenAt &&
-                      ` · ${new Date(device.lastSeenAt).toLocaleDateString("de-DE")}`}
+                    {device.lastSyncAt &&
+                      ` · ${new Date(device.lastSyncAt).toLocaleDateString("de-DE")}`}
                   </p>
                 </div>
 

@@ -122,7 +122,7 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
         const saltResult = await getEncryptionSalt(token!);
         if (cancelled) return;
 
-        const key = await deriveDeviceKey(sub!, saltResult.salt);
+        const key = await deriveDeviceKey(sub!, saltResult.encSalt);
         if (cancelled) return;
 
         // 4. Initialise the Dexie offline DB (tenant-scoped)
