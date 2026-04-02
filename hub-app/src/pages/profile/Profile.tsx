@@ -112,8 +112,8 @@ export function Profile() {
               <p className="text-[var(--text)] font-medium">
                 {profile.displayName ?? `${profile.firstName} ${profile.lastName}`}
               </p>
-              <p className="text-xs text-[var(--text-muted)]">
-                {profile.congregationRole.replace("_", " ")}
+              <p className="text-xs text-[var(--text-muted)] capitalize">
+                {profile.congregationRole.replace(/_/g, " ")}
                 {profile.congregationFlags.length > 0 && ` · ${profile.congregationFlags.join(", ")}`}
               </p>
             </div>

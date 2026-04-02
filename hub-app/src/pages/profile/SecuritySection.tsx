@@ -444,7 +444,7 @@ function SessionList({
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={10} className="text-[var(--text-muted)]" />
                     <span className="text-[10px] text-[var(--text-muted)]">
-                      {new Date(s.lastAccess * 1000).toLocaleString()}
+                      {new Date(s.lastAccess).toLocaleString()}
                     </span>
                   </div>
                 </div>
