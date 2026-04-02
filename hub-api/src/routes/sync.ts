@@ -25,9 +25,9 @@ const SYNCABLE_TABLES = [
   { name: "assignments",            delegate: "territoryAssignment",      tenantField: undefined,            timestampField: "updatedAt" },
   { name: "publishers",             delegate: "publisher",                tenantField: undefined,            timestampField: "updatedAt" },
   { name: "meetingPoints",          delegate: "fieldServiceMeetingPoint", tenantField: "tenantId" as const,  timestampField: "updatedAt" },
-  { name: "campaignMeetingPoints",  delegate: "campaignMeetingPoint",     tenantField: "tenantId" as const,  timestampField: "updatedAt" },
+  { name: "campaignMeetingPoints",  delegate: "campaignMeetingPoint",     tenantField: "tenantId" as const,  timestampField: "createdAt" },
   { name: "meetings",               delegate: "serviceGroupMeeting",      tenantField: "tenantId" as const,  timestampField: "updatedAt" },
-  { name: "territoryShares",        delegate: "territoryShare",           tenantField: undefined,            timestampField: "updatedAt" },
+  { name: "territoryShares",        delegate: "territoryShare",           tenantField: undefined,            timestampField: "createdAt" },
 ] as const;
 
 type TableName = (typeof SYNCABLE_TABLES)[number]["name"];
