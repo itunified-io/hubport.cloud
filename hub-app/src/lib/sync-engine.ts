@@ -14,6 +14,7 @@ import {
   decryptFromStorage,
   type PendingChange,
 } from "./offline-db";
+import { getApiUrl } from "./config";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ export async function checkConnectivity(token: string): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5_000);
-    const res = await fetch("/api/sync/status", {
+    const res = await fetch(`${getApiUrl()}/sync/status`, {
       method: "HEAD",
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
@@ -80,7 +81,7 @@ export async function checkConnectivity(token: string): Promise<boolean> {
  * Fetch sync status from the server (last accepted cursor, server time, etc.).
  */
 export async function getSyncStatus(token: string): Promise<Record<string, unknown>> {
-  const res = await fetch("/api/sync/status", {
+  const res = await fetch(`${getApiUrl()}/sync/status`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -114,7 +115,7 @@ export async function pullChanges(token: string): Promise<void> {
       const qs = new URLSearchParams();
       if (cursor) qs.set("cursor", cursor);
 
-      const res = await fetch(`/api/sync/pull?${qs.toString()}`, {
+      const res = await fetch(`${getApiUrl()}/sync/pull?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -219,7 +220,7 @@ export async function pushChanges(
       }),
     );
 
-    const res = await fetch("/api/sync/push", {
+    const res = await fetch(`${getApiUrl()}/sync/push`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

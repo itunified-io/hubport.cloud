@@ -8,6 +8,7 @@
  * API calls use relative URLs (reverse-proxy pattern; same-origin).
  */
 import { deriveEncryptionKey } from "./crypto";
+import { getApiUrl } from "./config";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ export function collectDeviceInfo(): DeviceInfo {
  */
 export async function registerDevice(token: string): Promise<RegisteredDevice> {
   const info = collectDeviceInfo();
-  const res = await fetch("/api/devices/register", {
+  const res = await fetch(`${getApiUrl()}/devices/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -122,7 +123,7 @@ export async function checkDeviceStatus(
 ): Promise<DeviceStatusResult> {
   const deviceUuid = getCurrentDeviceUuid();
   const res = await fetch(
-    `/api/devices/me?deviceUuid=${encodeURIComponent(deviceUuid)}`,
+    `${getApiUrl()}/devices/me?deviceUuid=${encodeURIComponent(deviceUuid)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
     },
@@ -145,7 +146,7 @@ export async function getEncryptionSalt(
 ): Promise<EncryptionSaltResult> {
   const deviceUuid = getCurrentDeviceUuid();
   const res = await fetch(
-    `/api/devices/encryption-salt?deviceUuid=${encodeURIComponent(deviceUuid)}`,
+    `${getApiUrl()}/devices/encryption-salt?deviceUuid=${encodeURIComponent(deviceUuid)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
     },
@@ -163,7 +164,7 @@ export async function getEncryptionSalt(
  * List all devices registered to the current user.
  */
 export async function listDevices(token: string): Promise<RegisteredDevice[]> {
-  const res = await fetch("/api/devices", {
+  const res = await fetch(`${getApiUrl()}/devices`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -182,7 +183,7 @@ export async function removeDevice(
   token: string,
   deviceId: string,
 ): Promise<void> {
-  const res = await fetch(`/api/devices/${encodeURIComponent(deviceId)}`, {
+  const res = await fetch(`${getApiUrl()}/devices/${encodeURIComponent(deviceId)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
