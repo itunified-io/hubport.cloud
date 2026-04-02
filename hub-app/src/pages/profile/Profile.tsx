@@ -4,6 +4,7 @@ import { User, Shield, AlertTriangle, Trash2, MapPin } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { getApiUrl } from "@/lib/config";
 import { SecuritySection } from "./SecuritySection";
+import { DevicesSection } from "./DevicesSection";
 import { AvailabilitySection } from "./AvailabilitySection";
 import { SpeakerTalksSection } from "./SpeakerTalksSection";
 
@@ -136,6 +137,9 @@ export function Profile() {
 
       {/* Security — always shown regardless of publisher profile */}
       <SecuritySection />
+
+      {/* Devices — offline sync device management */}
+      <DevicesSection />
 
       {/* Privacy settings (only if publisher record exists) */}
       {profile && (
