@@ -5,7 +5,8 @@ import { requirePermission } from "../lib/rbac.js";
 import { maskFields, audit } from "../lib/policy-engine.js";
 import { PERMISSIONS, FLAG_TO_APP_ROLE } from "../lib/permissions.js";
 import { syncPublisherRoomMemberships } from "../lib/matrix-provisioning.js";
-import { deleteKeycloakUser, assignKeycloakRole, removeKeycloakRole } from "../lib/keycloak-admin.js";
+import { deleteKeycloakUser, assignKeycloakRole, removeKeycloakRole, sendExecuteActionsEmail, resetPassword } from "../lib/keycloak-admin.js";
+import { randomBytes } from "node:crypto";
 
 const PublisherBody = Type.Object({
   firstName: Type.String({ minLength: 1 }),
@@ -47,6 +48,12 @@ export async function generateInternalEmail(firstName: string, lastName: string)
     candidate = `${base}${suffix}@${domain}`;
   }
   return candidate;
+}
+
+/** Generate a strong temporary password (base64url + special char) */
+function generateTempPassword(): string {
+  const base = randomBytes(12).toString("base64url").slice(0, 15);
+  return base + "!";
 }
 
 type PublisherBodyType = Static<typeof PublisherBody>;
@@ -278,6 +285,56 @@ export async function publisherRoutes(app: FastifyInstance): Promise<void> {
       }));
 
       return reply.send({ autoMapped, manual });
+    },
+  );
+
+  // Admin-initiated password reset (elder-only)
+  app.post<{ Params: IdParamsType }>(
+    "/publishers/:id/reset-password",
+    {
+      preHandler: [requirePermission(PERMISSIONS.PUBLISHERS_RESET_PASSWORD)],
+      schema: {
+        params: IdParams,
+      },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, keycloakSub: true, firstName: true, lastName: true },
+      });
+
+      if (!publisher?.keycloakSub) {
+        return reply.status(404).send({ error: "Publisher not found or not linked to Keycloak" });
+      }
+
+      try {
+        await sendExecuteActionsEmail(publisher.keycloakSub, ["UPDATE_PASSWORD"], undefined, "hub-app");
+        await audit(
+          "publisher.reset-password",
+          request.user.sub,
+          "Publisher",
+          publisher.id,
+          undefined,
+          { method: "email" },
+        );
+        return reply.send({ method: "email", message: "Password reset email sent" });
+      } catch {
+        const tempPassword = generateTempPassword();
+        await resetPassword(publisher.keycloakSub, tempPassword, true);
+        await audit(
+          "publisher.reset-password",
+          request.user.sub,
+          "Publisher",
+          publisher.id,
+          undefined,
+          { method: "temporary" },
+        );
+        return reply.send({
+          method: "temporary",
+          temporaryPassword: tempPassword,
+          message: "Temporary password set. User must change it on next login.",
+        });
+      }
     },
   );
 }
