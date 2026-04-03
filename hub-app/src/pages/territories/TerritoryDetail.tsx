@@ -583,25 +583,34 @@ export function TerritoryDetail() {
 
     for (let i = 0; i < uniqueCount; i++) {
       const coord = editCoords[i]!;
-      const el = document.createElement("div");
-      el.className = "clip-vertex";
-      el.dataset.vertexIndex = String(i);
-      el.style.cssText = `
+
+      // Outer container — MapLibre controls its `transform` for positioning.
+      // We must NEVER set `transform` on this element or MapLibre loses the position.
+      const container = document.createElement("div");
+      container.className = "clip-vertex";
+      container.dataset.vertexIndex = String(i);
+      container.style.cssText = "cursor: pointer; z-index: 10; padding: 4px;";
+
+      // Inner dot — safe to style freely (background, border, scale)
+      const dot = document.createElement("div");
+      dot.style.cssText = `
         width: 14px; height: 14px; border-radius: 50%;
         background: rgba(255,255,255,0.9); border: 2px solid #64748b;
-        cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-        z-index: 10; transition: transform 0.15s, background 0.15s, border-color 0.15s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        transition: transform 0.15s, background 0.15s, border-color 0.15s;
+        pointer-events: none;
       `;
-      el.title = "Click to select";
-      el.addEventListener("mouseenter", () => { el.style.transform = "scale(1.3)"; });
-      el.addEventListener("mouseleave", () => { el.style.transform = "scale(1)"; });
+      container.appendChild(dot);
 
-      const marker = new MarkerClass({ element: el, draggable: false })
+      container.addEventListener("mouseenter", () => { dot.style.transform = "scale(1.3)"; });
+      container.addEventListener("mouseleave", () => { dot.style.transform = "scale(1)"; });
+
+      const marker = new MarkerClass({ element: container, draggable: false })
         .setLngLat([coord[0], coord[1]])
         .addTo(map as any);
 
       const idx = i;
-      el.addEventListener("click", (e) => {
+      container.addEventListener("click", (e) => {
         e.stopPropagation();
         clipSelectVertexRef.current(idx);
       });
@@ -623,14 +632,16 @@ export function TerritoryDetail() {
     const endIdx = clipSegment.endIndex;
 
     clipMarkersRef.current.forEach((marker) => {
-      const el = marker.getElement();
-      const idx = parseInt(el.dataset.vertexIndex ?? "-1", 10);
+      const container = marker.getElement();
+      const dot = container.querySelector("div") as HTMLDivElement | null;
+      if (!dot) return;
+      const idx = parseInt(container.dataset.vertexIndex ?? "-1", 10);
       const isStart = idx === startIdx;
       const isEnd = idx === endIdx;
 
-      el.style.background = isStart ? "#f59e0b" : isEnd ? "#22c55e" : "rgba(255,255,255,0.9)";
-      el.style.borderColor = isStart ? "#92400e" : isEnd ? "#166534" : "#64748b";
-      el.title = isStart ? "Start vertex (A)" : isEnd ? "End vertex (B)" : "Click to select";
+      dot.style.background = isStart ? "#f59e0b" : isEnd ? "#22c55e" : "rgba(255,255,255,0.9)";
+      dot.style.borderColor = isStart ? "#92400e" : isEnd ? "#166534" : "#64748b";
+      container.title = isStart ? "Start vertex (A)" : isEnd ? "End vertex (B)" : "Click to select";
     });
   }, [clipMode, clipSegment.startIndex, clipSegment.endIndex]);
 
