@@ -419,5 +419,8 @@
   "invite.complete.email": "E-Mail",
   "invite.complete.tempPassword": "Temporary Password",
   "invite.complete.securityNote": "This password is temporary — you will be required to change it on first login. Do not share it with anyone.",
-  "invite.complete.login": "Log in now"
+  "invite.complete.login": "Log in now",
+  "territory.boundary.delete": "Delete Boundary",
+  "territory.boundary.delete.confirm": "Are you sure you want to delete the boundary for territory {number} \u2014 {name}? This cannot be undone.",
+  "territory.boundary.delete.success": "Boundary deleted"
 }

@@ -421,5 +421,8 @@
   "invite.complete.email": "E-Mail",
   "invite.complete.tempPassword": "Temporäres Passwort",
   "invite.complete.securityNote": "Dieses Passwort ist temporär — du musst es bei der ersten Anmeldung ändern. Teile es mit niemandem.",
-  "invite.complete.login": "Jetzt anmelden"
+  "invite.complete.login": "Jetzt anmelden",
+  "territory.boundary.delete": "Grenze l\u00f6schen",
+  "territory.boundary.delete.confirm": "M\u00f6chten Sie die Grenze f\u00fcr Gebiet {number} \u2014 {name} wirklich l\u00f6schen? Dies kann nicht r\u00fcckg\u00e4ngig gemacht werden.",
+  "territory.boundary.delete.success": "Grenze gel\u00f6scht"
 }

@@ -618,6 +618,15 @@ export function getViolations(token: string): Promise<TerritoryViolation[]> {
   return apiFetch("/territories/violations", token);
 }
 
+export function deleteBoundary(
+  token: string,
+  territoryId: string,
+): Promise<TerritoryListItem> {
+  return apiFetch(`/territories/${territoryId}/boundaries`, token, {
+    method: "DELETE",
+  });
+}
+
 export function getVersions(token: string, territoryId: string): Promise<BoundaryVersion[]> {
   return apiFetch(`/territories/${territoryId}/versions`, token);
 }
