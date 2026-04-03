@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.2
+
+### Gap Detection Bugfixes (#286)
+- fix: bulk ignore returns 400 when selecting >200 buildings — now chunks into batches of 200
+- fix: filter out features with missing osmId before sending ignore request
+- fix: remove orphaned `gap-markers-border` layer cleanup that caused console errors
+
 ## v2026.04.03.1
 
 ### Gap Detection — Shift+Drag Bulk Ignore (#284)

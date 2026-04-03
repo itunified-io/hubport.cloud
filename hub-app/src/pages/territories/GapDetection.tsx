@@ -199,7 +199,6 @@ export function GapDetection() {
     const map = mapRef.current;
     if (!map) return;
     try { map.removeLayer("gap-markers"); } catch { /* ok */ }
-    try { map.removeLayer("gap-markers-border"); } catch { /* ok */ }
     try { map.removeSource("gaps"); } catch { /* ok */ }
 
     if (!run?.resultGeoJson || run.resultGeoJson.features.length === 0) return;
@@ -559,23 +558,37 @@ export function GapDetection() {
     }
   };
 
-  /** Handle bulk ignore from rectangle selection. */
+  /** Handle bulk ignore from rectangle selection. Chunks into batches of 200 (API limit). */
   const handleRectangleIgnore = async () => {
     if (!selectedRun || !user?.access_token || selectedFeatures.length === 0) return;
     setIsIgnoring(true);
 
-    const buildings = selectedFeatures.map((f) => ({
-      territoryId: selectedRun.territoryId,
-      osmId: (f.properties?.osmId as string) ?? "",
-      reason: selectIgnoreReason,
-      lat: f.properties?.lat as number | undefined,
-      lng: f.properties?.lng as number | undefined,
-      streetAddress: f.properties?.streetAddress as string | undefined,
-      buildingType: f.properties?.buildingType as string | undefined,
-    }));
+    // Filter out features with missing/empty osmId and build payload
+    const buildings = selectedFeatures
+      .filter((f) => f.properties?.osmId)
+      .map((f) => ({
+        territoryId: selectedRun.territoryId,
+        osmId: f.properties!.osmId as string,
+        reason: selectIgnoreReason,
+        lat: f.properties?.lat as number | undefined,
+        lng: f.properties?.lng as number | undefined,
+        streetAddress: f.properties?.streetAddress as string | undefined,
+        buildingType: f.properties?.buildingType as string | undefined,
+      }));
+
+    if (buildings.length === 0) {
+      setIsIgnoring(false);
+      return;
+    }
+
+    // Chunk into batches of 200 (backend maxItems limit)
+    const BATCH_SIZE = 200;
 
     try {
-      await ignoreBuildings(buildings, user.access_token);
+      for (let i = 0; i < buildings.length; i += BATCH_SIZE) {
+        const batch = buildings.slice(i, i + BATCH_SIZE);
+        await ignoreBuildings(batch, user.access_token);
+      }
       // Clear selection and revert to street view
       setSelectedFeatures([]);
       clearSelectionHighlight();
