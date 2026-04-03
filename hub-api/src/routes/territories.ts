@@ -3,7 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission, requireAnyPermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { runAutoFixPipeline, detectOverlaps, type AutoFixResult, type OverlapInfo } from "../lib/postgis-helpers.js";
+import { runAutoFixPipeline, clipToCongregation, clipToNeighbors, detectOverlaps, type AutoFixResult, type OverlapInfo } from "../lib/postgis-helpers.js";
 import {
   queryRoadsInBBox,
   queryBuildingsInBBox,
@@ -649,6 +649,14 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       let fixed = 0;
       const failed: Array<{ id: string; number: string; error: string }> = [];
 
+      // Two-pass approach per spec:
+      // Pass 1: Clip all to congregation boundary (no neighbor dependencies)
+      // Pass 2: Resolve overlaps in number order (clips against latest DB state)
+
+      // Track intermediate state: territoryId → clipped boundary after pass 1
+      const pass1Results = new Map<string, object>();
+
+      // Pass 1 — Congregation clip
       for (const territory of territories) {
         if (!territory.boundaries) {
           failed.push({ id: territory.id, number: territory.number, error: "No boundary" });
@@ -664,17 +672,45 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
             `Previous boundary before bulk fix`
           );
 
-          // Run auto-fix pipeline
-          const autoFix = await runAutoFixPipeline(
-            prisma,
-            territory.boundaries as object,
-            territory.id
-          );
+          // Validate + clip to congregation boundary
+          const validated = await prisma.$queryRaw<Array<{ valid: string }>>`
+            SELECT ST_AsGeoJSON(ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)}))) as valid
+          `;
+          let current: object = JSON.parse(validated[0].valid);
 
-          if (autoFix.geometryModified) {
+          const congResult = await clipToCongregation(prisma, current);
+          if (congResult?.wasModified) {
+            current = congResult.clipped;
+          }
+
+          pass1Results.set(territory.id, current);
+
+          // Persist pass 1 result immediately so pass 2 reads latest state
+          await prisma.territory.update({
+            where: { id: territory.id },
+            data: { boundaries: current } as any,
+          });
+        } catch (err) {
+          failed.push({
+            id: territory.id,
+            number: territory.number,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Pass 2 — Neighbor overlap resolution (in number order, reads latest DB state)
+      for (const territory of territories) {
+        const pass1Boundary = pass1Results.get(territory.id);
+        if (!pass1Boundary) continue; // Failed in pass 1 or had no boundary
+
+        try {
+          const neighborResult = await clipToNeighbors(prisma, pass1Boundary, territory.id);
+
+          if (neighborResult.removedFrom.length > 0) {
             await prisma.territory.update({
               where: { id: territory.id },
-              data: { boundaries: autoFix.clipped } as any,
+              data: { boundaries: neighborResult.clipped } as any,
             });
           }
 

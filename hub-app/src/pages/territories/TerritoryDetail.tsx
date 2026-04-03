@@ -88,6 +88,7 @@ export function TerritoryDetail() {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [showDeleteBoundaryModal, setShowDeleteBoundaryModal] = useState(false);
   const [deletingBoundary, setDeletingBoundary] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Clip mode state
   const [clipMode, setClipMode] = useState(false);
@@ -757,6 +758,9 @@ export function TerritoryDetail() {
       // Refresh territory data
       const updated = await getTerritory(territory.id, token);
       setTerritory(updated);
+      // Show success message
+      setSuccessMessage(intl.formatMessage({ id: "territory.boundary.delete.success" }));
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error("Delete boundary failed:", err);
       setError(err instanceof Error ? err.message : "Failed to delete boundary");
@@ -1623,6 +1627,13 @@ export function TerritoryDetail() {
             setPendingBoundaries(null);
           }}
         />
+      )}
+
+      {/* Success message banner */}
+      {successMessage && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-green-500/20 border border-green-500/40 rounded-[var(--radius)] shadow-xl text-xs text-green-400 font-medium">
+          {successMessage}
+        </div>
       )}
 
       {/* Delete Boundary Confirmation Modal */}

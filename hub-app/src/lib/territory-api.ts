@@ -510,7 +510,7 @@ export async function importBranchKml(file: File, token: string): Promise<Import
   const kml = await file.text();
   return apiFetch("/territories/import/kml/branch", token, {
     method: "POST",
-    body: JSON.stringify({ kml, name: file.name.replace(/\.kml$/i, "") }),
+    body: JSON.stringify({ kml }),
   });
 }
 

@@ -32,7 +32,7 @@ export function ViolationBadges({
       .then((data) => { setViolations(data); setFetched(true); onViolationsLoaded?.(data); })
       .catch(() => { setError(true); setFetched(true); })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, onViolationsLoaded]);
 
   useEffect(() => {
     if (!map) return;

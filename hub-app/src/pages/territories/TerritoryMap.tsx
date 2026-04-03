@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Map, Plus, Loader2, X, ShieldAlert } from "lucide-react";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLibre";
@@ -99,6 +99,8 @@ export function TerritoryMap() {
   });
 
   const { can } = usePermissions();
+  const intl = useIntl();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [territories, setTerritories] = useState<TerritoryListItem[]>([]);
   const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,7 @@ export function TerritoryMap() {
   const [fixSelectedIds, setFixSelectedIds] = useState<Set<string>>(new Set());
   const [fixRunning, setFixRunning] = useState(false);
   const [violationList, setViolationList] = useState<TerritoryViolation[]>([]);
+  const [fixResultMessage, setFixResultMessage] = useState<string | null>(null);
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
   const congBoundaryRef = useRef<TerritoryListItem | null>(null);
@@ -133,7 +136,7 @@ export function TerritoryMap() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, refreshKey]);
 
   /** Add all map layers */
   const addAllLayers = useCallback(() => {
@@ -283,20 +286,25 @@ export function TerritoryMap() {
     try {
       const result = await bulkFixViolations(token, Array.from(fixSelectedIds));
       if (result.failed.length === 0) {
-        // All fixed
+        setFixResultMessage(intl.formatMessage({ id: "territory.fix.success" }, { count: result.fixed }));
       } else {
-        // Partial fix
+        setFixResultMessage(intl.formatMessage({ id: "territory.fix.partial" }, { fixed: result.fixed, failed: result.failed.length }));
       }
-      // Exit fix mode and refresh
+      // Exit fix mode and re-fetch data
       setFixMode(false);
       setFixSelectedIds(new Set());
-      window.location.reload();
+      setViolationList([]);
+      setRefreshKey((k) => k + 1);
+      // Auto-clear message after 5s
+      setTimeout(() => setFixResultMessage(null), 5000);
     } catch (err) {
       console.error("Bulk fix failed:", err);
+      setFixResultMessage("Bulk fix failed");
+      setTimeout(() => setFixResultMessage(null), 5000);
     } finally {
       setFixRunning(false);
     }
-  }, [token, fixSelectedIds]);
+  }, [token, fixSelectedIds, intl]);
 
   const handleViolationsLoaded = useCallback((violations: TerritoryViolation[]) => {
     setViolationList(violations);
@@ -479,7 +487,15 @@ export function TerritoryMap() {
           selectedIds={fixSelectedIds}
           onToggleSelect={handleToggleFixSelect}
           onViolationsLoaded={handleViolationsLoaded}
+          key={refreshKey}
         />
+
+        {/* Fix result message */}
+        {fixResultMessage && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-[var(--bg-2)] border border-[var(--amber)]/40 rounded-[var(--radius)] shadow-xl text-xs text-[var(--text)]">
+            {fixResultMessage}
+          </div>
+        )}
       </div>
 
       {/* Smart create modal (after drawing) */}
