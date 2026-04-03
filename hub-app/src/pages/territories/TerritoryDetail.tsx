@@ -6,6 +6,7 @@ import {
   Layers, Maximize2, Minimize2, Home, Building, Trees,
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
   ChevronDown, Check, X, Edit3, Save, Wand2, AlertTriangle, Crop,
+  MoreVertical, Trash2,
 } from "lucide-react";
 import type { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
@@ -13,7 +14,7 @@ import { usePermissions } from "@/auth/PermissionProvider";
 import ExportDropdown from "./ExportDropdown";
 import {
   getTerritory, listTerritories, listAddresses, updateAddress,
-  previewFix, updateTerritoryBoundaries, getViolations, getSnapContext,
+  previewFix, updateTerritoryBoundaries, getViolations, getSnapContext, deleteBoundary,
   type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult, type TerritoryViolation,
 } from "@/lib/territory-api";
 import { useClipSegment, type ClipCandidate } from "@/hooks/useClipSegment";
@@ -82,6 +83,11 @@ export function TerritoryDetail() {
   const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
   const [editViolations, setEditViolations] = useState<TerritoryViolation | null>(null);
   const [autoFixing, setAutoFixing] = useState(false);
+
+  // Kebab menu + delete boundary state
+  const [kebabOpen, setKebabOpen] = useState(false);
+  const [showDeleteBoundaryModal, setShowDeleteBoundaryModal] = useState(false);
+  const [deletingBoundary, setDeletingBoundary] = useState(false);
 
   // Clip mode state
   const [clipMode, setClipMode] = useState(false);
@@ -739,6 +745,26 @@ export function TerritoryDetail() {
     }
   }, [territory, updateMapPolygon, extractRing]);
 
+  // ─── Delete boundary handler ─────────────────────────────────
+
+  const handleDeleteBoundary = useCallback(async () => {
+    if (!token || !territory) return;
+    setDeletingBoundary(true);
+    try {
+      await deleteBoundary(token, territory.id);
+      setShowDeleteBoundaryModal(false);
+      setKebabOpen(false);
+      // Refresh territory data
+      const updated = await getTerritory(territory.id, token);
+      setTerritory(updated);
+    } catch (err) {
+      console.error("Delete boundary failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete boundary");
+    } finally {
+      setDeletingBoundary(false);
+    }
+  }, [token, territory]);
+
   // ─── Inline edit handlers ────────────────────────────────────
 
   const handleSaveBellCount = async (addr: Address) => {
@@ -1021,6 +1047,31 @@ export function TerritoryDetail() {
                     </button>
                     {can("app:territories.export") && territory?.boundaries && (
                       <ExportDropdown territories={[territory]} compact />
+                    )}
+                    {/* Kebab menu */}
+                    {can("app:territories.edit") && territory?.boundaries && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setKebabOpen((v) => !v)}
+                          className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {kebabOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setKebabOpen(false)} />
+                            <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-xl min-w-[180px]">
+                              <button
+                                onClick={() => { setKebabOpen(false); setShowDeleteBoundaryModal(true); }}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={13} />
+                                <FormattedMessage id="territory.boundary.delete" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                     <button
                       onClick={() => setMapExpanded((v) => !v)}
@@ -1572,6 +1623,39 @@ export function TerritoryDetail() {
             setPendingBoundaries(null);
           }}
         />
+      )}
+
+      {/* Delete Boundary Confirmation Modal */}
+      {showDeleteBoundaryModal && territory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius)] p-6 max-w-md mx-4 shadow-2xl">
+            <h3 className="text-sm font-semibold text-[var(--text)] mb-3">
+              <FormattedMessage id="territory.boundary.delete" />
+            </h3>
+            <p className="text-sm text-[var(--text-muted)] mb-6">
+              <FormattedMessage
+                id="territory.boundary.delete.confirm"
+                values={{ number: territory.number, name: territory.name }}
+              />
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteBoundaryModal(false)}
+                disabled={deletingBoundary}
+                className="px-4 py-2 text-xs font-medium border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+              >
+                <FormattedMessage id="common.cancel" defaultMessage="Cancel" />
+              </button>
+              <button
+                onClick={handleDeleteBoundary}
+                disabled={deletingBoundary}
+                className="px-4 py-2 text-xs font-semibold bg-red-500 text-white rounded-[var(--radius-sm)] hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {deletingBoundary ? "..." : <FormattedMessage id="territory.boundary.delete" />}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
