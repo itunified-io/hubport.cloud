@@ -1,6 +1,19 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.5
+
+### Territory Detail — Clip Segment Tool
+- feat: add Clip button to territory detail page (alongside Edit) for segment-based boundary alignment
+- feat: click two vertices to define a segment, then clip to nearby roads, neighbors, or congregation boundary
+- feat: preview clipped polygon before saving — user must approve with Save/Cancel
+- feat: "Straighten" option replaces segment with direct line between endpoints
+- feat: snap context cached after first fetch to avoid repeated Overpass API calls
+- feat: resilient to Overpass API failures (429/504) — continues with neighbor/boundary targets only
+- fix: vertex markers use outer/inner div pattern to prevent MapLibre transform conflicts
+- fix: vertex click uses ref to avoid stale closure in useCallback
+- fix: Edit button works correctly after canceling clip mode
+
 ## v2026.04.03.4
 
 ### Gap Detection — Fix console layer errors
