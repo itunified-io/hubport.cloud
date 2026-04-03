@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { FormattedMessage } from "react-intl";
-import { Edit3, Plus, Scissors, Save, X } from "lucide-react";
+import { Edit3, Plus, Scissors, Crop, Save, X } from "lucide-react";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import {
   useTerritoryEditor,
@@ -15,6 +15,8 @@ import { ContextMenu } from "./ContextMenu";
 import { EditHUD } from "./EditHUD";
 import { CreationFlow } from "./CreationFlow";
 import { SplitFlow } from "./SplitFlow";
+import { ClipSegmentPanel } from "./ClipSegmentPanel";
+import { useClipSegment } from "../../hooks/useClipSegment";
 import { extractVertices } from "../../lib/geometry-utils";
 
 interface TerritoryEditorProps {
@@ -65,6 +67,9 @@ export function TerritoryEditor({
     neighborGeometries,
     congregationBoundary,
   );
+
+  // Clip segment tool
+  const clipSegment = useClipSegment(editCoords, snapEngine.targets);
 
   // Track Alt/Option key
   useEffect(() => {
@@ -287,6 +292,24 @@ export function TerritoryEditor({
                 defaultMessage="Split"
               />
             </button>
+            <button
+              onClick={() => {
+                // Enter clip mode: load editCoords and activate clip segment selection
+                if (editor.selectedTerritory?.boundaries) {
+                  const vertices = extractVertices(editor.selectedTerritory.boundaries);
+                  setEditCoords(vertices);
+                }
+                editor.setMode("clip");
+                clipSegment.start();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border-2)] text-[var(--text)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+            >
+              <Crop size={14} />
+              <FormattedMessage
+                id="territories.clip"
+                defaultMessage="Clip"
+              />
+            </button>
           </>
         )}
 
@@ -331,6 +354,35 @@ export function TerritoryEditor({
             </button>
             <button
               onClick={() => handleSetMode("view")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border-2)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+            >
+              <X size={14} />
+              <FormattedMessage
+                id="territories.cancel"
+                defaultMessage="Cancel"
+              />
+            </button>
+          </>
+        )}
+
+        {editor.mode === "clip" && (
+          <>
+            <button
+              onClick={handleSave}
+              disabled={editor.saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--green)] text-black font-medium rounded-[var(--radius-sm)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            >
+              <Save size={14} />
+              <FormattedMessage
+                id="territories.save"
+                defaultMessage="Save"
+              />
+            </button>
+            <button
+              onClick={() => {
+                clipSegment.cancel();
+                handleSetMode("view");
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border-2)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
             >
               <X size={14} />
@@ -431,6 +483,105 @@ export function TerritoryEditor({
         />
       )}
 
+      {/* Clip mode: show clickable vertex handles */}
+      {editor.mode === "clip" && editCoords.length > 0 && (
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-20"
+          style={{ overflow: "visible" }}
+        >
+          <g className="pointer-events-auto">
+            {editCoords.slice(0, -1).map((coord, idx) => {
+              const isStart = clipSegment.startIndex === idx;
+              const isEnd = clipSegment.endIndex === idx;
+              const isSelected = isStart || isEnd;
+              // Highlight vertices in the selected segment
+              const inSegment =
+                clipSegment.startIndex !== null &&
+                clipSegment.endIndex !== null &&
+                (() => {
+                  const s = clipSegment.startIndex!;
+                  const e = clipSegment.endIndex!;
+                  return s <= e
+                    ? idx >= s && idx <= e
+                    : idx >= s || idx <= e;
+                })();
+
+              return (
+                <circle
+                  key={`clip-v-${idx}`}
+                  cx={coord[0]}
+                  cy={coord[1]}
+                  r={isSelected ? 8 : inSegment ? 6 : 5}
+                  fill={
+                    isStart
+                      ? "var(--amber)"
+                      : isEnd
+                        ? "var(--green)"
+                        : inSegment
+                          ? "rgba(251, 191, 36, 0.5)"
+                          : "rgba(255, 255, 255, 0.7)"
+                  }
+                  stroke={isSelected ? "white" : "var(--border-2)"}
+                  strokeWidth={isSelected ? 2 : 1}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => clipSegment.selectVertex(idx)}
+                />
+              );
+            })}
+          </g>
+        </svg>
+      )}
+
+      {/* Clip segment panel (target selection) */}
+      {editor.mode === "clip" &&
+        clipSegment.phase === "choose_target" && (
+          <ClipSegmentPanel
+            candidates={clipSegment.candidates}
+            onSelectCandidate={(candidate) => {
+              const newCoords = clipSegment.applyClip(candidate);
+              if (newCoords) {
+                const beforeCoords = [...editCoords];
+                setEditCoords(newCoords);
+                if (editor.selectedTerritory) {
+                  undoRedo.push({
+                    territoryId: editor.selectedTerritory.id,
+                    beforeGeometry: { type: "clip_segment", coords: beforeCoords },
+                    afterGeometry: { type: "clip_segment", coords: newCoords },
+                    description: `Clip to ${candidate.label}`,
+                  });
+                }
+              }
+            }}
+            onStraighten={() => {
+              const newCoords = clipSegment.straighten();
+              if (newCoords) {
+                const beforeCoords = [...editCoords];
+                setEditCoords(newCoords);
+                if (editor.selectedTerritory) {
+                  undoRedo.push({
+                    territoryId: editor.selectedTerritory.id,
+                    beforeGeometry: { type: "clip_segment", coords: beforeCoords },
+                    afterGeometry: { type: "clip_segment", coords: newCoords },
+                    description: "Straighten segment",
+                  });
+                }
+              }
+            }}
+            onCancel={clipSegment.cancel}
+          />
+      )}
+
+      {/* Clip mode status HUD */}
+      {editor.mode === "clip" && (
+        <div className="absolute bottom-4 left-4 z-20 bg-[var(--bg-1)]/90 border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 text-[10px] text-[var(--text-muted)]">
+          {clipSegment.phase === "idle" || clipSegment.phase === "select_start"
+            ? "Click first vertex to start segment"
+            : clipSegment.phase === "select_end"
+              ? "Click second vertex to end segment"
+              : "Choose a clip target"}
+        </div>
+      )}
+
       {/* Context menu */}
       {contextMenu && (
         <ContextMenu
@@ -444,7 +595,7 @@ export function TerritoryEditor({
       )}
 
       {/* Edit HUD */}
-      {(editor.mode === "edit" || editor.mode === "create") && (
+      {(editor.mode === "edit" || editor.mode === "create" || editor.mode === "clip") && (
         <EditHUD
           canUndo={undoRedo.canUndo}
           canRedo={undoRedo.canRedo}

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { getApiUrl } from "../lib/config";
 
-export type EditorMode = "view" | "edit" | "create" | "split";
+export type EditorMode = "view" | "edit" | "create" | "split" | "clip";
 
 export interface Territory {
   id: string;
