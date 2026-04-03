@@ -76,6 +76,25 @@ export function GapDetection() {
   } | null>(null);
   const [popupReason, setPopupReason] = useState("not_a_residence");
 
+  // ─── Rectangle selection state ──────────────────────────────────
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
+  const [selectedFeatures, setSelectedFeatures] = useState<GeoJsonFeature[]>([]);
+  const [selectIgnoreReason, setSelectIgnoreReason] = useState(IGNORE_REASONS[0]!.value);
+  const [isIgnoring, setIsIgnoring] = useState(false);
+
+  // Refs for synchronous access in map event handlers
+  const isSelectingRef = useRef(false);
+  const justFinishedSelectingRef = useRef(false);
+  const selectedFeaturesRef = useRef<GeoJsonFeature[]>([]);
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Keep selectedFeatures ref in sync with state (for onStyleReady closure)
+  useEffect(() => {
+    selectedFeaturesRef.current = selectedFeatures;
+  }, [selectedFeatures]);
+
   // ─── Fetch territories for map ───────────────────────────────
 
   useEffect(() => {
@@ -202,6 +221,33 @@ export function GapDetection() {
     });
   }, [addSource, addLayer, mapRef]);
 
+  /** Apply yellow highlight to selected gap markers via paint property expressions. */
+  const applySelectionHighlight = useCallback((osmIds: string[]) => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer("gap-markers") || osmIds.length === 0) return;
+
+    map.setPaintProperty("gap-markers", "circle-color", [
+      "match",
+      ["get", "osmId"],
+      ...osmIds.flatMap((id) => [id, "#facc15"]),
+      "#f97316", // default orange
+    ]);
+    map.setPaintProperty("gap-markers", "circle-radius", [
+      "match",
+      ["get", "osmId"],
+      ...osmIds.flatMap((id) => [id, 8]),
+      5, // default
+    ]);
+  }, [mapRef]);
+
+  /** Reset gap marker paint to default (remove selection highlight). */
+  const clearSelectionHighlight = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer("gap-markers")) return;
+    map.setPaintProperty("gap-markers", "circle-color", "#f97316");
+    map.setPaintProperty("gap-markers", "circle-radius", 5);
+  }, [mapRef]);
+
   // ─── Map: click handler for gap markers ──────────────────────
 
   useEffect(() => {
@@ -209,6 +255,8 @@ export function GapDetection() {
     if (!map || !isLoaded) return;
 
     const handleClick = (e: { point: { x: number; y: number }; lngLat: { lng: number; lat: number }; features?: Array<{ properties: Record<string, unknown> }> }) => {
+      // Don't open popup if we just finished a rectangle selection
+      if (justFinishedSelectingRef.current) return;
       if (!e.features || e.features.length === 0) return;
       const f = e.features[0]!;
       setPopupFeature({
@@ -240,17 +288,137 @@ export function GapDetection() {
     };
   }, [mapRef, isLoaded]);
 
+  // ─── Rectangle selection: Shift+drag ────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+    const canvas = map.getCanvas();
+
+    function handleMouseDown(e: MouseEvent) {
+      if (!e.shiftKey || isIgnoring) return;
+      e.preventDefault();
+      e.stopPropagation();
+      map!.dragPan.disable();
+      const rect = canvas.getBoundingClientRect();
+      const point = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      selectionStartRef.current = point;
+      setSelectionStart(point);
+      setSelectionEnd(point);
+      setIsSelecting(true);
+      isSelectingRef.current = true;
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+      if (!isSelectingRef.current) return;
+      const rect = canvas.getBoundingClientRect();
+      setSelectionEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      if (!isSelectingRef.current) return;
+      isSelectingRef.current = false;
+      setIsSelecting(false);
+      map!.dragPan.enable();
+
+      // Read start from ref (not React state) to avoid stale closure
+      const start = selectionStartRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const end = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+      // If drag distance < 5px, treat as click (not selection)
+      if (
+        start &&
+        Math.abs(end.x - start.x) < 5 &&
+        Math.abs(end.y - start.y) < 5
+      ) {
+        setSelectionStart(null);
+        setSelectionEnd(null);
+        return;
+      }
+
+      if (!start) return;
+
+      // Query features in screen-pixel bbox
+      const sw: [number, number] = [
+        Math.min(start.x, end.x),
+        Math.max(start.y, end.y),
+      ];
+      const ne: [number, number] = [
+        Math.max(start.x, end.x),
+        Math.min(start.y, end.y),
+      ];
+      const features = map!.queryRenderedFeatures([sw, ne], {
+        layers: ["gap-markers"],
+      });
+
+      // Clear rectangle overlay
+      setSelectionStart(null);
+      setSelectionEnd(null);
+
+      if (features.length === 0) {
+        return;
+      }
+
+      // Convert to GeoJsonFeature array
+      const geoFeatures: GeoJsonFeature[] = features.map((f) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [0, 0] },
+        properties: f.properties,
+      }));
+
+      setSelectedFeatures(geoFeatures);
+      setSelectIgnoreReason(IGNORE_REASONS[0]!.value);
+
+      // Highlight selected markers
+      const osmIds = features
+        .map((f) => f.properties?.osmId as string)
+        .filter(Boolean);
+      applySelectionHighlight(osmIds);
+
+      // Switch to satellite for visual verification
+      if (activeStyle !== "satellite") {
+        changeStyle("satellite");
+      }
+
+      // Prevent click handler from firing
+      justFinishedSelectingRef.current = true;
+      requestAnimationFrame(() => {
+        justFinishedSelectingRef.current = false;
+      });
+    }
+
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [mapRef, isLoaded, isIgnoring, activeStyle, applySelectionHighlight, changeStyle]);
+
   // ─── Map: initialize layers on style ready ───────────────────
 
   useEffect(() => {
     onStyleReady(() => {
       layersAdded.current = false;
+      // Re-add territory boundary layers (fills, outlines, labels, congregation)
       addMapLayers();
       layersAdded.current = true;
+      // Re-add gap markers for current run
       const sel = runs.find((r) => r.id === selectedRunId);
       if (sel) showGapsOnMap(sel);
+      // Re-apply selection highlighting if active (via ref to avoid stale closure)
+      const currentFeatures = selectedFeaturesRef.current;
+      if (currentFeatures.length > 0) {
+        const osmIds = currentFeatures
+          .map((f) => (f.properties?.osmId as string) ?? "")
+          .filter(Boolean);
+        applySelectionHighlight(osmIds);
+      }
     });
-  }, [onStyleReady, addMapLayers, showGapsOnMap, runs, selectedRunId]);
+  }, [onStyleReady, addMapLayers, showGapsOnMap, applySelectionHighlight, runs, selectedRunId]);
 
   useEffect(() => {
     if (!isLoaded || !territories.length) return;
@@ -258,9 +426,10 @@ export function GapDetection() {
     layersAdded.current = true;
   }, [isLoaded, territories, addMapLayers]);
 
-  // When selectedRunId changes, update gap markers
+  // When selectedRunId changes, update gap markers and clear selection
   const selectedRun = runs.find((r) => r.id === selectedRunId);
   useEffect(() => {
+    setSelectedFeatures([]);
     if (isLoaded && layersAdded.current) {
       showGapsOnMap(selectedRun);
     }
@@ -390,6 +559,43 @@ export function GapDetection() {
     }
   };
 
+  /** Handle bulk ignore from rectangle selection. */
+  const handleRectangleIgnore = async () => {
+    if (!selectedRun || !user?.access_token || selectedFeatures.length === 0) return;
+    setIsIgnoring(true);
+
+    const buildings = selectedFeatures.map((f) => ({
+      territoryId: selectedRun.territoryId,
+      osmId: (f.properties?.osmId as string) ?? "",
+      reason: selectIgnoreReason,
+      lat: f.properties?.lat as number | undefined,
+      lng: f.properties?.lng as number | undefined,
+      streetAddress: f.properties?.streetAddress as string | undefined,
+      buildingType: f.properties?.buildingType as string | undefined,
+    }));
+
+    try {
+      await ignoreBuildings(buildings, user.access_token);
+      // Clear selection and revert to street view
+      setSelectedFeatures([]);
+      clearSelectionHighlight();
+      if (activeStyle === "satellite") changeStyle("street");
+      // Re-fetch runs to update counts
+      await fetchRuns();
+    } catch {
+      // Keep selection active so user can retry
+    } finally {
+      setIsIgnoring(false);
+    }
+  };
+
+  /** Cancel rectangle selection — clear highlights, revert to street view. */
+  const handleRectangleCancel = () => {
+    setSelectedFeatures([]);
+    clearSelectionHighlight();
+    if (activeStyle === "satellite") changeStyle("street");
+  };
+
   const toggleGapSelection = (osmId: string) => {
     setSelectedGaps((prev) => {
       const next = new Set(prev);
@@ -484,6 +690,56 @@ export function GapDetection() {
             >
               <EyeOff size={12} />
               Ignore
+            </button>
+          </div>
+        )}
+
+        {/* Rectangle selection overlay */}
+        {isSelecting && selectionStart && selectionEnd && (
+          <div
+            style={{
+              position: "absolute",
+              left: Math.min(selectionStart.x, selectionEnd.x),
+              top: Math.min(selectionStart.y, selectionEnd.y),
+              width: Math.abs(selectionEnd.x - selectionStart.x),
+              height: Math.abs(selectionEnd.y - selectionStart.y),
+              border: "2px solid #3b82f6",
+              backgroundColor: "rgba(59, 130, 246, 0.15)",
+              pointerEvents: "none",
+              zIndex: 10,
+            }}
+          />
+        )}
+
+        {/* Rectangle selection confirmation bar */}
+        {selectedFeatures.length > 0 && (
+          <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center gap-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-4 py-3 shadow-lg">
+            <span className="text-sm font-medium whitespace-nowrap">
+              {selectedFeatures.length} buildings selected
+            </span>
+            <select
+              value={selectIgnoreReason}
+              onChange={(e) => setSelectIgnoreReason(e.target.value)}
+              className="flex-1 min-w-0 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+            >
+              {IGNORE_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleRectangleIgnore}
+              disabled={isIgnoring}
+              className="rounded-md bg-[var(--amber)] px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            >
+              {isIgnoring ? "…" : intl.formatMessage({ id: "gap.ignore", defaultMessage: "Ignore" })}
+            </button>
+            <button
+              onClick={handleRectangleCancel}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--glass)] cursor-pointer"
+            >
+              {intl.formatMessage({ id: "common.cancel", defaultMessage: "Cancel" })}
             </button>
           </div>
         )}
