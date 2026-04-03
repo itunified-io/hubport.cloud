@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.4
+
+### Gap Detection — Fix console layer errors
+- fix: use `map.getLayer()`/`map.getSource()` existence check instead of try-catch for layer cleanup
+- Eliminates "Cannot remove non-existing layer" console errors on gap detection page
+
 ## v2026.04.03.3
 
 ### Territory Editor — Clip Segment Tool (#288)

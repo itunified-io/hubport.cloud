@@ -198,8 +198,8 @@ export function GapDetection() {
     // Remove old gap layer
     const map = mapRef.current;
     if (!map) return;
-    try { map.removeLayer("gap-markers"); } catch { /* ok */ }
-    try { map.removeSource("gaps"); } catch { /* ok */ }
+    if (map.getLayer("gap-markers")) map.removeLayer("gap-markers");
+    if (map.getSource("gaps")) map.removeSource("gaps");
 
     if (!run?.resultGeoJson || run.resultGeoJson.features.length === 0) return;
 
