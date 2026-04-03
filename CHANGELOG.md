@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.3
+
+### Territory Editor — Clip Segment Tool (#288)
+- feat: new "Clip" tool in territory editor toolbar for segment-based boundary alignment
+- feat: select two vertices to define a boundary segment, then clip to nearest road, neighbor, or boundary
+- feat: "Straighten" option replaces segment with direct line between endpoints
+- feat: full undo/redo integration for clip operations
+- feat: floating panel shows available clip targets ranked by proximity
+- deps: add @turf/nearest-point-on-line, @turf/line-slice, @turf/helpers, @turf/length
+
 ## v2026.04.03.2
 
 ### Gap Detection Bugfixes (#286)

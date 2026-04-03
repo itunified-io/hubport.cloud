@@ -72,6 +72,11 @@ export function EditHUD({
             id="territories.createMode"
             defaultMessage="CREATE MODE"
           />
+        ) : mode === "clip" ? (
+          <FormattedMessage
+            id="territories.clipMode"
+            defaultMessage="CLIP MODE"
+          />
         ) : null}
       </div>
 
