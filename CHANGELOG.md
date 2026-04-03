@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.6
+
+### Gap Detection — Shift+Drag and Ignore Fixes
+- fix: disable MapLibre BoxZoom so shift+drag rectangle selection no longer triggers map zoom-out
+- fix: ignored buildings now properly disappear from map after bulk ignore (force refresh gap markers)
+- fix: per-batch error handling — failed batches are logged but remaining batches continue
+- chore: align package.json version with CalVer release tags (prevents version drift)
+
 ## v2026.04.03.5
 
 ### Territory Detail — Clip Segment Tool
