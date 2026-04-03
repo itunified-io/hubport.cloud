@@ -43,6 +43,7 @@ import { serviceGroupMeetingRoutes } from "./routes/service-group-meetings.js";
 import { deviceRoutes } from "./routes/devices.js";
 import { syncRoutes } from "./routes/sync.js";
 import { pushRoutes } from "./routes/push.js";
+import { territoryExportRoutes } from "./routes/territory-export.js";
 import prisma from "./lib/prisma.js";
 import { startTokenRotationJob } from './jobs/token-rotation.js';
 import { startWorkbookAutoFetch } from './jobs/workbook-auto-fetch.js';
@@ -128,6 +129,7 @@ async function start(): Promise<void> {
   await app.register(deviceRoutes);
   await app.register(syncRoutes);
   await app.register(pushRoutes);
+  await app.register(territoryExportRoutes);
 
   // Auto-sync schema on startup (applies new columns/tables)
   if (process.env.AUTO_MIGRATE !== "false") {
