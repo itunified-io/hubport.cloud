@@ -7,9 +7,16 @@ interface ViolationBadgesProps {
   maplibreModule: React.RefObject<any | null>;
   token: string | null;
   territories: Array<{ id: string; number: string; boundaries: unknown }>;
+  fixMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onViolationsLoaded?: (violations: TerritoryViolation[]) => void;
 }
 
-export function ViolationBadges({ map, maplibreModule, token, territories }: ViolationBadgesProps) {
+export function ViolationBadges({
+  map, maplibreModule, token, territories,
+  fixMode = false, selectedIds, onToggleSelect, onViolationsLoaded,
+}: ViolationBadgesProps) {
   const navigate = useNavigate();
   const [violations, setViolations] = useState<TerritoryViolation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +29,7 @@ export function ViolationBadges({ map, maplibreModule, token, territories }: Vio
     setLoading(true);
     setError(false);
     getViolations(token)
-      .then((data) => { setViolations(data); setFetched(true); })
+      .then((data) => { setViolations(data); setFetched(true); onViolationsLoaded?.(data); })
       .catch(() => { setError(true); setFetched(true); })
       .finally(() => setLoading(false));
   }, [token]);
@@ -42,48 +49,56 @@ export function ViolationBadges({ map, maplibreModule, token, territories }: Vio
     const MarkerClass = mgl.Marker || mgl.default?.Marker;
     if (!MarkerClass) return;
 
-    {
-      for (const v of violations) {
-        const territory = territories.find((t) => t.id === v.territoryId);
-        if (!territory?.boundaries) continue;
+    for (const v of violations) {
+      const territory = territories.find((t) => t.id === v.territoryId);
+      if (!territory?.boundaries) continue;
 
-        const bounds = territory.boundaries as { type?: string; coordinates?: number[][][] };
-        const coords = bounds.coordinates?.[0];
-        if (!coords || coords.length < 2) continue;
+      const bounds = territory.boundaries as { type?: string; coordinates?: number[][][] };
+      const coords = bounds.coordinates?.[0];
+      if (!coords || coords.length < 2) continue;
 
-        const ring = coords.slice(0, -1);
-        let cx = 0, cy = 0;
-        for (const coord of ring) { cx += (coord[0] ?? 0); cy += (coord[1] ?? 0); }
-        cx /= ring.length;
-        cy /= ring.length;
+      const ring = coords.slice(0, -1);
+      let cx = 0, cy = 0;
+      for (const coord of ring) { cx += (coord[0] ?? 0); cy += (coord[1] ?? 0); }
+      cx /= ring.length;
+      cy /= ring.length;
 
-        const hasExceedsBoundary = v.violations.some((vv) => vv === "exceeds_boundary");
-        const color = hasExceedsBoundary ? "#ef4444" : "#f59e0b";
+      const hasExceedsBoundary = v.violations.some((vv) => vv === "exceeds_boundary");
+      const isSelected = fixMode && selectedIds?.has(v.territoryId);
+      const baseColor = hasExceedsBoundary ? "#ef4444" : "#f59e0b";
+      const color = isSelected ? "#f59e0b" : baseColor;
+      const size = isSelected ? "28px" : "22px";
 
-        const el = document.createElement("div");
-        el.className = "violation-badge";
-        el.style.cssText = `
-          width: 22px; height: 22px; border-radius: 50%;
-          background: ${color}; color: ${hasExceedsBoundary ? "white" : "black"};
-          display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 700; cursor: pointer;
-          box-shadow: 0 2px 8px ${color}66;
-        `;
-        el.textContent = "!";
+      const el = document.createElement("div");
+      el.className = "violation-badge";
+      el.style.cssText = `
+        width: ${size}; height: ${size}; border-radius: 50%;
+        background: ${color}; color: ${isSelected ? "black" : hasExceedsBoundary ? "white" : "black"};
+        display: flex; align-items: center; justify-content: center;
+        font-size: ${isSelected ? "14px" : "12px"}; font-weight: 700; cursor: pointer;
+        box-shadow: 0 2px 8px ${color}66;
+        ${isSelected ? "border: 2px solid white;" : ""}
+        transition: all 0.15s ease;
+      `;
+      el.textContent = isSelected ? "\u2713" : "!";
+
+      if (fixMode) {
+        el.onclick = () => onToggleSelect?.(v.territoryId);
+      } else {
         el.onclick = () => navigate(`/territories/${v.territoryId}`);
-
-        const marker = new MarkerClass({ element: el })
-          .setLngLat([cx, cy])
-          .addTo(map);
-        markersRef.current.push(marker);
       }
+
+      const marker = new MarkerClass({ element: el })
+        .setLngLat([cx, cy])
+        .addTo(map);
+      markersRef.current.push(marker);
     }
 
     return () => {
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
     };
-  }, [map, violations, territories, navigate]);
+  }, [map, violations, territories, navigate, fixMode, selectedIds, onToggleSelect]);
 
   // Status indicator in bottom-right corner
   if (!fetched && !loading) return null;
