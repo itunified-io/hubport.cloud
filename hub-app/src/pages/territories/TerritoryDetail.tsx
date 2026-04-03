@@ -410,6 +410,8 @@ export function TerritoryDetail() {
     clipSegment.cancel();
     setClipMode(false);
     setClipSnapTargets([]);
+    setEditCoords([]);
+    setMapExpanded(false);
     clipMarkersRef.current.forEach((m) => m.remove());
     clipMarkersRef.current = [];
     // Restore original polygon
