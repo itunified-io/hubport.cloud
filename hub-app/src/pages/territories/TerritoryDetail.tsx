@@ -87,6 +87,8 @@ export function TerritoryDetail() {
   const [clipSnapTargets, setClipSnapTargets] = useState<SnapTarget[]>([]);
   const [clipLoading, setClipLoading] = useState(false);
   const clipMarkersRef = useRef<Marker[]>([]);
+  // Cache snap context so Overpass is only called once per page load
+  const snapContextCacheRef = useRef<any>(null);
 
   // Clip segment hook — initialized with current editCoords and snap targets
   const clipSegment = useClipSegment(editCoords, clipSnapTargets);
@@ -357,21 +359,26 @@ export function TerritoryDetail() {
         });
       }
 
-      // Try to fetch road data from Overpass (may fail/timeout — non-blocking)
+      // Fetch snap context (roads, local streets, water) — cached after first fetch
       try {
-        const lngs = ring.map((c) => c[0]);
-        const lats = ring.map((c) => c[1]);
-        const pad = 0.005; // ~500m padding
-        const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
+        let ctx = snapContextCacheRef.current;
+        if (!ctx) {
+          const lngs = ring.map((c) => c[0]);
+          const lats = ring.map((c) => c[1]);
+          const pad = 0.005; // ~500m padding
+          const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
+          ctx = await getSnapContext(bbox, token);
+          snapContextCacheRef.current = ctx;
+        }
 
-        const ctx = await getSnapContext(bbox, token);
-
-        // Convert road features to SnapTargets
-        if (ctx.roads?.features) {
-          for (const f of ctx.roads.features) {
+        // Convert road + local_street features to SnapTargets
+        const features = (ctx as any)?.features ?? (ctx as any)?.roads?.features ?? [];
+        for (const f of features) {
+          const snapType = f.properties?.snapType;
+          if (snapType === "road" || snapType === "local_street") {
             targets.push({
               type: "road",
-              label: (f.properties as any)?.name ?? "Road",
+              label: f.properties?.name ?? "Road",
               geometry: f.geometry as SnapTarget["geometry"],
             });
           }
