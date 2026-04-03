@@ -293,6 +293,12 @@ export function GapDetection() {
     if (!map || !isLoaded) return;
     const canvas = map.getCanvas();
 
+    // Disable MapLibre's built-in BoxZoom (shift+drag to zoom) so our
+    // rectangle selection can use shift+drag without triggering a zoom.
+    if ((map as any).boxZoom) {
+      (map as any).boxZoom.disable();
+    }
+
     function handleMouseDown(e: MouseEvent) {
       if (!e.shiftKey || isIgnoring) return;
       e.preventDefault();
@@ -585,16 +591,28 @@ export function GapDetection() {
     const BATCH_SIZE = 200;
 
     try {
+      let batchErrors = 0;
       for (let i = 0; i < buildings.length; i += BATCH_SIZE) {
         const batch = buildings.slice(i, i + BATCH_SIZE);
-        await ignoreBuildings(batch, user.access_token);
+        try {
+          await ignoreBuildings(batch, user.access_token);
+        } catch (batchErr) {
+          batchErrors++;
+          console.error(`Batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`, batchErr);
+        }
       }
       // Clear selection and revert to street view
       setSelectedFeatures([]);
       clearSelectionHighlight();
       if (activeStyle === "satellite") changeStyle("street");
-      // Re-fetch runs to update counts
-      await fetchRuns();
+      // Re-fetch runs and force refresh gap markers on map
+      const updatedRuns = await getGapRuns(user.access_token);
+      setRuns(updatedRuns);
+      const updatedRun = updatedRuns.find((r) => r.id === selectedRunId);
+      if (updatedRun) showGapsOnMap(updatedRun);
+      if (batchErrors > 0) {
+        console.warn(`${batchErrors} batch(es) failed. Some buildings may not have been ignored.`);
+      }
     } catch {
       // Keep selection active so user can retry
     } finally {
