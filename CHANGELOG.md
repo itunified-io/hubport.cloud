@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.1
+
+### Gap Detection — Shift+Drag Bulk Ignore (#284)
+- feat: shift+drag rectangle selection on gap detection map to bulk-ignore buildings
+- Hold Shift + drag to draw selection rectangle, buildings inside are highlighted yellow
+- Auto-switch to satellite view for visual verification
+- Confirmation bar with reason picker and Ignore/Cancel buttons
+- Uses existing batch ignore API (up to 200 buildings per call)
+- chore: publisher form refactor, sync fixes, device routes, i18n updates
+
 ## v2026.04.01.16
 
 ### Map fixes + upgrade instructions (#275)
