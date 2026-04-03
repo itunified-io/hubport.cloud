@@ -49,6 +49,11 @@ RUN npm run build --workspace=setup-wizard
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
+# Chromium for server-side PDF map rendering (Puppeteer)
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 RUN addgroup -g 1001 hubport && adduser -u 1001 -G hubport -s /bin/sh -D hubport
 
 # Copy built artifacts

@@ -257,6 +257,25 @@ export function getTerritory(id: string, token: string): Promise<TerritoryListIt
   return apiFetch(`/territories/${id}`, token);
 }
 
+// ─── PDF Export ─────────────────────────────────────────────────────
+
+export async function exportPdf(
+  territoryIds: string[],
+  token: string,
+  styles?: ("satellite" | "street")[],
+): Promise<Blob> {
+  const res = await fetch(`${getApiUrl()}/territories/export/pdf`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ territoryIds, ...(styles?.length ? { styles } : {}) }),
+  });
+  if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
+  return res.blob();
+}
+
 // ─── Address endpoints ──────────────────────────────────────────
 
 export function listAddresses(

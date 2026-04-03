@@ -10,6 +10,7 @@ import {
 import type { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
+import ExportDropdown from "./ExportDropdown";
 import {
   getTerritory, listTerritories, listAddresses, updateAddress,
   previewFix, updateTerritoryBoundaries, getViolations, getSnapContext,
@@ -1018,6 +1019,9 @@ export function TerritoryDetail() {
                       <Crop size={13} />
                       {clipLoading ? "Loading..." : "Clip"}
                     </button>
+                    {can("app:territories.export") && territory?.boundaries && (
+                      <ExportDropdown territories={[territory]} compact />
+                    )}
                     <button
                       onClick={() => setMapExpanded((v) => !v)}
                       className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"

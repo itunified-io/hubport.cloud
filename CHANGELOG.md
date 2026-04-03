@@ -1,6 +1,20 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.8
+
+### Territory Polygon Export
+- feat: add KML 2.2, GeoJSON (RFC 7946), GPX 1.1 client-side export for territory polygons
+- feat: add server-side PDF map export via Puppeteer + pdfkit (satellite + street styles)
+- feat: ExportDropdown component on TerritoryDetail page (single territory export)
+- feat: checkbox selection + export toolbar on TerritoryList page (bulk + export all)
+- feat: `TERRITORIES_EXPORT` permission for RBAC-controlled export access
+- feat: i18n messages for export UI (EN + DE)
+- feat: POST /territories/export/pdf endpoint with ZIP streaming
+- chore: add Chromium to Dockerfile for headless PDF rendering
+- chore: add puppeteer-core, pdfkit, archiver dependencies
+- chore: bump version to 2026.04.03.8
+
 ## v2026.04.03.7
 
 ### Gap Detection — Ignore Visibility Fix + Map Style Zoom Preservation
