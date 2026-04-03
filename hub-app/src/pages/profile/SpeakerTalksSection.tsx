@@ -93,6 +93,7 @@ export function SpeakerTalksSection() {
   if (!hasPublicTalkRole || loading || !speaker) return null;
 
   const myTalkNumbers = new Set(speaker.talks.map((t) => t.publicTalk.talkNumber));
+  const hasTalks = speaker.talks.length > 0;
 
   const availableTalks = allTalks
     .filter((t) => !myTalkNumbers.has(t.talkNumber))
@@ -199,27 +200,29 @@ export function SpeakerTalksSection() {
           </button>
         </div>
 
-        {/* Monthly availability */}
-        <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-2)] rounded-[var(--radius-sm)]">
-          <span className="text-sm text-[var(--text-muted)]">
-            <FormattedMessage id="speaker.monthlyAvailability" />
-          </span>
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((n) => (
-              <button
-                key={n}
-                onClick={() => setMonthlyInviteCap(n)}
-                className={`w-8 h-8 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
-                  monthlyInviteCap === n
-                    ? "bg-[var(--amber)] text-black"
-                    : "bg-[var(--glass-1)] text-[var(--text-muted)] hover:bg-[var(--glass-2)]"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+        {/* Monthly availability — only when talks exist */}
+        {hasTalks && (
+          <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-2)] rounded-[var(--radius-sm)]">
+            <span className="text-sm text-[var(--text-muted)]">
+              <FormattedMessage id="speaker.monthlyAvailability" />
+            </span>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setMonthlyInviteCap(n)}
+                  className={`w-8 h-8 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                    monthlyInviteCap === n
+                      ? "bg-[var(--amber)] text-black"
+                      : "bg-[var(--glass-1)] text-[var(--text-muted)] hover:bg-[var(--glass-2)]"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Talk list with mute toggles */}
         {speaker.talks.length === 0 ? (
@@ -314,8 +317,8 @@ export function SpeakerTalksSection() {
         )}
       </div>
 
-      {/* Sharing Preferences */}
-      <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
+      {/* Sharing Preferences — only when talks exist */}
+      {hasTalks && <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-4">
         <h2 className="text-sm font-medium text-[var(--text)]">
           <FormattedMessage id="speaker.sharingPrefs" />
         </h2>
@@ -357,7 +360,7 @@ export function SpeakerTalksSection() {
         >
           {saving ? "..." : <FormattedMessage id="common.save" />}
         </button>
-      </div>
+      </div>}
     </>
   );
 }

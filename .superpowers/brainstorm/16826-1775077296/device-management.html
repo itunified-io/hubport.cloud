@@ -1,0 +1,338 @@
+<h2>Section 3: Device Management</h2>
+<p class="subtitle">Registration, admin controls, revocation, and max 3 devices per user</p>
+
+<div class="mockup">
+  <div class="mockup-header">Device Registration Flow</div>
+  <div class="mockup-body" style="padding:20px;font-size:13px;">
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+
+      <!-- Step 1 -->
+      <div style="flex:1;min-width:160px;text-align:center;">
+        <div style="background:#3b82f620;border:1px solid #3b82f640;border-radius:8px;padding:14px;">
+          <div style="font-size:24px;margin-bottom:6px;">🔐</div>
+          <div style="font-weight:600;color:#3b82f6;font-size:11px;">1. Keycloak Login</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px;">OIDC token received</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+      <!-- Step 2 -->
+      <div style="flex:1;min-width:160px;text-align:center;">
+        <div style="background:#d9770620;border:1px solid #d9770640;border-radius:8px;padding:14px;">
+          <div style="font-size:24px;margin-bottom:6px;">📱</div>
+          <div style="font-weight:600;color:#d97706;font-size:11px;">2. Check localStorage</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px;">deviceId exists?<br>Yes → verify · No → register</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+      <!-- Step 3 -->
+      <div style="flex:1;min-width:160px;text-align:center;">
+        <div style="background:#22c55e20;border:1px solid #22c55e40;border-radius:8px;padding:14px;">
+          <div style="font-size:24px;margin-bottom:6px;">✅</div>
+          <div style="font-weight:600;color:#22c55e;font-size:11px;">3. POST /devices/register</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px;">UUID + metadata sent<br>Server checks limit (≤3)</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+      <!-- Step 4 -->
+      <div style="flex:1;min-width:160px;text-align:center;">
+        <div style="background:#a855f720;border:1px solid #a855f740;border-radius:8px;padding:14px;">
+          <div style="font-size:24px;margin-bottom:6px;">🔑</div>
+          <div style="font-weight:600;color:#a855f7;font-size:11px;">4. Get Encryption Key</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px;">POST /devices/encryption-key<br>Key held in memory only</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+      <!-- Step 5 -->
+      <div style="flex:1;min-width:160px;text-align:center;">
+        <div style="background:#06b6d420;border:1px solid #06b6d440;border-radius:8px;padding:14px;">
+          <div style="font-size:24px;margin-bottom:6px;">⬇️</div>
+          <div style="font-weight:600;color:#06b6d4;font-size:11px;">5. Initial Sync</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Full pull → encrypt → store<br>App ready for offline</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Device metadata -->
+<div style="margin-top:24px;">
+  <h3>Device Record — What Gets Stored</h3>
+  <div class="mockup">
+    <div class="mockup-header">Prisma: Device Model</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;">
+      <pre style="background:#0d1117;padding:16px;border-radius:8px;overflow-x:auto;color:#e2e8f0;font-size:11px;line-height:1.8;">model Device {
+  id            String    @id @default(uuid())
+  tenantId      String
+  userId        String    // Keycloak sub
+  deviceUuid    String    // client-generated UUID
+  userAgent     String    // navigator.userAgent
+  platform      String    // navigator.platform (e.g. "iPhone", "Win32")
+  screenSize    String    // e.g. "390x844"
+  displayName   String    // auto-generated: "iPhone · Safari"
+  status        String    @default("active")  // active | revoked
+  revokedAt     DateTime?
+  revokedBy     String?   // admin userId who revoked
+  revokeReason  String?   // optional message shown to user
+  lastSyncAt    DateTime?
+  lastIp        String?
+  registeredAt  DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, deviceUuid])
+  @@index([tenantId, userId])
+}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Limit enforcement -->
+<div style="margin-top:24px;">
+  <h3>Device Limit Enforcement</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+
+    <div style="background:#22c55e15;border:1px solid #22c55e30;border-radius:8px;padding:16px;">
+      <div style="font-weight:600;color:#22c55e;font-size:13px;margin-bottom:8px;">✅ Under Limit (< 3 devices)</div>
+      <div style="font-size:12px;color:#94a3b8;line-height:1.6;">
+        POST /devices/register → <code>201 Created</code><br>
+        Device auto-registered, no friction<br>
+        Admin sees it in device list immediately
+      </div>
+    </div>
+
+    <div style="background:#ef444415;border:1px solid #ef444430;border-radius:8px;padding:16px;">
+      <div style="font-weight:600;color:#ef4444;font-size:13px;margin-bottom:8px;">🚫 At Limit (3 devices)</div>
+      <div style="font-size:12px;color:#94a3b8;line-height:1.6;">
+        POST /devices/register → <code>409 Conflict</code><br>
+        Response includes list of existing devices<br>
+        User sees dialog: "You have 3 registered devices.<br>Remove one to use this device."<br>
+        User picks one to remove → <code>DELETE /devices/:id</code> → retry register
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Panel Mockup -->
+<div style="margin-top:24px;">
+  <h3>Admin View — Device Management</h3>
+  <div class="mockup">
+    <div class="mockup-header">Settings → Geräte / Devices (admin only)</div>
+    <div class="mockup-body" style="padding:0;font-size:13px;">
+
+      <!-- User group -->
+      <div style="border-bottom:1px solid #333;padding:16px;">
+        <div style="font-weight:600;color:#e2e8f0;font-size:13px;margin-bottom:12px;">Benjamin Büchele</div>
+
+        <!-- Device 1 -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;margin-bottom:6px;">
+          <div style="font-size:20px;">📱</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;color:#e2e8f0;font-size:12px;">iPhone · Safari</div>
+            <div style="font-size:10px;color:#64748b;">390×844 · Last sync: 2 min ago</div>
+          </div>
+          <div style="background:#22c55e30;color:#22c55e;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;">Active</div>
+          <button style="background:#ef444430;color:#ef4444;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">Revoke</button>
+        </div>
+
+        <!-- Device 2 -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;margin-bottom:6px;">
+          <div style="font-size:20px;">💻</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;color:#e2e8f0;font-size:12px;">macOS · Chrome</div>
+            <div style="font-size:10px;color:#64748b;">1920×1080 · Last sync: 1 hour ago</div>
+          </div>
+          <div style="background:#22c55e30;color:#22c55e;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;">Active</div>
+          <button style="background:#ef444430;color:#ef4444;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">Revoke</button>
+        </div>
+
+        <!-- Device 3 - revoked -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;opacity:0.5;">
+          <div style="font-size:20px;">📱</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;color:#e2e8f0;font-size:12px;">iPad · Safari</div>
+            <div style="font-size:10px;color:#64748b;">1024×768 · Revoked: 3 days ago — "Lost device"</div>
+          </div>
+          <div style="background:#ef444430;color:#ef4444;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;">Revoked</div>
+        </div>
+      </div>
+
+      <!-- Another user -->
+      <div style="padding:16px;">
+        <div style="font-weight:600;color:#e2e8f0;font-size:13px;margin-bottom:12px;">Maria Schmidt</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;">
+          <div style="font-size:20px;">📱</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;color:#e2e8f0;font-size:12px;">Android · Chrome</div>
+            <div style="font-size:10px;color:#64748b;">412×915 · Last sync: 5 min ago</div>
+          </div>
+          <div style="background:#22c55e30;color:#22c55e;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;">Active</div>
+          <button style="background:#ef444430;color:#ef4444;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">Revoke</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Revocation Flow -->
+<div style="margin-top:24px;">
+  <h3>Revocation Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">What happens when admin clicks "Revoke"</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;">
+      <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+
+        <div style="flex:1;min-width:180px;text-align:center;">
+          <div style="background:#ef444420;border:1px solid #ef444440;border-radius:8px;padding:14px;">
+            <div style="font-size:20px;margin-bottom:4px;">🛑</div>
+            <div style="font-weight:600;color:#ef4444;font-size:11px;">1. Admin Revokes</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">
+              Confirmation dialog<br>
+              Optional reason field<br>
+              DELETE /devices/:id
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+        <div style="flex:1;min-width:180px;text-align:center;">
+          <div style="background:#f59e0b20;border:1px solid #f59e0b40;border-radius:8px;padding:14px;">
+            <div style="font-size:20px;margin-bottom:4px;">🔑</div>
+            <div style="font-weight:600;color:#f59e0b;font-size:11px;">2. Server-Side</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">
+              Device status → "revoked"<br>
+              Encryption key deleted<br>
+              revokedAt + reason stored
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+        <div style="flex:1;min-width:180px;text-align:center;">
+          <div style="background:#a855f720;border:1px solid #a855f740;border-radius:8px;padding:14px;">
+            <div style="font-size:20px;margin-bottom:4px;">📱</div>
+            <div style="font-weight:600;color:#a855f7;font-size:11px;">3. Next App Open</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">
+              GET /devices/me → "revoked"<br>
+              Show reason to user<br>
+              Wipe all Dexie data
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;padding-top:20px;color:#64748b;">→</div>
+
+        <div style="flex:1;min-width:180px;text-align:center;">
+          <div style="background:#64748b20;border:1px solid #64748b40;border-radius:8px;padding:14px;">
+            <div style="font-size:20px;margin-bottom:4px;">🔄</div>
+            <div style="font-weight:600;color:#64748b;font-size:11px;">4. Fresh Start</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px;">
+              localStorage deviceId cleared<br>
+              Force re-login<br>
+              Can re-register (if under limit)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User's own device view -->
+<div style="margin-top:24px;">
+  <h3>User View — My Devices</h3>
+  <div class="mockup">
+    <div class="mockup-header">Profil → Meine Geräte / My Devices</div>
+    <div class="mockup-body" style="padding:16px;font-size:13px;">
+      <div style="font-size:11px;color:#64748b;margin-bottom:12px;">3 of 3 devices registered</div>
+
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#d9770615;border:1px solid #d9770630;border-radius:8px;margin-bottom:6px;">
+        <div style="font-size:20px;">📱</div>
+        <div style="flex:1;">
+          <div style="font-weight:500;color:#e2e8f0;font-size:12px;">iPhone · Safari <span style="color:#d97706;font-size:10px;">← this device</span></div>
+          <div style="font-size:10px;color:#64748b;">Registered: 2 weeks ago · Last sync: just now</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;margin-bottom:6px;">
+        <div style="font-size:20px;">💻</div>
+        <div style="flex:1;">
+          <div style="font-weight:500;color:#e2e8f0;font-size:12px;">macOS · Chrome</div>
+          <div style="font-size:10px;color:#64748b;">Registered: 1 month ago · Last sync: 1 hour ago</div>
+        </div>
+        <button style="background:#ef444430;color:#ef4444;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">Remove</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#1a1a2e;border-radius:8px;">
+        <div style="font-size:20px;">📱</div>
+        <div style="flex:1;">
+          <div style="font-weight:500;color:#e2e8f0;font-size:12px;">iPad · Safari</div>
+          <div style="font-size:10px;color:#64748b;">Registered: 1 week ago · Last sync: 3 days ago</div>
+        </div>
+        <button style="background:#ef444430;color:#ef4444;border:none;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- API Endpoints Summary -->
+<div style="margin-top:24px;">
+  <h3>API Endpoints</h3>
+  <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;color:#94a3b8;">
+      <thead>
+        <tr style="border-bottom:1px solid #333;color:#e2e8f0;">
+          <th style="text-align:left;padding:6px 8px;font-size:11px;">Method</th>
+          <th style="text-align:left;padding:6px 8px;font-size:11px;">Endpoint</th>
+          <th style="text-align:left;padding:6px 8px;font-size:11px;">Who</th>
+          <th style="text-align:left;padding:6px 8px;font-size:11px;">Purpose</th>
+        </tr>
+      </thead>
+      <tbody style="font-size:11px;">
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#22c55e;">POST</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/devices/register</td>
+          <td style="padding:6px 8px;">User</td>
+          <td style="padding:6px 8px;">Register new device (checks limit)</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#3b82f6;">GET</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/devices/me</td>
+          <td style="padding:6px 8px;">User</td>
+          <td style="padding:6px 8px;">Check this device status (active/revoked)</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#3b82f6;">GET</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/devices</td>
+          <td style="padding:6px 8px;">User</td>
+          <td style="padding:6px 8px;">List own devices</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#ef4444;">DELETE</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/devices/:id</td>
+          <td style="padding:6px 8px;">User</td>
+          <td style="padding:6px 8px;">Remove own device</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#3b82f6;">GET</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/admin/devices</td>
+          <td style="padding:6px 8px;">Admin</td>
+          <td style="padding:6px 8px;">List all devices (all users)</td>
+        </tr>
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:6px 8px;"><span style="color:#ef4444;">DELETE</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/admin/devices/:id</td>
+          <td style="padding:6px 8px;">Admin</td>
+          <td style="padding:6px 8px;">Revoke any device (with reason)</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;"><span style="color:#22c55e;">POST</span></td>
+          <td style="padding:6px 8px;font-family:monospace;">/devices/encryption-key</td>
+          <td style="padding:6px 8px;">User</td>
+          <td style="padding:6px 8px;">Get encryption key for this device</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

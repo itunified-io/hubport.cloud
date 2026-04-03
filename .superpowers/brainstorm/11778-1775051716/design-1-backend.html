@@ -1,0 +1,123 @@
+<h2>Design Section 1/4 — Backend: PostGIS Pipeline + Versioning</h2>
+<p class="subtitle">Review this section. Does it look right so far?</p>
+
+<div class="section">
+  <h3>1. Prisma Schema Addition</h3>
+  <div class="mockup">
+    <div class="mockup-header">schema.prisma — new model</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.9; color: rgba(255,255,255,0.8);">
+      <div style="color: #a78bfa;">model TerritoryBoundaryVersion {</div>
+      <div style="padding-left: 20px;">id            String   @id @default(uuid())</div>
+      <div style="padding-left: 20px;">territoryId   String</div>
+      <div style="padding-left: 20px;">version       Int      <span style="color: rgba(255,255,255,0.4);">// 1, 2, 3... per territory</span></div>
+      <div style="padding-left: 20px;">boundaries    Json     <span style="color: rgba(255,255,255,0.4);">// GeoJSON snapshot of boundary at this version</span></div>
+      <div style="padding-left: 20px;">changeType    String   <span style="color: rgba(255,255,255,0.4);">// "creation" | "manual_edit" | "auto_clip" | "import" | "restore"</span></div>
+      <div style="padding-left: 20px;">changeSummary String?  <span style="color: rgba(255,255,255,0.4);">// human-readable: "Clipped to congregation, removed overlap with 302"</span></div>
+      <div style="padding-left: 20px;">createdAt     DateTime @default(now())</div>
+      <div style="padding-left: 20px;"><br></div>
+      <div style="padding-left: 20px;">territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)</div>
+      <div style="padding-left: 20px;"><br></div>
+      <div style="padding-left: 20px;">@@index([territoryId, version])</div>
+      <div style="color: #a78bfa;">}</div>
+      <div style="margin-top: 12px; color: rgba(255,255,255,0.4);">// Add to Territory model:</div>
+      <div style="color: rgba(255,255,255,0.6);">boundaryVersions TerritoryBoundaryVersion[]</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. postgis-helpers.ts — Spatial Functions</h3>
+  <div class="mockup">
+    <div class="mockup-header">hub-api/src/lib/postgis-helpers.ts — 4 core functions</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.9; color: rgba(255,255,255,0.8);">
+      <div style="color: #22c55e;">// 1. Validate + auto-heal geometry</div>
+      <div>validateGeometry(geojson) → valid GeoJSON</div>
+      <div style="color: rgba(255,255,255,0.4);">  SQL: ST_AsGeoJSON(ST_MakeValid(ST_GeomFromGeoJSON($1)))</div>
+      <div style="margin-top: 8px; color: #22c55e;">// 2. Clip to congregation boundary</div>
+      <div>clipToCongregation(geojson) → clipped GeoJSON | null</div>
+      <div style="color: rgba(255,255,255,0.4);">  SQL: ST_AsGeoJSON(ST_Intersection(</div>
+      <div style="color: rgba(255,255,255,0.4);">    ST_GeomFromGeoJSON($1),</div>
+      <div style="color: rgba(255,255,255,0.4);">    ST_GeomFromGeoJSON(congregation.boundaries)</div>
+      <div style="color: rgba(255,255,255,0.4);">  ))</div>
+      <div style="color: rgba(255,255,255,0.4);">  Returns null if no congregation boundary exists (skip step)</div>
+      <div style="margin-top: 8px; color: #22c55e;">// 3. Clip away neighbor overlaps</div>
+      <div>clipToNeighbors(geojson, excludeTerritoryId) → { clipped, removedFrom[] }</div>
+      <div style="color: rgba(255,255,255,0.4);">  For each neighbor territory WHERE id != excludeTerritoryId:</div>
+      <div style="color: rgba(255,255,255,0.4);">    geojson = ST_Difference(geojson, neighbor.boundaries)</div>
+      <div style="color: rgba(255,255,255,0.4);">  Returns list of territories that were clipped from</div>
+      <div style="margin-top: 8px; color: #22c55e;">// 4. Detect remaining overlaps (informational)</div>
+      <div>detectOverlaps(geojson, excludeTerritoryId) → OverlapInfo[]</div>
+      <div style="color: rgba(255,255,255,0.4);">  SQL: SELECT t.id, t.number, t.name,</div>
+      <div style="color: rgba(255,255,255,0.4);">    ST_Area(ST_Intersection(...)::geography) as overlapAreaM2</div>
+      <div style="color: rgba(255,255,255,0.4);">  FROM "Territory" t WHERE ST_Intersects(...) AND t.id != $excludeId</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. Auto-Fix Pipeline (sequential)</h3>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+    <div style="padding: 8px 16px; background: rgba(59,130,246,0.15); border-radius: 6px; border: 1px solid rgba(59,130,246,0.3); font-size: 13px;">
+      <strong>Input</strong><br><span style="color: rgba(255,255,255,0.5);">Raw GeoJSON</span>
+    </div>
+    <span style="color: rgba(255,255,255,0.3);">→</span>
+    <div style="padding: 8px 16px; background: rgba(34,197,94,0.1); border-radius: 6px; border: 1px solid rgba(34,197,94,0.2); font-size: 13px;">
+      <strong>① Validate</strong><br><span style="color: rgba(255,255,255,0.5);">ST_MakeValid</span>
+    </div>
+    <span style="color: rgba(255,255,255,0.3);">→</span>
+    <div style="padding: 8px 16px; background: rgba(34,197,94,0.1); border-radius: 6px; border: 1px solid rgba(34,197,94,0.2); font-size: 13px;">
+      <strong>② Congregation clip</strong><br><span style="color: rgba(255,255,255,0.5);">ST_Intersection</span>
+    </div>
+    <span style="color: rgba(255,255,255,0.3);">→</span>
+    <div style="padding: 8px 16px; background: rgba(245,158,11,0.1); border-radius: 6px; border: 1px solid rgba(245,158,11,0.2); font-size: 13px;">
+      <strong>③ Neighbor clip</strong><br><span style="color: rgba(255,255,255,0.5);">ST_Difference × N</span>
+    </div>
+    <span style="color: rgba(255,255,255,0.3);">→</span>
+    <div style="padding: 8px 16px; background: rgba(167,139,250,0.1); border-radius: 6px; border: 1px solid rgba(167,139,250,0.2); font-size: 13px;">
+      <strong>④ Overlap detect</strong><br><span style="color: rgba(255,255,255,0.5);">ST_Intersects</span>
+    </div>
+    <span style="color: rgba(255,255,255,0.3);">→</span>
+    <div style="padding: 8px 16px; background: rgba(59,130,246,0.15); border-radius: 6px; border: 1px solid rgba(59,130,246,0.3); font-size: 13px;">
+      <strong>Output</strong><br><span style="color: rgba(255,255,255,0.5);">Clipped GeoJSON + metadata</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. API Endpoints</h3>
+  <div class="mockup">
+    <div class="mockup-header">New + modified endpoints</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 2.2; color: rgba(255,255,255,0.8);">
+      <div style="color: #f59e0b;">// NEW — Preview auto-fix without saving</div>
+      <div><span style="color: #22c55e;">POST</span> /territories/:id/preview-fix</div>
+      <div style="color: rgba(255,255,255,0.4);">  Body: { boundaries: GeoJSON }</div>
+      <div style="color: rgba(255,255,255,0.4);">  Returns: { original, clipped, applied[], overlaps[], geometryModified }</div>
+      <div style="color: rgba(255,255,255,0.4);">  No DB write — dry run only</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// NEW — Preview for new territory (no ID yet)</div>
+      <div><span style="color: #22c55e;">POST</span> /territories/preview-fix</div>
+      <div style="color: rgba(255,255,255,0.4);">  Body: { boundaries: GeoJSON }</div>
+      <div style="color: rgba(255,255,255,0.4);">  Same pipeline but excludeTerritoryId = null</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// MODIFIED — Now runs auto-fix pipeline + creates version</div>
+      <div><span style="color: #3b82f6;">PUT</span> /territories/:id</div>
+      <div style="color: rgba(255,255,255,0.4);">  If boundaries changed: run pipeline → save clipped → create version</div>
+      <div style="color: rgba(255,255,255,0.4);">  Response adds: autoFix { applied[], overlaps[], geometryModified }</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// MODIFIED — Now runs auto-fix pipeline + creates version</div>
+      <div><span style="color: #3b82f6;">POST</span> /territories</div>
+      <div style="color: rgba(255,255,255,0.4);">  If boundaries present: run pipeline → save clipped → create v1</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// NEW — List boundary versions</div>
+      <div><span style="color: #22c55e;">GET</span> /territories/:id/versions</div>
+      <div style="color: rgba(255,255,255,0.4);">  Returns: version history (id, version, changeType, changeSummary, createdAt)</div>
+      <div style="color: rgba(255,255,255,0.4);">  Does NOT include boundaries JSON (too large) — fetch via restore preview</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// NEW — Preview + restore a version</div>
+      <div><span style="color: #22c55e;">POST</span> /territories/:id/restore</div>
+      <div style="color: rgba(255,255,255,0.4);">  Body: { versionId: uuid }</div>
+      <div style="color: rgba(255,255,255,0.4);">  Runs auto-fix on the old geometry → preview → if accepted, saves + new version</div>
+      <div style="margin-top: 8px; color: #f59e0b;">// NEW — Detect violations across all territories</div>
+      <div><span style="color: #22c55e;">GET</span> /territories/violations</div>
+      <div style="color: rgba(255,255,255,0.4);">  Returns: [{ territoryId, number, name, violations: ["exceeds_boundary", "overlaps_302"] }]</div>
+      <div style="color: rgba(255,255,255,0.4);">  Used by map view to show warning badges</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top: 1.5rem;">Does the backend design look right? I'll present frontend next.</p>

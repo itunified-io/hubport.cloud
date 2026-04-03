@@ -32,6 +32,12 @@ export interface MapInstance {
     lng: number;
     lat: number;
   };
+  queryRenderedFeatures: (
+    geometry?: [[number, number], [number, number]],
+    options?: { layers?: string[] },
+  ) => Array<{ properties: Record<string, unknown>; [key: string]: unknown }>;
+  dragPan: { enable: () => void; disable: () => void };
+  setPaintProperty: (layerId: string, name: string, value: unknown) => void;
 }
 
 /** Available map styles */
@@ -124,6 +130,7 @@ export function useMapLibre({
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeStyle, setActiveStyle] = useState<MapStyleKey>("street");
   const styleReadyCb = useRef<(() => void) | null>(null);
+  const styleChangeGenRef = useRef(0);
   const initAttempted = useRef(false);
 
   // Poll for container availability — handles late-appearing containers
@@ -231,11 +238,16 @@ export function useMapLibre({
     if (!map) return;
     setActiveStyle(key);
     map.setStyle(MAP_STYLES[key].url);
+
+    // Increment generation — stale handlers from previous changeStyle calls become no-ops
+    const gen = ++styleChangeGenRef.current;
+
     const handler = () => {
+      if (styleChangeGenRef.current !== gen) return; // stale — skip
       if (styleReadyCb.current) styleReadyCb.current();
     };
     map.on("styledata", handler);
-    setTimeout(() => map.off("styledata", handler), 5000);
+    setTimeout(() => map.off("styledata", handler), 5_000);
   }, []);
 
   const onStyleReady = useCallback((cb: () => void) => {

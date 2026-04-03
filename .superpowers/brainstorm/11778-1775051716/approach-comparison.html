@@ -1,0 +1,140 @@
+<h2>Implementation Approach</h2>
+<p class="subtitle">Two approaches for building the spatial validation + polygon fix system. I recommend Approach A.</p>
+
+<div class="options">
+  <div class="option" data-choice="approach-a" onclick="toggleSelect(this)" style="border-color: rgba(34, 197, 94, 0.3);">
+    <div class="letter" style="background: #22c55e;">A</div>
+    <div class="content">
+      <h3>🟢 Recommended: PostGIS Raw SQL Pipeline</h3>
+      <p>Build <code>postgis-helpers.ts</code> with raw SQL using Prisma's <code>$queryRawUnsafe</code>. All spatial operations (validate, clip, overlap detect) run as a single SQL transaction on the server. Preview is a dry-run endpoint that returns the proposed geometry without saving.</p>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>PostGIS is already installed (the DB uses postgis/postgis:16-3.4-alpine)</li>
+            <li>ST_MakeValid, ST_Intersection, ST_Difference are battle-tested</li>
+            <li>Single SQL transaction = atomic, no partial state</li>
+            <li>Consistent with the existing Drawing UX spec design</li>
+            <li>Server-authoritative — no client-side geometry manipulation needed</li>
+            <li>Fast — PostGIS handles complex polygon operations in <100ms</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Raw SQL outside Prisma's type system (mitigated with typed wrapper functions)</li>
+            <li>Boundaries stored as JSONB, need ST_GeomFromGeoJSON conversion on every query</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.12);">
+        <strong style="color: #22c55e;">Architecture:</strong>
+        <div style="font-family: monospace; font-size: 12px; margin-top: 8px; line-height: 2; color: rgba(255,255,255,0.7);">
+          POST /territories/:id/preview-fix → dry-run auto-clip, return diff<br>
+          PUT  /territories/:id             → save with auto-fix pipeline + version<br>
+          POST /territories                 → create with auto-fix + version<br>
+          GET  /territories/:id/versions    → list boundary versions<br>
+          POST /territories/:id/restore     → restore to a previous version<br>
+          <br>
+          postgis-helpers.ts:<br>
+          &nbsp;&nbsp;validateAndClip(geojson, congregationId) → clipped geometry<br>
+          &nbsp;&nbsp;detectOverlaps(territoryId, geojson) → overlap list<br>
+          &nbsp;&nbsp;clipToNeighbors(geojson, territoryId) → neighbor-clipped geometry
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="approach-b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Client-Side Turf.js + Server Validation</h3>
+      <p>Use Turf.js in the browser for real-time clip/overlap preview during editing, then validate server-side on save. Two-pass: client clips locally for instant feedback, server confirms and persists.</p>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Instant client-side preview without API round-trip</li>
+            <li>Turf.js has good TypeScript types</li>
+            <li>Visual feedback while dragging vertices</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Turf.js polygon clipping has known edge cases (self-intersections, multi-polygons)</li>
+            <li>Client/server geometry mismatch risk — Turf vs PostGIS may produce different results</li>
+            <li>+120KB bundle size (Turf.js)</li>
+            <li>Must duplicate validation logic in two places</li>
+            <li>Congregation boundary + all neighbor polygons must be loaded client-side</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem; padding: 1.5rem; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+  <h3>Scope Summary — What Gets Built</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <th style="text-align: left; padding: 8px; color: rgba(255,255,255,0.5);">Component</th>
+        <th style="text-align: left; padding: 8px; color: rgba(255,255,255,0.5);">Layer</th>
+        <th style="text-align: left; padding: 8px; color: rgba(255,255,255,0.5);">Bug Fixed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;"><code>postgis-helpers.ts</code></td>
+        <td style="padding: 8px;">Backend</td>
+        <td style="padding: 8px;">🔴 1 + 🟡 2</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Auto-fix pipeline in <code>PUT /territories/:id</code></td>
+        <td style="padding: 8px;">Backend</td>
+        <td style="padding: 8px;">🔴 1 + 🟡 2</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Preview endpoint <code>POST /territories/:id/preview-fix</code></td>
+        <td style="padding: 8px;">Backend</td>
+        <td style="padding: 8px;">🔴 1 + 🟡 2</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;"><code>TerritoryBoundaryVersion</code> model + endpoints</td>
+        <td style="padding: 8px;">Backend + DB</td>
+        <td style="padding: 8px;">Versioning</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Preview dialog (original vs clipped overlay)</td>
+        <td style="padding: 8px;">Frontend</td>
+        <td style="padding: 8px;">🔴 1 + 🟡 2</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Warning badges on map view for violating territories</td>
+        <td style="padding: 8px;">Frontend</td>
+        <td style="padding: 8px;">🟡 2</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Wire "Edit boundary" button in TerritoryDetail</td>
+        <td style="padding: 8px;">Frontend</td>
+        <td style="padding: 8px;">🔴 3</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Wire CreationFlow into TerritoryMap "New Territory"</td>
+        <td style="padding: 8px;">Frontend</td>
+        <td style="padding: 8px;">🔴 4</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">Version history dropdown + restore in TerritoryDetail</td>
+        <td style="padding: 8px;">Frontend</td>
+        <td style="padding: 8px;">Versioning</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="subtitle" style="margin-top: 1rem;">Select your preferred approach (A or B), then tell me in the terminal.</p>

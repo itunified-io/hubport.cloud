@@ -26,23 +26,22 @@ export interface DeviceInfo {
 export interface RegisteredDevice {
   id: string;
   deviceUuid: string;
-  userAgent: string;
+  displayName: string;
   platform: string;
   screenSize: string;
-  status: "pending" | "approved" | "revoked";
-  lastSeenAt: string | null;
-  createdAt: string;
+  status: "active" | "revoked";
+  lastSyncAt: string | null;
+  registeredAt: string;
 }
 
 export interface DeviceStatusResult {
   deviceUuid: string;
-  status: "pending" | "approved" | "revoked";
+  status: "active" | "revoked";
   encryptionEnabled: boolean;
 }
 
 export interface EncryptionSaltResult {
-  deviceUuid: string;
-  salt: string; // base64-encoded
+  encSalt: string; // base64-encoded
 }
 
 // ─── UUID helpers ────────────────────────────────────────────────

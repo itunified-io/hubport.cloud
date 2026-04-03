@@ -28,15 +28,18 @@ export interface SyncStatus {
 }
 
 interface DeltaPage {
-  records: Array<{ table: string; id: string; data: Record<string, unknown> | null; deletedAt?: string | null }>;
-  cursor: string | null;
+  serverTime: string;
+  tables: Record<string, { upserts: Array<Record<string, unknown>>; deletes: string[] }>;
+  cursor?: string;
   hasMore: boolean;
 }
 
 interface PushResult {
-  id: string; // pendingChange id (stringified)
-  status: "accepted" | "conflict" | "rejected";
-  serverData?: Record<string, unknown> | null;
+  recordId: string;
+  status: "accepted" | "conflict" | "error";
+  serverVersion?: number;
+  serverData?: unknown;
+  clientVersion?: number;
   reason?: string;
 }
 
@@ -127,7 +130,7 @@ export async function pullChanges(token: string): Promise<void> {
 
       const page = (await res.json()) as DeltaPage;
 
-      // Process each record
+      // Process each table's upserts and deletes
       await db.transaction(
         "rw",
         [
@@ -136,26 +139,25 @@ export async function pullChanges(token: string): Promise<void> {
           db.publishers, db.territoryShares,
         ],
         async () => {
-          for (const change of page.records) {
-            const table = db.table(change.table);
+          for (const [tableName, changes] of Object.entries(page.tables)) {
+            const table = db.table(tableName);
             if (!table) continue;
 
-            if (change.deletedAt || change.data === null) {
-              // Record was deleted on server
-              await table.delete(change.id);
-            } else {
-              // Encrypt PII before storing
-              const encrypted = await encryptForStorage(
-                change.table,
-                change.data,
-              );
+            // Process deletes
+            for (const id of changes.deletes) {
+              await table.delete(id);
+            }
+
+            // Process upserts — encrypt PII before storing
+            for (const record of changes.upserts) {
+              const encrypted = await encryptForStorage(tableName, record);
               await table.put(encrypted);
             }
           }
         },
       );
 
-      cursor = page.cursor;
+      cursor = page.cursor ?? null;
       hasMore = page.hasMore;
     }
 
@@ -238,24 +240,33 @@ export async function pushChanges(
       );
     }
 
-    const results = (await res.json()) as PushResult[];
+    const pushResponse = (await res.json()) as { results: PushResult[] };
+    const results = pushResponse.results;
+
+    // Build recordId → local pendingChange id map
+    const recordToLocal = new Map<string, number>();
+    for (const p of pending) {
+      recordToLocal.set(p.recordId, p.id!);
+    }
 
     // Process each result
     for (const result of results) {
-      const numId = Number(result.id);
+      const localId = recordToLocal.get(result.recordId);
+      if (localId === undefined) continue;
+
       switch (result.status) {
         case "accepted":
-          await db.pendingChanges.delete(numId);
+          await db.pendingChanges.delete(localId);
           break;
 
         case "conflict": {
           // Encrypt server data before storing
           let encryptedServerData: string | null = null;
           if (result.serverData) {
-            const enc = await encryptFromObject("pendingChanges", result.serverData);
+            const enc = await encryptFromObject("pendingChanges", result.serverData as Record<string, unknown>);
             encryptedServerData = enc;
           }
-          await db.pendingChanges.update(numId, {
+          await db.pendingChanges.update(localId, {
             status: "conflict",
             serverData: encryptedServerData,
             updatedAt: new Date().toISOString(),
@@ -263,8 +274,8 @@ export async function pushChanges(
           break;
         }
 
-        case "rejected":
-          await db.pendingChanges.update(numId, {
+        case "error":
+          await db.pendingChanges.update(localId, {
             status: "rejected",
             updatedAt: new Date().toISOString(),
           });
@@ -368,8 +379,22 @@ export async function resolveUseTheirs(changeId: number): Promise<void> {
  * state with the server's view.
  */
 export async function fullSync(token: string, deviceId: string): Promise<void> {
-  await pushChanges(token, deviceId);
+  // Push first, but don't let push failure prevent pull.
+  // On iOS, push can fail due to transient connectivity or crypto issues;
+  // pull should still proceed so the user sees up-to-date data.
+  let pushError: unknown = null;
+  try {
+    await pushChanges(token, deviceId);
+  } catch (err) {
+    pushError = err;
+  }
+
+  // Pull always runs, even if push failed
   await pullChanges(token);
+
+  // If push failed but pull succeeded (state is now "idle"),
+  // re-throw so callers know there was a partial failure.
+  if (pushError) throw pushError;
 }
 
 // ─── Storage Persistence ─────────────────────────────────────────

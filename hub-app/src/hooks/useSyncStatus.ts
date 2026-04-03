@@ -17,7 +17,7 @@ import {
   type SyncState,
 } from "@/lib/sync-engine";
 import { getCurrentDeviceUuid } from "@/lib/device-manager";
-import { getOfflineDB } from "@/lib/offline-db";
+import { isOfflineReady, getOfflineDB } from "@/lib/offline-db";
 
 const STALE_THRESHOLD_MS = 5 * 60 * 1_000; // 5 minutes
 
@@ -76,6 +76,9 @@ export function useSyncStatus(): SyncStatusResult {
 
   const triggerSync = useCallback(async () => {
     if (!token || syncing.current) return;
+    // Guard: don't attempt sync if offline DB is not yet initialised
+    // (OfflineProvider init is async — auto-sync events can fire before it completes)
+    if (!isOfflineReady()) return;
     const online = await checkConnectivity(token);
     if (!online) return;
     syncing.current = true;

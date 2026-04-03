@@ -1,0 +1,88 @@
+<h2>Auto-Clip + Preview + Versioning Flow</h2>
+<p class="subtitle">Confirm this matches your intent before I design the details</p>
+
+<div class="section">
+  <h3>Step-by-Step Save Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">What happens when user saves a polygon (new or edited)</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; line-height: 2;">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">1</span>
+        <span>User draws/edits polygon → clicks <strong style="color: #f59e0b;">Save</strong></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">2</span>
+        <span>Server runs auto-fix pipeline: <code>ST_MakeValid</code> → <code>ST_Difference(water)</code> → <code>ST_Intersection(congregation)</code> → <code>ST_Difference(neighbors)</code></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">3</span>
+        <span>Server returns <strong style="color: #f59e0b;">preview</strong> — original vs auto-clipped geometry + list of changes applied</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #f59e0b; color: black; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">4</span>
+        <span>Client shows <strong style="color: #f59e0b;">preview overlay</strong> on map: original in red dashed, clipped in green solid</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #f59e0b; color: black; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">5</span>
+        <span>User sees what changed + can <strong style="color: #22c55e;">Accept</strong> or <strong style="color: #ef4444;">Cancel</strong></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #22c55e; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">6</span>
+        <span>On Accept → server saves clipped geometry + creates <strong style="color: #a78bfa;">version snapshot</strong> of previous boundary</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span style="background: #22c55e; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">7</span>
+        <span>If no changes needed (no violations) → saves directly, no preview dialog</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Polygon Versioning</h3>
+  <div class="mockup">
+    <div class="mockup-header">TerritoryBoundaryVersion model</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.8; color: rgba(255,255,255,0.8);">
+      <div style="color: #a78bfa;">model TerritoryBoundaryVersion {</div>
+      <div style="padding-left: 20px;">id            String   @id @default(uuid())</div>
+      <div style="padding-left: 20px;">territoryId   String   <span style="color: rgba(255,255,255,0.4);">// FK → Territory</span></div>
+      <div style="padding-left: 20px;">version       Int      <span style="color: rgba(255,255,255,0.4);">// auto-increment per territory</span></div>
+      <div style="padding-left: 20px;">boundaries    Json     <span style="color: rgba(255,255,255,0.4);">// GeoJSON snapshot</span></div>
+      <div style="padding-left: 20px;">changeType    String   <span style="color: rgba(255,255,255,0.4);">// "manual_edit" | "auto_clip" | "import" | "creation"</span></div>
+      <div style="padding-left: 20px;">changeSummary String?  <span style="color: rgba(255,255,255,0.4);">// "Clipped to congregation boundary, removed overlap with T-302"</span></div>
+      <div style="padding-left: 20px;">createdAt     DateTime @default(now())</div>
+      <div style="color: #a78bfa;">}</div>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.15);">
+    <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 14px;"><strong style="color: #a78bfa;">Restore flow:</strong> Territory detail page shows version history dropdown. User picks a previous version → preview on map → confirm restore → creates a new version (restore is non-destructive).</p>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Batch Fix for Existing Territories</h3>
+  <p class="subtitle">How should the bulk cleanup work?</p>
+  <div class="options">
+    <div class="option" data-choice="batch-button" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>"Fix All Violations" button on Map View</h3>
+        <p>One-click button in the Kartenansicht toolbar. Runs auto-clip on ALL territories that violate congregation boundary or overlap neighbors. Shows a summary preview: "12 territories will be clipped, 5 overlaps resolved" → Confirm → batch save with versions.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="batch-per-territory" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Per-territory "Fix" badge on Map View</h3>
+        <p>Each violating territory gets a red warning icon on the map. Click the icon → shows preview of auto-clip for that specific territory → Accept/Cancel. Fix one at a time, but with visual indicators showing which territories need attention.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="batch-both" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Both — bulk button + per-territory badges</h3>
+        <p>Warning badges on each violating territory (click to fix individually). Plus a "Fix All" button in the toolbar for bulk resolution. Best flexibility but more UI work.</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,49 @@
+<h2>Territory Polygon Editing: How should it work?</h2>
+<p class="subtitle">Choose the editing interaction model for moving vertices and adjusting boundaries</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Inline Map Editing (Recommended)</h3>
+      <p>Edit directly on the existing territory detail map. Click "Edit" &rarr; vertices become draggable handles on the map. Drag to move, click edge midpoints to add vertices, right-click to delete. Snap-to-road button snaps all vertices to nearest OSM road/street. Save/Cancel buttons appear.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>No page navigation — stays in context</li>
+          <li>See addresses, assignments while editing</li>
+          <li>Familiar Google Maps-style UX</li>
+          <li>Works for both new and existing territories</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>More complex map interaction code</li>
+          <li>Small screen real estate on mobile</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Full-Screen Editor Page</h3>
+      <p>Navigate to dedicated <code>/territories/:id/edit</code> page with full-screen map. Sidebar with vertex list, snap controls, undo/redo stack. More room for tools but loses context of the detail page.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Maximum map space</li>
+          <li>Room for advanced tools (undo stack, vertex table)</li>
+          <li>Clean separation of view vs edit</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Context switch — loses address/assignment view</li>
+          <li>Extra route + page component to build</li>
+          <li>More navigation complexity</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem;">
+  <h3>Snap-to-Road Feature (included in both)</h3>
+  <p style="color: #94a3b8;">When editing, a <strong>"Snap to Roads"</strong> button would query the existing <code>/territories/snap-context</code> endpoint (already fetches OSM roads, buildings, water in bbox). Each vertex snaps to the nearest road geometry within a configurable threshold (e.g., 50m). User sees a preview before confirming.</p>
+</div>

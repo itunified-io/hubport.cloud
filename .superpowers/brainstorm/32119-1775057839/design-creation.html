@@ -1,0 +1,76 @@
+<h2>Design Section 1: Smart Creation Flow</h2>
+<p class="subtitle">Draw on map &rarr; auto-detect city &rarr; pick number &rarr; save</p>
+
+<div class="section">
+  <h3>User Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">Step-by-Step Flow</div>
+    <div class="mockup-body" style="padding: 1.5rem;">
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+
+        <div style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 3px solid #f59e0b;">
+          <div style="color: #f59e0b; font-weight: 700; font-size: 0.75rem; margin-bottom: 0.5rem;">STEP 1</div>
+          <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 600;">Click "+ New Territory" on map page</div>
+          <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 0.25rem;">Map shows all existing territories + congregation boundary (red dashed). No modal — goes straight to drawing mode.</div>
+        </div>
+
+        <div style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 3px solid #f59e0b;">
+          <div style="color: #f59e0b; font-weight: 700; font-size: 0.75rem; margin-bottom: 0.5rem;">STEP 2</div>
+          <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 600;">Draw rough polygon</div>
+          <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 0.25rem;">Click vertices or freehand lasso. Neighboring territories and congregation boundary remain visible underneath. Double-click or Enter to close.</div>
+        </div>
+
+        <div style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 3px solid #3b82f6;">
+          <div style="color: #3b82f6; font-weight: 700; font-size: 0.75rem; margin-bottom: 0.5rem;">STEP 3 (auto)</div>
+          <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 600;">System auto-detects</div>
+          <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 0.25rem;">
+            <strong>1.</strong> Reverse geocode centroid &rarr; city name (e.g., "Antdorf")<br>
+            <strong>2.</strong> Find existing territories with same city &rarr; determine group prefix (e.g., 5xx)<br>
+            <strong>3.</strong> Find next available number in that group (e.g., 507)
+          </div>
+        </div>
+
+        <div style="flex: 1; min-width: 200px; background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 3px solid #22c55e;">
+          <div style="color: #22c55e; font-weight: 700; font-size: 0.75rem; margin-bottom: 0.5rem;">STEP 4</div>
+          <div style="color: #e2e8f0; font-size: 0.85rem; font-weight: 600;">Confirm in modal</div>
+          <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 0.25rem;">
+            Modal shows:<br>
+            &bull; Pre-filled name: <span style="color:#f59e0b">"Antdorf"</span> (editable)<br>
+            &bull; Suggested number: <span style="color:#f59e0b">"507"</span> (editable)<br>
+            &bull; Group hint: <span style="color:#64748b">"5xx &mdash; Antdorf (501, 503, 505 exist)"</span><br>
+            &bull; Create button &rarr; saves with drawn polygon
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Backend: Reverse Geocode Endpoint</h3>
+  <div style="background: #0f172a; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.8rem; color: #94a3b8;">
+    <span style="color: #22c55e;">POST</span> <span style="color: #e2e8f0;">/territories/suggest</span><br><br>
+    <span style="color: #64748b;">// Request</span><br>
+    { boundaries: <span style="color: #f59e0b;">GeoJSON Polygon</span> }<br><br>
+    <span style="color: #64748b;">// Response</span><br>
+    {<br>
+    &nbsp;&nbsp;city: <span style="color: #f59e0b;">"Antdorf"</span>,<br>
+    &nbsp;&nbsp;suggestedPrefix: <span style="color: #f59e0b;">"5"</span>,<br>
+    &nbsp;&nbsp;suggestedNumber: <span style="color: #f59e0b;">"507"</span>,<br>
+    &nbsp;&nbsp;existingInGroup: [<span style="color: #f59e0b;">"501"</span>, <span style="color: #f59e0b;">"503"</span>, <span style="color: #f59e0b;">"505"</span>],<br>
+    &nbsp;&nbsp;autoFix: <span style="color: #64748b;">{ ...AutoFixResult }</span><br>
+    }
+  </div>
+  <p style="color: #64748b; font-size: 0.75rem; margin-top: 0.5rem;">
+    Uses Overpass <code>is_in</code> query on centroid to get admin boundary name. Matches against existing territory names to find group prefix. Runs auto-fix pipeline on the polygon. All in one round-trip.
+  </p>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Key Change: Drawing Happens on TerritoryMap (not TerritoryDetail)</h3>
+  <p style="color: #94a3b8; font-size: 0.85rem;">
+    Currently: "+ New Territory" opens a modal asking for number + name, then navigates to detail page to draw.<br>
+    <strong>New:</strong> "+ New Territory" enters drawing mode directly on the map view — user sees all neighbors and the congregation boundary while drawing. After drawing, modal asks for number + name (pre-filled). Territory is created with the polygon in one step.
+  </p>
+</div>

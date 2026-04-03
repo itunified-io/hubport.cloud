@@ -1,0 +1,62 @@
+<h2>Architecture Approach</h2>
+<p class="subtitle">How to structure the territory editor enhancement — one approach, three layers</p>
+
+<div class="section">
+  <h3>Recommended: Unified Inline Editor</h3>
+  <p>Enhance the existing TerritoryDetail map with a proper inline polygon editor. One cohesive system that handles creation, editing, and snapping — no separate pages or components.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="layer1" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Smart Creation Flow</h3>
+      <p><strong>New territory from map:</strong> User draws rough circle/polygon on the TerritoryMap page (with neighbors + congregation boundary visible). On close:</p>
+      <ul style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">
+        <li>Reverse geocode centroid via Overpass &rarr; get city/village name</li>
+        <li>Match city to existing group prefix (e.g., other "Antdorf" territories are 5xx)</li>
+        <li>If new city, suggest next available prefix</li>
+        <li>Show modal: pre-filled city name + suggested prefix, user picks exact number</li>
+        <li>Save &rarr; navigate to detail page with polygon already set</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="option" data-choice="layer2" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Inline Polygon Editor</h3>
+      <p><strong>Edit mode on detail page:</strong> Click "Edit" &rarr; polygon vertices become draggable circles on the map.</p>
+      <ul style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">
+        <li><strong>Drag vertex</strong> &mdash; move to new position (magnet-snap to nearby roads if within 30m)</li>
+        <li><strong>Click midpoint</strong> &mdash; insert new vertex between two existing ones</li>
+        <li><strong>Right-click vertex</strong> &mdash; delete it (min 3 vertices)</li>
+        <li><strong>Snap toggle</strong> &mdash; enable/disable magnet snap while dragging</li>
+        <li><strong>Save/Cancel toolbar</strong> &mdash; appears at top, runs auto-fix pipeline on save</li>
+        <li>Neighboring territories shown as translucent overlays during edit</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="option" data-choice="layer3" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Snap-to-Road System</h3>
+      <p><strong>Two snap modes</strong> using the existing <code>/territories/snap-context</code> endpoint:</p>
+      <ul style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">
+        <li><strong>Magnet snap (while dragging)</strong> &mdash; as user drags a vertex within 30m of a road, vertex "magnetizes" to nearest point on road geometry. Visual indicator (blue highlight on road segment).</li>
+        <li><strong>"Snap All" button</strong> &mdash; batch-snap all vertices to nearest roads. Shows before/after preview overlay (orange = original, green = snapped). Accept or cancel.</li>
+        <li>Snap targets: roads, building outlines, water boundaries (from existing Overpass queries)</li>
+        <li>Configurable threshold (30m default, adjustable)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem;">
+  <h3>Bug Fixes (included)</h3>
+  <ul style="color: #94a3b8; font-size: 0.85rem;">
+    <li><strong>Edit button missing</strong> &mdash; investigate <code>can("app:territories.edit")</code> timing / permission data loading race. Replaced by new inline editor button.</li>
+    <li><strong>Violation badges not showing</strong> &mdash; debug PostGIS query results + ViolationBadges reactivity. Ensure <code>isLoaded</code> gate works and violations API returns data.</li>
+  </ul>
+</div>
