@@ -499,6 +499,21 @@ export async function importKml(file: File, token: string): Promise<ImportKmlRes
   });
 }
 
+export interface ImportBranchKmlResult {
+  updated: number;
+  created: number;
+  skipped: number;
+  warnings: string[];
+}
+
+export async function importBranchKml(file: File, token: string): Promise<ImportBranchKmlResult> {
+  const kml = await file.text();
+  return apiFetch("/territories/import/kml/branch", token, {
+    method: "POST",
+    body: JSON.stringify({ kml, name: file.name.replace(/\.kml$/i, "") }),
+  });
+}
+
 export async function previewCsv(file: File, token: string): Promise<CsvPreviewResult> {
   const csv = await file.text();
   return apiFetch("/territories/import/csv/preview", token, {

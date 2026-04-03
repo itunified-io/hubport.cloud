@@ -422,5 +422,11 @@
   "invite.complete.login": "Log in now",
   "territory.boundary.delete": "Delete Boundary",
   "territory.boundary.delete.confirm": "Are you sure you want to delete the boundary for territory {number} \u2014 {name}? This cannot be undone.",
-  "territory.boundary.delete.success": "Boundary deleted"
+  "territory.boundary.delete.success": "Boundary deleted",
+  "import.branch.title": "Branch KML Import",
+  "import.branch.subtitle": "Update territory boundaries from branch KML files",
+  "import.branch.updated": "{count} territories updated",
+  "import.branch.created": "{count} new territories created",
+  "import.branch.skipped": "{count} skipped (no polygon)",
+  "import.branch.warnings": "{count} warnings"
 }

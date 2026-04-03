@@ -424,5 +424,11 @@
   "invite.complete.login": "Jetzt anmelden",
   "territory.boundary.delete": "Grenze l\u00f6schen",
   "territory.boundary.delete.confirm": "M\u00f6chten Sie die Grenze f\u00fcr Gebiet {number} \u2014 {name} wirklich l\u00f6schen? Dies kann nicht r\u00fcckg\u00e4ngig gemacht werden.",
-  "territory.boundary.delete.success": "Grenze gel\u00f6scht"
+  "territory.boundary.delete.success": "Grenze gel\u00f6scht",
+  "import.branch.title": "Branch-KML-Import",
+  "import.branch.subtitle": "Gebietsgrenzen aus Branch-KML-Dateien aktualisieren",
+  "import.branch.updated": "{count} Gebiete aktualisiert",
+  "import.branch.created": "{count} neue Gebiete erstellt",
+  "import.branch.skipped": "{count} \u00fcbersprungen (kein Polygon)",
+  "import.branch.warnings": "{count} Warnungen"
 }
