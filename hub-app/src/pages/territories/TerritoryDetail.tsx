@@ -5,16 +5,19 @@ import {
   ArrowLeft, User, Calendar, Loader2, MapPin, Clock, Hash,
   Layers, Maximize2, Minimize2, Home, Building, Trees,
   Ban, ArrowUpDown, Archive, Search, Filter, Bell,
-  ChevronDown, Check, X, Edit3, Save, Wand2, AlertTriangle,
+  ChevronDown, Check, X, Edit3, Save, Wand2, AlertTriangle, Crop,
 } from "lucide-react";
 import type { Marker } from "maplibre-gl";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import {
   getTerritory, listTerritories, listAddresses, updateAddress,
-  previewFix, updateTerritoryBoundaries, getViolations,
+  previewFix, updateTerritoryBoundaries, getViolations, getSnapContext,
   type TerritoryListItem, type Address, type AddressStatus, type AutoFixResult, type TerritoryViolation,
 } from "@/lib/territory-api";
+import { useClipSegment, type ClipCandidate } from "@/hooks/useClipSegment";
+import type { SnapTarget } from "./SnapEngine";
+import { ClipSegmentPanel } from "./ClipSegmentPanel";
 import { CreationFlow } from "./CreationFlow";
 import { AutoFixPreview } from "./AutoFixPreview";
 import { VersionHistory } from "./VersionHistory";
@@ -78,6 +81,15 @@ export function TerritoryDetail() {
   const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
   const [editViolations, setEditViolations] = useState<TerritoryViolation | null>(null);
   const [autoFixing, setAutoFixing] = useState(false);
+
+  // Clip mode state
+  const [clipMode, setClipMode] = useState(false);
+  const [clipSnapTargets, setClipSnapTargets] = useState<SnapTarget[]>([]);
+  const [clipLoading, setClipLoading] = useState(false);
+  const clipMarkersRef = useRef<Marker[]>([]);
+
+  // Clip segment hook — initialized with current editCoords and snap targets
+  const clipSegment = useClipSegment(editCoords, clipSnapTargets);
 
   // Address state
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -308,6 +320,80 @@ export function TerritoryDetail() {
     }
   }, [mapRef, territory?.number]);
 
+  /** Enter clip mode — fetch snap context, extract vertices, activate clip tool */
+  const enterClipMode = useCallback(async () => {
+    if (!territory?.boundaries || !token) return;
+    const ring = extractRing(territory.boundaries);
+    if (ring.length < 3) return;
+
+    setClipLoading(true);
+    setMapExpanded(true);
+    setEditCoords(ring);
+
+    try {
+      // Build bbox from territory coordinates
+      const lngs = ring.map((c) => c[0]);
+      const lats = ring.map((c) => c[1]);
+      const pad = 0.005; // ~500m padding
+      const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
+
+      const ctx = await getSnapContext(bbox, token);
+      const targets: SnapTarget[] = [];
+
+      // Convert road features to SnapTargets
+      if (ctx.roads?.features) {
+        for (const f of ctx.roads.features) {
+          targets.push({
+            type: "road",
+            label: (f.properties as any)?.name ?? "Road",
+            geometry: f.geometry as SnapTarget["geometry"],
+          });
+        }
+      }
+
+      // Add neighbor territory boundaries as snap targets
+      for (const n of neighbors) {
+        if (n.boundaries) {
+          targets.push({
+            type: "neighbor",
+            label: `Territory #${n.number}`,
+            geometry: n.boundaries as SnapTarget["geometry"],
+          });
+        }
+      }
+
+      // Add congregation boundary if available
+      if (congBoundary?.boundaries) {
+        targets.push({
+          type: "boundary",
+          label: "Congregation boundary",
+          geometry: congBoundary.boundaries as SnapTarget["geometry"],
+        });
+      }
+
+      setClipSnapTargets(targets);
+      setClipMode(true);
+      clipSegment.start();
+    } catch (err) {
+      console.error("Failed to load snap context for clip mode:", err);
+    } finally {
+      setClipLoading(false);
+    }
+  }, [territory, extractRing, token, neighbors, congBoundary, clipSegment]);
+
+  /** Cancel clip mode — clean up markers, restore original polygon */
+  const cancelClipMode = useCallback(() => {
+    clipSegment.cancel();
+    setClipMode(false);
+    setClipSnapTargets([]);
+    clipMarkersRef.current.forEach((m) => m.remove());
+    clipMarkersRef.current = [];
+    // Restore original polygon
+    if (territory?.boundaries) {
+      updateMapPolygon(extractRing(territory.boundaries));
+    }
+  }, [clipSegment, territory, updateMapPolygon, extractRing]);
+
   /** Auto-fix: run preview-fix on current polygon to resolve violations */
   const runAutoFix = useCallback(async () => {
     if (!token || !territory || editCoords.length < 4) return;
@@ -447,6 +533,74 @@ export function TerritoryDetail() {
     if (!editMode || editCoords.length < 3) return;
     updateMapPolygon(editCoords);
   }, [editMode, editCoords, updateMapPolygon]);
+
+  /** Clip mode vertex markers — clickable (not draggable) with color-coded selection */
+  useEffect(() => {
+    const map = mapRef.current;
+    const mgl = maplibreModule.current;
+    if (!map || !mgl || !clipMode || editCoords.length < 3) {
+      clipMarkersRef.current.forEach((m) => m.remove());
+      clipMarkersRef.current = [];
+      return;
+    }
+
+    // Clean old clip markers
+    clipMarkersRef.current.forEach((m) => m.remove());
+    clipMarkersRef.current = [];
+
+    const MarkerClass = mgl.Marker || mgl.default?.Marker;
+    if (!MarkerClass) return;
+
+    // Skip closing vertex
+    const uniqueCount = editCoords.length > 1 &&
+      editCoords[0]![0] === editCoords[editCoords.length - 1]![0] &&
+      editCoords[0]![1] === editCoords[editCoords.length - 1]![1]
+      ? editCoords.length - 1
+      : editCoords.length;
+
+    for (let i = 0; i < uniqueCount; i++) {
+      const coord = editCoords[i]!;
+      const isStart = clipSegment.startIndex === i;
+      const isEnd = clipSegment.endIndex === i;
+
+      const el = document.createElement("div");
+      const bg = isStart ? "#f59e0b" : isEnd ? "#22c55e" : "rgba(255,255,255,0.9)";
+      const border = isStart ? "2px solid #92400e" : isEnd ? "2px solid #166534" : "2px solid #64748b";
+      el.style.cssText = `
+        width: 14px; height: 14px; border-radius: 50%;
+        background: ${bg}; border: ${border};
+        cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        z-index: 10; transition: transform 0.15s;
+      `;
+      el.title = isStart ? "Start vertex" : isEnd ? "End vertex" : "Click to select";
+      el.addEventListener("mouseenter", () => { el.style.transform = "scale(1.3)"; });
+      el.addEventListener("mouseleave", () => { el.style.transform = "scale(1)"; });
+
+      const marker = new MarkerClass({ element: el, draggable: false })
+        .setLngLat([coord[0], coord[1]])
+        .addTo(map as any);
+
+      const idx = i;
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        clipSegment.selectVertex(idx);
+      });
+
+      clipMarkersRef.current.push(marker);
+    }
+
+    return () => {
+      clipMarkersRef.current.forEach((m) => m.remove());
+      clipMarkersRef.current = [];
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipMode, editCoords.length, clipSegment.phase, clipSegment.startIndex, clipSegment.endIndex, mapRef, maplibreModule]);
+
+  /** Live-update polygon on map during clip mode */
+  useEffect(() => {
+    if (!clipMode || editCoords.length < 3) return;
+    updateMapPolygon(editCoords);
+  }, [clipMode, editCoords, updateMapPolygon]);
 
   /** Remove clip preview layers safely */
   const removeClipPreview = useCallback((map: any) => {
@@ -765,7 +919,24 @@ export function TerritoryDetail() {
                 >
                   Field Work
                 </button>
-                {!editMode ? (
+                {clipMode ? (
+                  <>
+                    {/* Clip mode status HUD */}
+                    <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-1)] border border-[var(--amber)]/40 text-[10px] font-medium text-[var(--amber)] shadow-lg">
+                      <Crop size={11} className="inline mr-1" />
+                      {clipSegment.phase === "select_start" && "Click first vertex"}
+                      {clipSegment.phase === "select_end" && "Click second vertex"}
+                      {clipSegment.phase === "choose_target" && "Choose clip target"}
+                    </div>
+                    <button
+                      onClick={cancelClipMode}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer shadow-lg"
+                    >
+                      <X size={13} />
+                      Cancel
+                    </button>
+                  </>
+                ) : !editMode ? (
                   <>
                     <button
                       onClick={() => {
@@ -779,6 +950,20 @@ export function TerritoryDetail() {
                     >
                       <Edit3 size={13} />
                       <FormattedMessage id="territories.edit" defaultMessage="Edit" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (can("app:territories.edit")) enterClipMode();
+                      }}
+                      disabled={clipLoading}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors shadow-lg ${
+                        can("app:territories.edit") && !clipLoading
+                          ? "bg-[var(--bg-1)] border border-[var(--amber)]/40 text-[var(--amber)] hover:bg-[var(--amber)]/10 cursor-pointer"
+                          : "bg-[var(--bg-1)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
+                      }`}
+                    >
+                      <Crop size={13} />
+                      {clipLoading ? "Loading..." : "Clip"}
                     </button>
                     <button
                       onClick={() => setMapExpanded((v) => !v)}
@@ -833,6 +1018,58 @@ export function TerritoryDetail() {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Clip Segment target panel */}
+              {clipMode && clipSegment.phase === "choose_target" && (
+                <ClipSegmentPanel
+                  candidates={clipSegment.candidates}
+                  onSelectCandidate={(candidate: ClipCandidate) => {
+                    const newCoords = clipSegment.applyClip(candidate);
+                    if (newCoords) {
+                      setEditCoords(newCoords);
+                      updateMapPolygon(newCoords);
+                      // Save the clipped polygon immediately
+                      const boundaries = { type: "Polygon", coordinates: [newCoords] };
+                      if (token && territory) {
+                        setSaving(true);
+                        updateTerritoryBoundaries(token, territory.id, boundaries)
+                          .then(async () => {
+                            const refreshed = await getTerritory(territory.id, token);
+                            setTerritory(refreshed);
+                            territoryRef.current = refreshed;
+                            layerAdded.current = false;
+                          })
+                          .catch((err) => console.error("Clip save failed:", err))
+                          .finally(() => setSaving(false));
+                      }
+                      cancelClipMode();
+                    }
+                  }}
+                  onStraighten={() => {
+                    const newCoords = clipSegment.straighten();
+                    if (newCoords) {
+                      setEditCoords(newCoords);
+                      updateMapPolygon(newCoords);
+                      // Save straightened polygon
+                      const boundaries = { type: "Polygon", coordinates: [newCoords] };
+                      if (token && territory) {
+                        setSaving(true);
+                        updateTerritoryBoundaries(token, territory.id, boundaries)
+                          .then(async () => {
+                            const refreshed = await getTerritory(territory.id, token);
+                            setTerritory(refreshed);
+                            territoryRef.current = refreshed;
+                            layerAdded.current = false;
+                          })
+                          .catch((err) => console.error("Straighten save failed:", err))
+                          .finally(() => setSaving(false));
+                      }
+                      cancelClipMode();
+                    }
+                  }}
+                  onCancel={cancelClipMode}
+                />
               )}
 
               <MyLocationMarker
