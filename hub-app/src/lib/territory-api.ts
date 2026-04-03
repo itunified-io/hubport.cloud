@@ -642,6 +642,21 @@ export function deleteBoundary(
   });
 }
 
+export interface BulkFixResult {
+  fixed: number;
+  failed: Array<{ id: string; number: string; error: string }>;
+}
+
+export function bulkFixViolations(
+  token: string,
+  territoryIds: string[],
+): Promise<BulkFixResult> {
+  return apiFetch("/territories/fix/bulk", token, {
+    method: "POST",
+    body: JSON.stringify({ territoryIds }),
+  });
+}
+
 export function getVersions(token: string, territoryId: string): Promise<BoundaryVersion[]> {
   return apiFetch(`/territories/${territoryId}/versions`, token);
 }

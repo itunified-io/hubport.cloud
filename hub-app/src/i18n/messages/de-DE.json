@@ -430,5 +430,11 @@
   "import.branch.updated": "{count} Gebiete aktualisiert",
   "import.branch.created": "{count} neue Gebiete erstellt",
   "import.branch.skipped": "{count} \u00fcbersprungen (kein Polygon)",
-  "import.branch.warnings": "{count} Warnungen"
+  "import.branch.warnings": "{count} Warnungen",
+  "territory.fix.button": "Verst\u00f6\u00dfe beheben",
+  "territory.fix.selectAll": "Alle ausw\u00e4hlen",
+  "territory.fix.selected": "{count} ausgew\u00e4hlt",
+  "territory.fix.run": "Ausgew\u00e4hlte beheben",
+  "territory.fix.success": "{count, plural, one {# Gebiet behoben} other {# Gebiete behoben}}",
+  "territory.fix.partial": "{fixed} behoben, {failed} fehlgeschlagen"
 }

@@ -428,5 +428,11 @@
   "import.branch.updated": "{count} territories updated",
   "import.branch.created": "{count} new territories created",
   "import.branch.skipped": "{count} skipped (no polygon)",
-  "import.branch.warnings": "{count} warnings"
+  "import.branch.warnings": "{count} warnings",
+  "territory.fix.button": "Fix Violations",
+  "territory.fix.selectAll": "Select All",
+  "territory.fix.selected": "{count} selected",
+  "territory.fix.run": "Fix Selected",
+  "territory.fix.success": "{count, plural, one {# territory fixed} other {# territories fixed}}",
+  "territory.fix.partial": "{fixed} fixed, {failed} failed"
 }
