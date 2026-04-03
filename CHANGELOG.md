@@ -1,6 +1,16 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.9
+
+### Territory Management Features
+- feat: **Delete Boundary** — kebab menu on TerritoryDetail to delete a territory polygon without removing the territory itself (`DELETE /territories/:id/boundaries`)
+- feat: **Branch KML Import** — new import card to update existing territory boundaries by matching territory numbers from branch-tool KML files (`POST /territories/import/kml/branch`)
+- feat: **Bulk Fix Violations** — fix mode on map view to select and auto-fix multiple violated territories at once (`POST /territories/fix/bulk`)
+- refactor: extract KML parser into shared `kml-parser.ts` utility
+- feat: i18n keys for all three features (EN + DE)
+- chore: bump version to 2026.04.03.9
+
 ## v2026.04.03.8
 
 ### Territory Polygon Export
