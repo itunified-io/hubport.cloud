@@ -87,6 +87,8 @@ export function TerritoryDetail() {
   const [clipSnapTargets, setClipSnapTargets] = useState<SnapTarget[]>([]);
   const [clipLoading, setClipLoading] = useState(false);
   const clipMarkersRef = useRef<Marker[]>([]);
+  // Clip preview — shows clipped polygon for user approval before saving
+  const [clipPreviewCoords, setClipPreviewCoords] = useState<[number, number][] | null>(null);
   // Cache snap context so Overpass is only called once per page load
   const snapContextCacheRef = useRef<any>(null);
 
@@ -1072,55 +1074,79 @@ export function TerritoryDetail() {
               )}
 
               {/* Clip Segment target panel */}
-              {clipMode && clipSegment.phase === "choose_target" && (
+              {clipMode && clipSegment.phase === "choose_target" && !clipPreviewCoords && (
                 <ClipSegmentPanel
                   candidates={clipSegment.candidates}
                   onSelectCandidate={(candidate: ClipCandidate) => {
                     const newCoords = clipSegment.applyClip(candidate);
                     if (newCoords) {
-                      setEditCoords(newCoords);
+                      setClipPreviewCoords(newCoords);
+                      // Show preview: update polygon to clipped version
                       updateMapPolygon(newCoords);
-                      // Save the clipped polygon immediately
-                      const boundaries = { type: "Polygon", coordinates: [newCoords] };
-                      if (token && territory) {
-                        setSaving(true);
-                        updateTerritoryBoundaries(token, territory.id, boundaries)
-                          .then(async () => {
-                            const refreshed = await getTerritory(territory.id, token);
-                            setTerritory(refreshed);
-                            territoryRef.current = refreshed;
-                            layerAdded.current = false;
-                          })
-                          .catch((err) => console.error("Clip save failed:", err))
-                          .finally(() => setSaving(false));
-                      }
-                      cancelClipMode();
+                      // Hide vertex markers during preview
+                      clipMarkersRef.current.forEach((m) => m.remove());
+                      clipMarkersRef.current = [];
                     }
                   }}
                   onStraighten={() => {
                     const newCoords = clipSegment.straighten();
                     if (newCoords) {
-                      setEditCoords(newCoords);
+                      setClipPreviewCoords(newCoords);
                       updateMapPolygon(newCoords);
-                      // Save straightened polygon
-                      const boundaries = { type: "Polygon", coordinates: [newCoords] };
-                      if (token && territory) {
-                        setSaving(true);
-                        updateTerritoryBoundaries(token, territory.id, boundaries)
-                          .then(async () => {
-                            const refreshed = await getTerritory(territory.id, token);
-                            setTerritory(refreshed);
-                            territoryRef.current = refreshed;
-                            layerAdded.current = false;
-                          })
-                          .catch((err) => console.error("Straighten save failed:", err))
-                          .finally(() => setSaving(false));
-                      }
-                      cancelClipMode();
+                      clipMarkersRef.current.forEach((m) => m.remove());
+                      clipMarkersRef.current = [];
                     }
                   }}
                   onCancel={cancelClipMode}
                 />
+              )}
+
+              {/* Clip preview approval — Save / Cancel */}
+              {clipMode && clipPreviewCoords && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 bg-[var(--bg-1)] border border-[var(--border-2)] rounded-[var(--radius)] shadow-lg p-3 min-w-[260px]">
+                  <p className="text-xs text-[var(--text-muted)] mb-2 text-center">Review the clipped boundary</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        // Save the clipped polygon
+                        const boundaries = { type: "Polygon", coordinates: [clipPreviewCoords] };
+                        if (token && territory) {
+                          setSaving(true);
+                          updateTerritoryBoundaries(token, territory.id, boundaries)
+                            .then(async () => {
+                              const refreshed = await getTerritory(territory.id, token);
+                              setTerritory(refreshed);
+                              territoryRef.current = refreshed;
+                              layerAdded.current = false;
+                            })
+                            .catch((err) => console.error("Clip save failed:", err))
+                            .finally(() => setSaving(false));
+                        }
+                        setClipPreviewCoords(null);
+                        cancelClipMode();
+                      }}
+                      disabled={saving}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--green)] text-black rounded-[var(--radius-sm)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                    >
+                      <Save size={13} />
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setClipPreviewCoords(null);
+                        // Restore original polygon
+                        if (territory?.boundaries) {
+                          updateMapPolygon(extractRing(territory.boundaries));
+                        }
+                        cancelClipMode();
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-[var(--bg-1)] border border-[var(--border)] text-[var(--text-muted)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+                    >
+                      <X size={13} />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
 
               <MyLocationMarker
