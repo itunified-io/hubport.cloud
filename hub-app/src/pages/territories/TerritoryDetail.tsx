@@ -325,7 +325,7 @@ export function TerritoryDetail() {
 
   /** Enter clip mode — fetch snap context, extract vertices, activate clip tool */
   const enterClipMode = useCallback(async () => {
-    if (!territory?.boundaries || !token) return;
+    if (!territory?.boundaries || !token || clipLoading) return;
     const ring = extractRing(territory.boundaries);
     if (ring.length < 3) return;
 
@@ -334,25 +334,8 @@ export function TerritoryDetail() {
     setEditCoords(ring);
 
     try {
-      // Build bbox from territory coordinates
-      const lngs = ring.map((c) => c[0]);
-      const lats = ring.map((c) => c[1]);
-      const pad = 0.005; // ~500m padding
-      const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
-
-      const ctx = await getSnapContext(bbox, token);
+      // Build targets from neighbors + congregation boundary (always available, no API call)
       const targets: SnapTarget[] = [];
-
-      // Convert road features to SnapTargets
-      if (ctx.roads?.features) {
-        for (const f of ctx.roads.features) {
-          targets.push({
-            type: "road",
-            label: (f.properties as any)?.name ?? "Road",
-            geometry: f.geometry as SnapTarget["geometry"],
-          });
-        }
-      }
 
       // Add neighbor territory boundaries as snap targets
       for (const n of neighbors) {
@@ -374,15 +357,44 @@ export function TerritoryDetail() {
         });
       }
 
+      // Try to fetch road data from Overpass (may fail/timeout — non-blocking)
+      try {
+        const lngs = ring.map((c) => c[0]);
+        const lats = ring.map((c) => c[1]);
+        const pad = 0.005; // ~500m padding
+        const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
+
+        const ctx = await getSnapContext(bbox, token);
+
+        // Convert road features to SnapTargets
+        if (ctx.roads?.features) {
+          for (const f of ctx.roads.features) {
+            targets.push({
+              type: "road",
+              label: (f.properties as any)?.name ?? "Road",
+              geometry: f.geometry as SnapTarget["geometry"],
+            });
+          }
+        }
+      } catch (roadErr) {
+        console.warn("Road data unavailable (Overpass timeout/rate-limit), continuing with neighbors only:", roadErr);
+      }
+
       setClipSnapTargets(targets);
       setClipMode(true);
-      clipSegment.start();
     } catch (err) {
-      console.error("Failed to load snap context for clip mode:", err);
+      console.error("Failed to enter clip mode:", err);
     } finally {
       setClipLoading(false);
     }
-  }, [territory, extractRing, token, neighbors, congBoundary, clipSegment]);
+  }, [territory, extractRing, token, neighbors, congBoundary, clipLoading]);
+
+  // Start clip workflow when clip mode activates
+  useEffect(() => {
+    if (clipMode && clipSegment.phase === "idle") {
+      clipSegment.start();
+    }
+  }, [clipMode, clipSegment]);
 
   /** Cancel clip mode — clean up markers, restore original polygon */
   const cancelClipMode = useCallback(() => {
