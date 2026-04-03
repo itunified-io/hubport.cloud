@@ -47,6 +47,11 @@ const AssignBody = Type.Object({
 
 type AssignBodyType = Static<typeof AssignBody>;
 
+const BulkFixBody = Type.Object({
+  territoryIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 50 }),
+});
+type BulkFixBodyType = Static<typeof BulkFixBody>;
+
 async function createBoundaryVersion(
   territoryId: string,
   boundaries: object,
@@ -618,6 +623,72 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       });
 
       return reply.code(200).send(updated);
+    },
+  );
+
+  // Bulk fix violations — auto-fix pipeline on multiple territories
+  app.post<{ Body: BulkFixBodyType }>(
+    "/territories/fix/bulk",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
+      schema: { body: BulkFixBody },
+    },
+    async (request, reply) => {
+      const { territoryIds } = request.body;
+
+      // Fetch all requested territories
+      const territories = await prisma.territory.findMany({
+        where: { id: { in: territoryIds } },
+        orderBy: { number: "asc" },
+      });
+
+      if (territories.length === 0) {
+        return reply.code(404).send({ error: "No territories found" });
+      }
+
+      let fixed = 0;
+      const failed: Array<{ id: string; number: string; error: string }> = [];
+
+      for (const territory of territories) {
+        if (!territory.boundaries) {
+          failed.push({ id: territory.id, number: territory.number, error: "No boundary" });
+          continue;
+        }
+
+        try {
+          // Save previous boundary for undo
+          await createBoundaryVersion(
+            territory.id,
+            territory.boundaries as object,
+            "bulk_fix",
+            `Previous boundary before bulk fix`
+          );
+
+          // Run auto-fix pipeline
+          const autoFix = await runAutoFixPipeline(
+            prisma,
+            territory.boundaries as object,
+            territory.id
+          );
+
+          if (autoFix.geometryModified) {
+            await prisma.territory.update({
+              where: { id: territory.id },
+              data: { boundaries: autoFix.clipped } as any,
+            });
+          }
+
+          fixed++;
+        } catch (err) {
+          failed.push({
+            id: territory.id,
+            number: territory.number,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      return reply.send({ fixed, failed });
     },
   );
 
