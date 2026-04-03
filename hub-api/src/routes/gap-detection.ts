@@ -186,18 +186,45 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // ─── List runs (recent) ─────────────────────────────────────────
+  // Filters ignored buildings from resultGeoJson so the frontend
+  // always receives an up-to-date feature set without re-running detection.
   app.get(
     "/territories/gap-detection/runs",
     {
       preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_VIEW),
     },
     async () => {
-      return prisma.gapDetectionRun.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        include: {
-          territory: { select: { id: true, number: true, name: true } },
-        },
+      const [runs, ignoredRows] = await Promise.all([
+        prisma.gapDetectionRun.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          include: {
+            territory: { select: { id: true, number: true, name: true } },
+          },
+        }),
+        prisma.ignoredOsmBuilding.findMany({ select: { osmId: true } }),
+      ]);
+
+      if (ignoredRows.length === 0) return runs;
+
+      const ignoredSet = new Set(ignoredRows.map((r) => r.osmId));
+
+      return runs.map((run) => {
+        const geo = run.resultGeoJson as {
+          type: string;
+          features: Array<{ properties: Record<string, unknown>; [k: string]: unknown }>;
+        } | null;
+        if (!geo?.features) return run;
+
+        const filtered = geo.features.filter(
+          (f) => !ignoredSet.has(f.properties?.osmId as string),
+        );
+
+        return {
+          ...run,
+          resultGeoJson: { ...geo, features: filtered },
+          gapCount: filtered.length,
+        };
       });
     },
   );

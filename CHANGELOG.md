@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.7
+
+### Gap Detection — Ignore Visibility Fix + Map Style Zoom Preservation
+- fix: ignored buildings now properly disappear from map — backend `/runs` endpoint filters out ignored osmIds from resultGeoJson before returning
+- fix: `gapCount` on runs updated to reflect filtered results
+- fix: map zoom and center preserved when switching between Street/Satellite/OSM styles
+- chore: bump version to 2026.04.03.7
+
 ## v2026.04.03.6
 
 ### Gap Detection — Shift+Drag and Ignore Fixes

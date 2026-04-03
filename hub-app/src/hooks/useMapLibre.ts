@@ -37,7 +37,12 @@ export interface MapInstance {
     options?: { layers?: string[] },
   ) => Array<{ properties: Record<string, unknown>; [key: string]: unknown }>;
   dragPan: { enable: () => void; disable: () => void };
+  boxZoom: { enable: () => void; disable: () => void };
   setPaintProperty: (layerId: string, name: string, value: unknown) => void;
+  getCenter: () => { lng: number; lat: number };
+  getZoom: () => number;
+  setCenter: (center: [number, number]) => void;
+  setZoom: (zoom: number) => void;
 }
 
 /** Available map styles */
@@ -236,8 +241,17 @@ export function useMapLibre({
   const changeStyle = useCallback((key: MapStyleKey) => {
     const map = mapRef.current;
     if (!map) return;
+
+    // Preserve current view (setStyle resets center/zoom)
+    const center = map.getCenter();
+    const currentZoom = map.getZoom();
+
     setActiveStyle(key);
     map.setStyle(MAP_STYLES[key].url);
+
+    // Restore view after style swap
+    map.setCenter([center.lng, center.lat]);
+    map.setZoom(currentZoom);
 
     // Increment generation — stale handlers from previous changeStyle calls become no-ops
     const gen = ++styleChangeGenRef.current;
