@@ -397,11 +397,13 @@ export function TerritoryDetail() {
   }, [territory, extractRing, token, neighbors, congBoundary, clipLoading]);
 
   // Start clip workflow when clip mode activates
+  const clipStart = clipSegment.start;
+  const clipPhase = clipSegment.phase;
   useEffect(() => {
-    if (clipMode && clipSegment.phase === "idle") {
-      clipSegment.start();
+    if (clipMode && clipPhase === "idle") {
+      clipStart();
     }
-  }, [clipMode, clipSegment]);
+  }, [clipMode, clipPhase, clipStart]);
 
   /** Cancel clip mode — clean up markers, restore original polygon */
   const cancelClipMode = useCallback(() => {
@@ -556,7 +558,7 @@ export function TerritoryDetail() {
     updateMapPolygon(editCoords);
   }, [editMode, editCoords, updateMapPolygon]);
 
-  /** Clip mode vertex markers — clickable (not draggable) with color-coded selection */
+  /** Clip mode — create vertex markers once when entering clip mode */
   useEffect(() => {
     const map = mapRef.current;
     const mgl = maplibreModule.current;
@@ -566,9 +568,8 @@ export function TerritoryDetail() {
       return;
     }
 
-    // Clean old clip markers
-    clipMarkersRef.current.forEach((m) => m.remove());
-    clipMarkersRef.current = [];
+    // Only create markers if we don't have any yet
+    if (clipMarkersRef.current.length > 0) return;
 
     const MarkerClass = mgl.Marker || mgl.default?.Marker;
     if (!MarkerClass) return;
@@ -582,19 +583,16 @@ export function TerritoryDetail() {
 
     for (let i = 0; i < uniqueCount; i++) {
       const coord = editCoords[i]!;
-      const isStart = clipSegment.startIndex === i;
-      const isEnd = clipSegment.endIndex === i;
-
       const el = document.createElement("div");
-      const bg = isStart ? "#f59e0b" : isEnd ? "#22c55e" : "rgba(255,255,255,0.9)";
-      const border = isStart ? "2px solid #92400e" : isEnd ? "2px solid #166534" : "2px solid #64748b";
+      el.className = "clip-vertex";
+      el.dataset.vertexIndex = String(i);
       el.style.cssText = `
         width: 14px; height: 14px; border-radius: 50%;
-        background: ${bg}; border: ${border};
+        background: rgba(255,255,255,0.9); border: 2px solid #64748b;
         cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-        z-index: 10; transition: transform 0.15s;
+        z-index: 10; transition: transform 0.15s, background 0.15s, border-color 0.15s;
       `;
-      el.title = isStart ? "Start vertex" : isEnd ? "End vertex" : "Click to select";
+      el.title = "Click to select";
       el.addEventListener("mouseenter", () => { el.style.transform = "scale(1.3)"; });
       el.addEventListener("mouseleave", () => { el.style.transform = "scale(1)"; });
 
@@ -616,7 +614,25 @@ export function TerritoryDetail() {
       clipMarkersRef.current = [];
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipMode, editCoords.length, clipSegment.phase, clipSegment.startIndex, clipSegment.endIndex, mapRef, maplibreModule]);
+  }, [clipMode, editCoords.length, mapRef, maplibreModule]);
+
+  /** Clip mode — update vertex marker styles when selection changes (no marker recreation) */
+  useEffect(() => {
+    if (!clipMode) return;
+    const startIdx = clipSegment.startIndex;
+    const endIdx = clipSegment.endIndex;
+
+    clipMarkersRef.current.forEach((marker) => {
+      const el = marker.getElement();
+      const idx = parseInt(el.dataset.vertexIndex ?? "-1", 10);
+      const isStart = idx === startIdx;
+      const isEnd = idx === endIdx;
+
+      el.style.background = isStart ? "#f59e0b" : isEnd ? "#22c55e" : "rgba(255,255,255,0.9)";
+      el.style.borderColor = isStart ? "#92400e" : isEnd ? "#166534" : "#64748b";
+      el.title = isStart ? "Start vertex (A)" : isEnd ? "End vertex (B)" : "Click to select";
+    });
+  }, [clipMode, clipSegment.startIndex, clipSegment.endIndex]);
 
   /** Live-update polygon on map during clip mode */
   useEffect(() => {
