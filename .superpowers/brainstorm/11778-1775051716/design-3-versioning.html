@@ -1,0 +1,147 @@
+<h2>Design Section 3/4 — Version History & Restore</h2>
+<p class="subtitle">Review this section. Does it look right so far?</p>
+
+<div class="section">
+  <h3>1. Version History in TerritoryDetail</h3>
+  <div class="mockup">
+    <div class="mockup-header">Version dropdown — below map controls</div>
+    <div class="mockup-body" style="min-height: 220px;">
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;">
+        <div style="font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Boundary History</div>
+
+        <!-- Version list -->
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.2); border-radius: 6px; cursor: pointer;">
+            <div style="background: #a78bfa; color: white; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;">v3</div>
+            <div style="flex: 1;">
+              <div style="font-size: 12px; font-weight: 500;">Manual edit</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4);">Today, 15:20</div>
+            </div>
+            <div style="font-size: 10px; color: rgba(167,139,250,0.8); background: rgba(167,139,250,0.1); padding: 2px 6px; border-radius: 3px;">current</div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; cursor: pointer;">
+            <div style="background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;">v2</div>
+            <div style="flex: 1;">
+              <div style="font-size: 12px; font-weight: 500;">Auto-clip</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4);">Mar 31, 10:45 — Clipped to congregation boundary</div>
+            </div>
+            <div style="font-size: 10px; color: rgba(255,255,255,0.3);">restore ↩</div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; cursor: pointer;">
+            <div style="background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700;">v1</div>
+            <div style="flex: 1;">
+              <div style="font-size: 12px; font-weight: 500;">KML import</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4);">Mar 30, 09:12 — Initial boundary from KML</div>
+            </div>
+            <div style="font-size: 10px; color: rgba(255,255,255,0.3);">restore ↩</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. Restore Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">What happens when user clicks "restore ↩"</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 2.2; color: rgba(255,255,255,0.8);">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #a78bfa; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">1</span>
+        <span>User clicks "restore ↩" on v1</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #a78bfa; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">2</span>
+        <span>Client calls <code>POST /territories/:id/restore { versionId }</code></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #a78bfa; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">3</span>
+        <span>Server loads v1 boundaries → runs auto-fix pipeline on them (they may now violate current neighbors)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #f59e0b; color: black; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">4</span>
+        <span>If modified → preview dialog (same as edit preview)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0;">
+        <span style="background: #22c55e; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">5</span>
+        <span>Accept → saves boundary + creates <strong>v4</strong> (changeType: "restore", summary: "Restored from v1")</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.12);">
+    <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.7);"><strong style="color: #a78bfa;">Non-destructive:</strong> Restore never overwrites history. It creates a new version pointing back to the restored source. The full version chain is always preserved. Even after restore, all previous versions remain accessible.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. When Versions Are Created</h3>
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: rgba(34,197,94,0.15); color: #22c55e; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">creation</div>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.7);">New territory gets its first boundary via CreationFlow → v1</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: rgba(59,130,246,0.15); color: #3b82f6; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">manual_edit</div>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.7);">User edits boundary via vertex handles → new version on save</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: rgba(245,158,11,0.15); color: #f59e0b; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">auto_clip</div>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.7);">Auto-fix pipeline modifies geometry (congregation clip or neighbor clip) → new version</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: rgba(139,92,246,0.15); color: #8b5cf6; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">import</div>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.7);">KML/CSV import sets boundary → v1 (or new version if boundary already existed)</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+      <div style="background: rgba(167,139,250,0.15); color: #a78bfa; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">restore</div>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.7);">User restores a previous version → new version with reference to source</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. Permissions</h3>
+  <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Action</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Permission</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">New?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">View version history</td>
+          <td style="padding: 6px;"><code>app:territories.view</code></td>
+          <td style="padding: 6px;">No</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Edit boundary (vertex handles)</td>
+          <td style="padding: 6px;"><code>app:territories.edit</code></td>
+          <td style="padding: 6px;">No</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Restore a version</td>
+          <td style="padding: 6px;"><code>app:territories.edit</code></td>
+          <td style="padding: 6px;">No</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Create new territory</td>
+          <td style="padding: 6px;"><code>app:territories.edit</code></td>
+          <td style="padding: 6px;">No</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px;">View violations on map</td>
+          <td style="padding: 6px;"><code>app:territories.view</code></td>
+          <td style="padding: 6px;">No</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.4);">No new permissions needed. All actions use existing territory permissions.</p>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top: 1.5rem;">Does the versioning design look right? Last section will be the migration plan for existing territories.</p>

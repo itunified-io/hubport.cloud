@@ -52,6 +52,7 @@ export const PERMISSIONS = {
   PUBLISHERS_VIEW_CONTACTS: "app:publishers.view_contacts",
   PUBLISHERS_EDIT: "app:publishers.edit",
   PUBLISHERS_EDIT_LIMITED: "app:publishers.edit_limited",
+  PUBLISHERS_RESET_PASSWORD: "app:publishers.reset_password",
 
   // Meetings
   MEETINGS_VIEW: "app:meetings.view",
@@ -293,6 +294,7 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.SETTINGS_VIEW,
     PERMISSIONS.ROLES_VIEW,
     PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.PUBLISHERS_RESET_PASSWORD,
     PERMISSIONS.CHAT_VIEW,
     PERMISSIONS.CHAT_SEND,
     PERMISSIONS.CHAT_CREATE_SPACE,

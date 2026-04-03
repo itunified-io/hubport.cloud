@@ -1,0 +1,77 @@
+<h2>Offline Architecture — 3 Approaches</h2>
+<p class="subtitle">Each approach handles the same requirements differently. Click the one that fits best.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Encrypted IndexedDB + Custom Sync Engine</h3>
+      <p><strong>Stack:</strong> Raw IndexedDB + Web Crypto API + custom sync logic</p>
+      <p>Build everything from scratch. IndexedDB stores encrypted blobs per table. Custom diff-based sync compares local timestamps vs server. Conflict detection via version counters.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Zero dependencies — smallest bundle</li>
+          <li>Full control over encryption &amp; sync</li>
+          <li>No library lock-in</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Most development effort (weeks)</li>
+          <li>Must handle all IndexedDB edge cases (iOS quirks, quota, transactions)</li>
+          <li>Conflict resolution from scratch</li>
+          <li>Migration/schema changes are manual</li>
+        </ul></div>
+      </div>
+      <p style="margin-top:12px;color:#f59e0b;font-size:13px;">⏱ Estimated: 3-4 weeks</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dexie.js + Encryption Middleware + Sync Protocol</h3>
+      <p><strong>Stack:</strong> Dexie.js (IndexedDB wrapper) + dexie-encrypted + custom sync</p>
+      <p>Dexie provides a clean Promise-based API over IndexedDB with schema versioning and migrations. Encryption via middleware that transparently encrypts/decrypts on read/write. Sync engine built on top using Dexie's hooks.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Battle-tested IndexedDB wrapper (500K+ weekly npm downloads)</li>
+          <li>Schema versioning &amp; migrations built-in</li>
+          <li>Transparent encryption middleware</li>
+          <li>Rich query API (compound indexes, where clauses)</li>
+          <li>iOS Safari well-tested by community</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>~40KB bundle addition (gzipped)</li>
+          <li>Sync engine still custom-built</li>
+          <li>Dexie Cloud exists but is SaaS — we'd use Dexie locally only</li>
+        </ul></div>
+      </div>
+      <p style="margin-top:12px;color:#22c55e;font-size:13px;">⭐ Recommended — best balance of effort vs control</p>
+      <p style="color:#f59e0b;font-size:13px;">⏱ Estimated: 1.5-2 weeks</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>RxDB + CRDTs</h3>
+      <p><strong>Stack:</strong> RxDB (reactive database) + built-in replication + encryption plugin</p>
+      <p>Full offline-first database with built-in replication protocol, encryption plugin, and reactive queries. RxDB handles conflict resolution via revision trees (CouchDB-style).</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Replication protocol built-in (pull/push/conflict)</li>
+          <li>Encryption plugin included</li>
+          <li>Reactive queries (Observable-based)</li>
+          <li>Most feature-complete solution</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Heavy — 150KB+ gzipped, RxJS dependency</li>
+          <li>Requires backend replication endpoint (custom protocol)</li>
+          <li>Opinionated — may fight with existing Fastify/Prisma patterns</li>
+          <li>Premium features behind paid license</li>
+          <li>Overkill for our data volume</li>
+        </ul></div>
+      </div>
+      <p style="margin-top:12px;color:#f59e0b;font-size:13px;">⏱ Estimated: 2-3 weeks (including backend replication endpoint)</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,144 @@
+<h2>Section 1: Offline Data Layer</h2>
+<p class="subtitle">Dexie.js schema, encryption middleware, and storage budget</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dexie Database Schema — hubportOffline</div>
+  <div class="mockup-body" style="padding:20px;font-size:13px;">
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+
+      <div style="background:#1a1a2e;border:1px solid #d97706;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#d97706;font-size:12px;margin-bottom:8px;">territories</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>id</code> (PK) · <code>number</code> · <code>name</code> · <code>description</code><br>
+          <code>type</code> · <code>boundaries</code> (GeoJSON, encrypted)<br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #3b82f6;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#3b82f6;font-size:12px;margin-bottom:8px;">addresses</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>addressId</code> (PK) · <code>territoryId</code> (indexed)<br>
+          <code>streetAddress</code> · <code>city</code> · <code>postalCode</code> (encrypted)<br>
+          <code>lat</code> · <code>lng</code> · <code>type</code> · <code>status</code><br>
+          <code>bellCount</code> · <code>notes</code> (encrypted)<br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #22c55e;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#22c55e;font-size:12px;margin-bottom:8px;">visits</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>visitId</code> (PK) · <code>addressId</code> (indexed)<br>
+          <code>memberId</code> · <code>visitDate</code> · <code>outcome</code><br>
+          <code>notes</code> (encrypted)<br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #a855f7;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#a855f7;font-size:12px;margin-bottom:8px;">assignments</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>id</code> (PK) · <code>territoryId</code> (indexed)<br>
+          <code>publisherId</code> · <code>assignedAt</code> · <code>returnedAt</code><br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #f43f5e;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#f43f5e;font-size:12px;margin-bottom:8px;">meetingPoints</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>id</code> (PK) · <code>name</code> · <code>address</code> (encrypted)<br>
+          <code>lat</code> · <code>lng</code> · <code>dayOfWeek</code> · <code>time</code><br>
+          <code>conductorId</code> · <code>maxParticipants</code><br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #06b6d4;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#06b6d4;font-size:12px;margin-bottom:8px;">meetings</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>id</code> (PK) · <code>meetingPointId</code> (indexed)<br>
+          <code>date</code> · <code>time</code> · <code>status</code><br>
+          <code>conductorId</code> · <code>notes</code> (encrypted)<br>
+          <code>signups[]</code> · <code>fieldGroups[]</code><br>
+          <code>version</code> · <code>updatedAt</code> · <code>syncedAt</code>
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #f59e0b;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#f59e0b;font-size:12px;margin-bottom:8px;">pendingChanges</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>id</code> (PK, auto) · <code>table</code> · <code>recordId</code><br>
+          <code>operation</code> (create | update | delete)<br>
+          <code>payload</code> (encrypted) · <code>createdAt</code><br>
+          <code>status</code> (pending | pushing | failed | conflict)
+        </div>
+      </div>
+
+      <div style="background:#1a1a2e;border:1px solid #64748b;border-radius:8px;padding:12px;">
+        <div style="font-weight:700;color:#64748b;font-size:12px;margin-bottom:8px;">syncMeta</div>
+        <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+          <code>key</code> (PK) · <code>value</code><br>
+          Stores: <code>lastSyncAt</code>, <code>deviceId</code>,<br>
+          <code>persistenceGranted</code>, <code>schemaVersion</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Encryption detail -->
+<div style="margin-top:20px;">
+  <h3>Encryption Strategy</h3>
+  <div class="mockup">
+    <div class="mockup-header">AES-256-GCM via Web Crypto API</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <div style="font-weight:600;color:#e2e8f0;margin-bottom:8px;">Key Derivation</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.8;">
+            1. OIDC access_token + deviceId → HMAC-SHA256 → seed<br>
+            2. seed → PBKDF2 (100K iterations, random salt) → AES-256 key<br>
+            3. Salt stored in syncMeta (not encrypted)<br>
+            4. Key held in <strong>memory only</strong> — never persisted
+          </div>
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <div style="font-weight:600;color:#e2e8f0;margin-bottom:8px;">What Gets Encrypted</div>
+          <div style="font-size:12px;color:#94a3b8;line-height:1.8;">
+            <span style="color:#22c55e;">●</span> PII fields: names, addresses, notes, phone numbers<br>
+            <span style="color:#22c55e;">●</span> GeoJSON boundaries (location data)<br>
+            <span style="color:#22c55e;">●</span> Pending change payloads<br>
+            <span style="color:#64748b;">○</span> IDs, timestamps, status enums — <em>not encrypted</em> (needed for indexing)
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:#f59e0b15;border:1px solid #f59e0b30;border-radius:8px;">
+        <div style="font-size:12px;color:#f59e0b;">
+          <strong>iOS Note:</strong> Each encrypted field gets a unique IV (12 bytes, crypto.getRandomValues). Dexie middleware intercepts put/get — transparent to app code. Web Crypto SubtleCrypto available on iOS Safari 15+.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Storage budget -->
+<div style="margin-top:20px;">
+  <h3>Storage Budget</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:200px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#22c55e;">~5 MB</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Typical congregation<br>(50 territories, 3000 addresses, 10K visits)</div>
+    </div>
+    <div style="flex:1;min-width:200px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#f59e0b;">~8 MB</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px;">With encryption overhead<br>(IV + padding per field, ~60% overhead)</div>
+    </div>
+    <div style="flex:1;min-width:200px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#3b82f6;">50-500 MB</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px;">iOS Safari quota<br>(~50% free disk, persist() extends)</div>
+    </div>
+  </div>
+</div>

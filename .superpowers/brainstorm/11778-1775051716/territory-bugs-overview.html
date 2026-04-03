@@ -1,0 +1,65 @@
+<h2>Territory Polygon — 4 Bugs to Fix</h2>
+<p class="subtitle">Based on your screenshot and description. Which bugs are highest priority?</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="boundary-violation" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>🔴 Polygon exceeds congregation boundary</h3>
+      <p>Some territory polygons extend beyond the dashed red congregation boundary line. The spec defines auto-clipping via <code>ST_Intersection()</code> on save — but it's <strong>not implemented</strong>. Current <code>PUT /territories/:id</code> is a plain Prisma update with zero spatial validation.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Spec says</h4><ul><li>Auto-clip to congregation boundary on save</li><li>Return <code>autoFix.applied: ["congregation_clip"]</code> in response</li><li>Toast: "Boundary adjusted — clipped to congregation area"</li></ul></div>
+        <div class="cons"><h4>Current state</h4><ul><li>No PostGIS helpers exist</li><li>No spatial SQL at all in save pipeline</li><li>Boundaries stored as raw JSONB, never validated</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="overlap-violation" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>🟡 Territory polygons overlap each other</h3>
+      <p>Adjacent territories share area — their polygons overlap instead of sharing clean edges. The spec defines overlap <strong>detection</strong> (not auto-fix) with warning badges showing overlap area.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Spec says</h4><ul><li>Detect overlaps after save via <code>ST_Intersects()</code></li><li>Return <code>autoFix.overlaps: [{territoryId, number, overlapAreaM2}]</code></li><li>Yellow warning badge: "Overlaps with T-5 (121 m²)"</li><li>Do NOT auto-resolve — user adjusts manually</li></ul></div>
+        <div class="cons"><h4>Current state</h4><ul><li>No overlap detection</li><li>No visual feedback for overlapping areas</li><li>Snap engine helps prevent overlaps but doesn't enforce</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="edit-polygon" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>🔴 Edit polygon not working</h3>
+      <p>Vertex handles don't appear when clicking a territory on the detail page. The <code>TerritoryEditor</code>, <code>VertexHandle</code>, and <code>MidpointHandle</code> components exist in code but may not be wired up correctly or the edit mode entry point is broken.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>What exists</h4><ul><li>TerritoryEditor.tsx with full vertex manipulation</li><li>VertexHandle + MidpointHandle components</li><li>SnapEngine with 4-level priority</li><li>Undo/redo hook</li></ul></div>
+        <div class="cons"><h4>What's likely broken</h4><ul><li>Edit mode activation (button/click handler)</li><li>Map event wiring for vertex drag</li><li>Component rendering within detail page</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="new-territory" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>🔴 New Territory creation not working</h3>
+      <p>The "+ New Territory" button in map view doesn't produce a working territory. The <code>CreationFlow</code> component exists with click-to-place and freehand lasso modes, but the <code>POST /territories</code> endpoint is a minimal Prisma create — may not be handling boundaries correctly.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>What exists</h4><ul><li>CreationFlow.tsx with 2 drawing modes</li><li>POST /territories endpoint</li><li>Territory number + name input</li></ul></div>
+        <div class="cons"><h4>What's likely broken</h4><ul><li>API saves territory but boundaries may not persist</li><li>Drawing mode may not activate on map</li><li>No spatial validation on create</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem; padding: 1.5rem; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+  <h3>Implementation Gap Summary</h3>
+  <p style="color: rgba(255,255,255,0.6);">The Drawing UX spec (Spec 1) designed a complete auto-fix pipeline with PostGIS spatial validation, but the current backend is a plain CRUD API. The entire spatial layer needs to be built:</p>
+  <ul style="color: rgba(255,255,255,0.6);">
+    <li><strong>postgis-helpers.ts</strong> — doesn't exist yet (ST_MakeValid, ST_Intersection, ST_Intersects)</li>
+    <li><strong>Auto-fix pipeline</strong> — validate → water clip → congregation clip → overlap detect</li>
+    <li><strong>autoFix response</strong> — extended PUT response with fix metadata</li>
+    <li><strong>Frontend feedback</strong> — toasts for auto-fixes, warning badges for overlaps</li>
+  </ul>
+</div>
+
+<p class="subtitle" style="margin-top: 1.5rem;">Select the bugs you want to fix in this session (click multiple). Then tell me in the terminal.</p>

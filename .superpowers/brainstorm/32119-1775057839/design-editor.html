@@ -1,0 +1,116 @@
+<h2>Design Section 2: Inline Polygon Editor</h2>
+<p class="subtitle">Edit territory boundaries directly on the detail page map</p>
+
+<div class="section">
+  <h3>Edit Mode UX</h3>
+  <div class="mockup">
+    <div class="mockup-header">Territory Detail — Edit Mode Active</div>
+    <div class="mockup-body" style="padding: 0; position: relative; height: 350px; background: #d4e6d0; overflow: hidden;">
+
+      <!-- Simulated map background -->
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #c8dcc4 0%, #d4e6d0 30%, #c0d8bc 60%, #d0e2cc 100%);">
+        <!-- Street lines -->
+        <div style="position: absolute; top: 120px; left: 0; right: 0; height: 2px; background: #a0b89c; transform: rotate(-5deg);"></div>
+        <div style="position: absolute; top: 200px; left: 50px; width: 400px; height: 2px; background: #a0b89c; transform: rotate(15deg);"></div>
+      </div>
+
+      <!-- Territory polygon (editable) -->
+      <svg style="position: absolute; inset: 0; width: 100%; height: 100%;" viewBox="0 0 600 350">
+        <!-- Neighbor territory (translucent) -->
+        <polygon points="350,50 500,80 520,200 400,220 340,150" fill="rgba(139,92,246,0.15)" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="420" y="140" fill="#7c3aed" font-size="11" font-weight="600" opacity="0.6">#312</text>
+
+        <!-- Congregation boundary -->
+        <path d="M 30,30 L 570,40 L 560,320 L 40,310 Z" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+
+        <!-- Active territory polygon -->
+        <polygon points="100,80 280,60 340,150 300,260 150,280 80,180" fill="rgba(245,158,11,0.25)" stroke="#f59e0b" stroke-width="2"/>
+
+        <!-- Edge midpoints (insertable) -->
+        <circle cx="190" cy="70" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="310" cy="105" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="320" cy="205" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="225" cy="270" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="115" cy="230" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="90" cy="130" r="4" fill="#64748b" stroke="white" stroke-width="1.5" opacity="0.6"/>
+
+        <!-- Draggable vertex handles -->
+        <circle cx="100" cy="80" r="7" fill="#f59e0b" stroke="white" stroke-width="2" style="cursor: grab;"/>
+        <circle cx="280" cy="60" r="7" fill="#f59e0b" stroke="white" stroke-width="2" style="cursor: grab;"/>
+        <circle cx="340" cy="150" r="7" fill="#3b82f6" stroke="white" stroke-width="2.5" style="cursor: grabbing;"/><!-- actively dragged -->
+        <circle cx="300" cy="260" r="7" fill="#f59e0b" stroke="white" stroke-width="2" style="cursor: grab;"/>
+        <circle cx="150" cy="280" r="7" fill="#f59e0b" stroke="white" stroke-width="2" style="cursor: grab;"/>
+        <circle cx="80" cy="180" r="7" fill="#f59e0b" stroke="white" stroke-width="2" style="cursor: grab;"/>
+
+        <!-- Snap indicator (blue line to road) -->
+        <line x1="340" y1="150" x2="355" y2="155" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <text x="360" y="148" fill="#3b82f6" font-size="9" font-weight="500">snap: Hauptstraße</text>
+      </svg>
+
+      <!-- Edit toolbar (top) -->
+      <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 10;">
+        <div style="display: flex; align-items: center; gap: 4px; background: rgba(15,23,42,0.9); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #94a3b8; border: 1px solid #334155;">
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></div>
+          Snap: ON
+        </div>
+        <div style="background: rgba(34,197,94,0.9); color: white; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
+          ✓ Save
+        </div>
+        <div style="background: rgba(15,23,42,0.9); color: #94a3b8; border-radius: 6px; padding: 4px 12px; font-size: 11px; border: 1px solid #334155; cursor: pointer;">
+          ✕ Cancel
+        </div>
+      </div>
+
+      <!-- Territory label -->
+      <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(15,23,42,0.9); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #f59e0b; font-weight: 600; border: 1px solid #334155;">
+        #314 Seeshaupt — Editing
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Interactions</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+
+    <div style="background: #1e293b; border-radius: 8px; padding: 1rem;">
+      <div style="color: #f59e0b; font-weight: 700; font-size: 0.7rem; margin-bottom: 0.5rem;">DRAG VERTEX</div>
+      <div style="color: #94a3b8; font-size: 0.8rem;">
+        Amber circles are draggable handles. While dragging, if within 30m of a road/building edge, vertex magnetizes to nearest point. Blue highlight shows snap target.
+      </div>
+    </div>
+
+    <div style="background: #1e293b; border-radius: 8px; padding: 1rem;">
+      <div style="color: #64748b; font-weight: 700; font-size: 0.7rem; margin-bottom: 0.5rem;">CLICK MIDPOINT</div>
+      <div style="color: #94a3b8; font-size: 0.8rem;">
+        Gray circles on edge midpoints. Click to insert a new vertex at that position. Becomes a draggable amber handle.
+      </div>
+    </div>
+
+    <div style="background: #1e293b; border-radius: 8px; padding: 1rem;">
+      <div style="color: #ef4444; font-weight: 700; font-size: 0.7rem; margin-bottom: 0.5rem;">RIGHT-CLICK VERTEX</div>
+      <div style="color: #94a3b8; font-size: 0.8rem;">
+        Context menu with "Delete vertex". Disabled if only 3 vertices remain (minimum for polygon).
+      </div>
+    </div>
+
+    <div style="background: #1e293b; border-radius: 8px; padding: 1rem;">
+      <div style="color: #3b82f6; font-weight: 700; font-size: 0.7rem; margin-bottom: 0.5rem;">SNAP TOGGLE</div>
+      <div style="color: #94a3b8; font-size: 0.8rem;">
+        Blue indicator in toolbar. Toggle on/off. When on, dragged vertices magnetize to nearby OSM features (roads, buildings, water).
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top: 1.5rem;">
+  <h3>Implementation: New Component <code>PolygonEditor.tsx</code></h3>
+  <p style="color: #94a3b8; font-size: 0.85rem;">
+    Replaces the current broken <code>editMode</code> state with a proper map-integrated editor. Receives <code>map</code> ref from TerritoryDetail. Manages its own GeoJSON source + layers for vertex handles, midpoints, and polygon preview. On save, calls <code>updateTerritoryBoundaries()</code> which runs the auto-fix pipeline server-side.
+  </p>
+  <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">
+    <strong>Neighbor overlay:</strong> When edit mode activates, fetches neighboring territories (already loaded in TerritoryMap via <code>listTerritories()</code>) and renders them as translucent polygons so the user can see adjacent boundaries.
+  </p>
+</div>

@@ -1,0 +1,145 @@
+<h2>Design Section 4/4 — Migration Plan for Existing Territories</h2>
+<p class="subtitle">How to handle territories that already exist in the DB when this feature ships.</p>
+
+<div class="section">
+  <h3>1. Bootstrap v1 Snapshots</h3>
+  <div class="mockup">
+    <div class="mockup-header">One-time migration — runs on first deploy</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 2.2; color: rgba(255,255,255,0.8);">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">1</span>
+        <span>Prisma migration adds <code>TerritoryBoundaryVersion</code> table</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">2</span>
+        <span>Seed script runs: for each Territory WHERE boundaries IS NOT NULL</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">3</span>
+        <span>Create version record: <code>{ version: 1, changeType: "import", changeSummary: "Initial snapshot from existing boundary" }</code></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0;">
+        <span style="background: #22c55e; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">4</span>
+        <span>Idempotent — skips territories that already have version records</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.12);">
+    <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.7);"><strong style="color: #3b82f6;">When:</strong> This runs as part of the Prisma seed script (<code>prisma/seed.ts</code>), which executes on <code>db push</code> / container restart. It's idempotent — safe to re-run. Existing boundaries are NOT modified, just snapshotted as v1.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. Initial Violation Detection</h3>
+  <div class="mockup">
+    <div class="mockup-header">What happens on first map load after deploy</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 2.2; color: rgba(255,255,255,0.8);">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #f59e0b; color: black; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">1</span>
+        <span>User opens Kartenansicht (map view)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #f59e0b; color: black; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">2</span>
+        <span><code>GET /territories/violations</code> scans all territory boundaries</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="background: #ef4444; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">!</span>
+        <span>Existing violations appear as warning badges on the map</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0;">
+        <span style="background: #22c55e; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;">✓</span>
+        <span>User fixes each one manually: click badge → detail page → Edit → auto-fix preview → save</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.12);">
+    <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.7);"><strong style="color: #f59e0b;">No auto-fix on deploy:</strong> Existing boundaries are NOT automatically clipped during migration. The user sees violations and fixes them one-by-one via the normal edit flow. This preserves intentional boundary decisions and gives the user control over each change.</p>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. No Breaking Changes</h3>
+  <div style="padding: 1rem; background: rgba(34,197,94,0.06); border-radius: 8px; border: 1px solid rgba(34,197,94,0.12);">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Concern</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Impact</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Existing <code>GET /territories</code></td>
+          <td style="padding: 6px;">✅ Unchanged — still returns boundaries in same JSON shape</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Existing <code>PUT /territories/:id</code></td>
+          <td style="padding: 6px;">✅ Enhanced — now runs auto-fix pipeline, but response is backward-compatible (adds <code>autoFix</code> field)</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Territories without boundaries</td>
+          <td style="padding: 6px;">✅ No version record created — they get v1 when boundary is first drawn</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Congregation boundary territory</td>
+          <td style="padding: 6px;">✅ Excluded from violations check (it IS the boundary)</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px;">KML import</td>
+          <td style="padding: 6px;">✅ Import now runs auto-fix pipeline — imported boundaries get clipped automatically</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. Seed Role Migration</h3>
+  <div style="padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+    <div style="font-family: monospace; font-size: 12px; line-height: 2; color: rgba(255,255,255,0.8);">
+      <div style="color: rgba(255,255,255,0.4);">// seed-roles.ts already runs on every deploy (idempotent upsert)</div>
+      <div style="color: rgba(255,255,255,0.4);">// New "Territory Servant" role gets created automatically</div>
+      <div style="color: rgba(255,255,255,0.4);">// FLAG_TO_APP_ROLE picks it up on next login/token refresh</div>
+      <div style="margin-top: 8px;">Existing users with <code>territory_servant</code> flag:</div>
+      <div style="padding-left: 16px;">→ Next login: flag auto-maps to new "Territory Servant" AppRole</div>
+      <div style="padding-left: 16px;">→ Immediately get territory edit permissions</div>
+      <div style="padding-left: 16px;">→ No manual action needed by admin</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem; padding: 1.5rem; border-radius: 12px; background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.15);">
+  <h3 style="color: #a78bfa;">Complete Design Summary</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <th style="text-align: left; padding: 8px; color: rgba(255,255,255,0.5);">Section</th>
+        <th style="text-align: left; padding: 8px; color: rgba(255,255,255,0.5);">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">1. Backend: PostGIS pipeline + versioning</td>
+        <td style="padding: 8px; color: #22c55e;">✅ Approved</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">2. Frontend: Edit, Create, Preview, Violations</td>
+        <td style="padding: 8px; color: #22c55e;">✅ Approved</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">3. Version History & Restore</td>
+        <td style="padding: 8px; color: #22c55e;">✅ Approved</td>
+      </tr>
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <td style="padding: 8px;">3b. RBAC: Territory Servant role + flag mapping</td>
+        <td style="padding: 8px; color: #22c55e;">✅ Approved</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px;">4. Migration plan</td>
+        <td style="padding: 8px; color: #f59e0b;">⏳ Reviewing now</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="subtitle" style="margin-top: 1.5rem;">Does the migration plan look right? If all sections are approved, I'll write the full design spec document and commit it.</p>

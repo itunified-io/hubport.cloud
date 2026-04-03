@@ -11,6 +11,15 @@ Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 - Uses existing batch ignore API (up to 200 buildings per call)
 - chore: publisher form refactor, sync fixes, device routes, i18n updates
 
+## v2026.04.02.3
+
+### Admin Password Reset (#282)
+- feat: `POST /api/publishers/:id/reset-password` — email-first with temp password fallback
+- feat: in-memory rate limiter (3 requests/hour/publisher)
+- feat: Reset Password button on publisher detail page (elder-only)
+- feat: one-time-display dialog for temporary password with copy-to-clipboard
+- feat: i18n strings for reset password UI (en-US, de-DE)
+
 ## v2026.04.01.16
 
 ### Map fixes + upgrade instructions (#275)

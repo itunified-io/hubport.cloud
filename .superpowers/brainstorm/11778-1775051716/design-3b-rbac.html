@@ -1,0 +1,159 @@
+<h2>Design Section 3b/4 — RBAC: Territory Servant Role + Flag Mapping</h2>
+<p class="subtitle">Missing piece: territory_servant flag has no AppRole. Here's the fix.</p>
+
+<div class="section">
+  <h3>Current State (broken)</h3>
+  <div style="padding: 1rem; background: rgba(239,68,68,0.06); border-radius: 8px; border: 1px solid rgba(239,68,68,0.12);">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Congregation Flag</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Auto-Mapped AppRole</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Has territories.edit?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;"><code>service_overseer</code></td>
+          <td style="padding: 6px;">Service Overseer ✅</td>
+          <td style="padding: 6px;">✅ Yes</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;"><code>territory_servant</code></td>
+          <td style="padding: 6px; color: #ef4444;">❌ None — unmapped!</td>
+          <td style="padding: 6px; color: #ef4444;">❌ No</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px;"><code>accounts_servant</code></td>
+          <td style="padding: 6px; color: rgba(255,255,255,0.4);">❌ None</td>
+          <td style="padding: 6px; color: rgba(255,255,255,0.4);">N/A</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Fix: Add Territory Servant Seed Role + Flag Mapping</h3>
+
+  <div class="mockup">
+    <div class="mockup-header">seed-roles.ts — new role</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.9; color: rgba(255,255,255,0.8);">
+      <div>{</div>
+      <div style="padding-left: 16px;">name: <span style="color: #22c55e;">"Territory Servant"</span>,</div>
+      <div style="padding-left: 16px;">description: <span style="color: #22c55e;">"Territory management — draw, edit, assign, import boundaries"</span>,</div>
+      <div style="padding-left: 16px;">scope: <span style="color: #22c55e;">"all"</span>,</div>
+      <div style="padding-left: 16px;">permissions: [</div>
+      <div style="padding-left: 32px; color: rgba(255,255,255,0.5);">// View</div>
+      <div style="padding-left: 32px;">P.TERRITORIES_VIEW, P.ADDRESSES_VIEW, P.ASSIGNMENTS_VIEW,</div>
+      <div style="padding-left: 32px;">P.PUBLISHERS_VIEW, P.CAMPAIGNS_VIEW,</div>
+      <div style="padding-left: 32px; color: rgba(255,255,255,0.5);">// Edit boundaries</div>
+      <div style="padding-left: 32px;">P.TERRITORIES_EDIT, P.TERRITORIES_ASSIGN,</div>
+      <div style="padding-left: 32px;">P.TERRITORIES_IMPORT, P.TERRITORIES_SHARE,</div>
+      <div style="padding-left: 32px; color: rgba(255,255,255,0.5);">// Addresses & OSM</div>
+      <div style="padding-left: 32px;">P.ADDRESSES_EDIT, P.ADDRESSES_IMPORT,</div>
+      <div style="padding-left: 32px;">P.OSM_REFRESH, P.OSM_EDIT,</div>
+      <div style="padding-left: 32px;">P.GAP_DETECTION_VIEW, P.GAP_DETECTION_RUN,</div>
+      <div style="padding-left: 32px; color: rgba(255,255,255,0.5);">// Assignments</div>
+      <div style="padding-left: 32px;">P.ASSIGNMENTS_MANAGE,</div>
+      <div style="padding-left: 32px; color: rgba(255,255,255,0.5);">// Standard</div>
+      <div style="padding-left: 32px;">P.MEETINGS_VIEW, P.FIELD_SERVICE_VIEW,</div>
+      <div style="padding-left: 32px;">P.CHAT_VIEW, P.CHAT_SEND,</div>
+      <div style="padding-left: 16px;">]</div>
+      <div>}</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 1rem;">
+    <div class="mockup">
+      <div class="mockup-header">permissions.ts — add flag mapping</div>
+      <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.9; color: rgba(255,255,255,0.8);">
+        <div style="color: rgba(255,255,255,0.4);">// FLAG_TO_APP_ROLE — add:</div>
+        <div>territory_servant: <span style="color: #22c55e;">"Territory Servant"</span>,</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>After Fix</h3>
+  <div style="padding: 1rem; background: rgba(34,197,94,0.06); border-radius: 8px; border: 1px solid rgba(34,197,94,0.12);">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Who</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">How they get territories.edit</th>
+          <th style="text-align: left; padding: 6px; color: rgba(255,255,255,0.5);">Can edit polygons?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Elder with <code>service_overseer</code> flag</td>
+          <td style="padding: 6px;">Auto → Service Overseer role</td>
+          <td style="padding: 6px;">✅</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">MS with <code>territory_servant</code> flag</td>
+          <td style="padding: 6px;">Auto → Territory Servant role <span style="color: #22c55e;">(NEW)</span></td>
+          <td style="padding: 6px;">✅</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Any publisher manually assigned SO Assistant role</td>
+          <td style="padding: 6px;">Manual AppRole assignment</td>
+          <td style="padding: 6px;">✅</td>
+        </tr>
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 6px;">Elder (base role, no SO flag)</td>
+          <td style="padding: 6px;">Keycloak elder BASE_ROLE</td>
+          <td style="padding: 6px;">✅ (already in BASE_ROLE)</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px;">Regular publisher</td>
+          <td style="padding: 6px;">—</td>
+          <td style="padding: 6px;">❌ View only</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Difference: Territory Servant vs Service Overseer Assistant</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Territory Servant (auto from flag)</div>
+      <div class="mockup-body" style="font-size: 12px; line-height: 1.8;">
+        <div>✅ Edit boundaries</div>
+        <div>✅ Import KML/CSV</div>
+        <div>✅ Assign territories</div>
+        <div>✅ Share territories</div>
+        <div>✅ Manage addresses & OSM</div>
+        <div>✅ Gap detection</div>
+        <div>❌ Delete territories</div>
+        <div>❌ Split territories</div>
+        <div>❌ Manage campaigns</div>
+        <div>❌ Meeting points</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Service Overseer Assistant (manual)</div>
+      <div class="mockup-body" style="font-size: 12px; line-height: 1.8;">
+        <div>✅ Edit boundaries</div>
+        <div>❌ Import KML/CSV</div>
+        <div>✅ Assign territories</div>
+        <div>❌ Share territories</div>
+        <div>✅ Manage addresses & OSM</div>
+        <div>✅ Gap detection</div>
+        <div>❌ Delete territories</div>
+        <div>❌ Split territories</div>
+        <div>✅ Campaign assist</div>
+        <div>❌ Meeting points</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; padding: 1rem; border-radius: 8px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.12);">
+    <p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.7);"><strong style="color: #3b82f6;">Key difference:</strong> Territory Servant is the boundary specialist (import, share, edit). SO Assistant is the operational helper (campaigns, assignments). Territory Servant gets auto-mapped from the congregation flag; SO Assistant is manually assigned to any publisher.</p>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top: 1.5rem;">Does this RBAC fix look right? Then I'll present the final section — migration plan for existing territories.</p>

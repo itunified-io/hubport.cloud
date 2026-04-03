@@ -1,0 +1,209 @@
+<h2>Section 2: Sync Engine</h2>
+<p class="subtitle">Pull/push protocol, conflict resolution, and iOS-safe sync lifecycle</p>
+
+<div class="mockup">
+  <div class="mockup-header">Sync Protocol — Delta-Based</div>
+  <div class="mockup-body" style="padding:20px;font-size:13px;">
+
+    <!-- Pull Flow -->
+    <div style="margin-bottom:20px;">
+      <div style="font-weight:700;color:#3b82f6;font-size:14px;margin-bottom:10px;">↓ PULL — Server → Client</div>
+      <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;line-height:1.8;">
+        <code style="color:#22c55e;">GET /sync/pull?since=2026-04-01T10:00:00Z</code><br><br>
+        Server queries all syncable tables for <code>updatedAt > since</code><br>
+        Returns delta payload grouped by table:<br>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;margin-top:8px;overflow-x:auto;color:#e2e8f0;font-size:11px;">{
+  "serverTime": "2026-04-01T12:30:00Z",
+  "tables": {
+    "territories": { "upserts": [...], "deletes": ["id1"] },
+    "addresses":   { "upserts": [...], "deletes": [] },
+    "visits":      { "upserts": [...], "deletes": [] },
+    "assignments": { "upserts": [...], "deletes": [] },
+    "meetings":    { "upserts": [...], "deletes": [] },
+    "meetingPoints": { "upserts": [...], "deletes": [] }
+  },
+  "hasMore": false
+}</pre>
+        <div style="margin-top:8px;color:#f59e0b;">
+          <strong>Pagination:</strong> If delta > 500 records, <code>hasMore: true</code> — client calls again with cursor until complete
+        </div>
+      </div>
+    </div>
+
+    <!-- Push Flow -->
+    <div style="margin-bottom:20px;">
+      <div style="font-weight:700;color:#22c55e;font-size:14px;margin-bottom:10px;">↑ PUSH — Client → Server</div>
+      <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;line-height:1.8;">
+        <code style="color:#22c55e;">POST /sync/push</code><br><br>
+        Client sends all pending changes from <code>pendingChanges</code> table:<br>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;margin-top:8px;overflow-x:auto;color:#e2e8f0;font-size:11px;">{
+  "deviceId": "uuid-...",
+  "changes": [
+    {
+      "table": "addresses",
+      "recordId": "addr-123",
+      "operation": "update",
+      "version": 3,
+      "payload": { "status": "not_at_home", "notes": "..." }
+    },
+    {
+      "table": "visits",
+      "recordId": "visit-new-1",
+      "operation": "create",
+      "version": 0,
+      "payload": { "addressId": "addr-123", "outcome": "contacted", ... }
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+
+    <!-- Push Response -->
+    <div>
+      <div style="font-weight:700;color:#a855f7;font-size:14px;margin-bottom:10px;">⚡ PUSH Response — Per-Change Status</div>
+      <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;line-height:1.8;">
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;color:#e2e8f0;font-size:11px;">{
+  "results": [
+    { "recordId": "addr-123", "status": "conflict",
+      "serverVersion": 5,
+      "serverData": { "status": "do_not_call", "notes": "..." },
+      "clientVersion": 3 },
+    { "recordId": "visit-new-1", "status": "accepted",
+      "serverVersion": 1 }
+  ]
+}</pre>
+        <div style="margin-top:8px;">
+          Statuses: <span style="color:#22c55e;">accepted</span> · <span style="color:#ef4444;">conflict</span> · <span style="color:#f59e0b;">rejected</span> (validation error)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Lifecycle -->
+<div style="margin-top:24px;">
+  <h3>Sync Lifecycle — iOS-Safe</h3>
+  <div class="mockup">
+    <div class="mockup-header">When Sync Happens</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+
+        <div style="background:#22c55e15;border:1px solid #22c55e30;border-radius:8px;padding:14px;">
+          <div style="font-weight:600;color:#22c55e;font-size:12px;margin-bottom:6px;">🟢 App Open / Resume</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            visibilitychange → "visible"<br>
+            Auto-pull if lastSync > 5 min ago<br>
+            Auto-push any pending changes<br>
+            <em>Works on iOS — fires reliably</em>
+          </div>
+        </div>
+
+        <div style="background:#3b82f615;border:1px solid #3b82f630;border-radius:8px;padding:14px;">
+          <div style="font-weight:600;color:#3b82f6;font-size:12px;margin-bottom:6px;">🔵 Manual "Sync Now"</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            User taps sync button in header<br>
+            Full pull + push cycle<br>
+            Shows progress: "Syncing 3/6 tables..."<br>
+            Toast on completion or error
+          </div>
+        </div>
+
+        <div style="background:#f59e0b15;border:1px solid #f59e0b30;border-radius:8px;padding:14px;">
+          <div style="font-weight:600;color:#f59e0b;font-size:12px;margin-bottom:6px;">🟡 Reconnect</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            navigator.onLine → true<br>
+            Push pending changes immediately<br>
+            Then pull server updates<br>
+            <em>iOS: online event can be delayed</em>
+          </div>
+        </div>
+
+        <div style="background:#ef444415;border:1px solid #ef444430;border-radius:8px;padding:14px;">
+          <div style="font-weight:600;color:#ef4444;font-size:12px;margin-bottom:6px;">🔴 NOT Used</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            ❌ Background Sync API<br>
+            ❌ Periodic Background Sync<br>
+            <em>Not available on iOS Safari</em><br>
+            All sync is foreground-only
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Conflict Resolution -->
+<div style="margin-top:24px;">
+  <h3>Conflict Resolution Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">What Happens When Two People Edit the Same Record</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+
+        <div style="flex:1;min-width:200px;text-align:center;">
+          <div style="background:#3b82f620;border:1px solid #3b82f640;border-radius:8px;padding:16px;">
+            <div style="font-size:28px;margin-bottom:6px;">📱</div>
+            <div style="font-weight:600;color:#3b82f6;font-size:12px;">Your Change (Offline)</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;">
+              Address #42<br>
+              status: "not_at_home"<br>
+              notes: "Rang twice"<br>
+              <span style="color:#f59e0b;">version: 3</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;padding-top:40px;color:#64748b;font-size:20px;">⚡</div>
+
+        <div style="flex:1;min-width:200px;text-align:center;">
+          <div style="background:#ef444420;border:1px solid #ef444440;border-radius:8px;padding:16px;">
+            <div style="font-size:28px;margin-bottom:6px;">🖥️</div>
+            <div style="font-weight:600;color:#ef4444;font-size:12px;">Server Version (Updated by Other User)</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;">
+              Address #42<br>
+              status: "do_not_call"<br>
+              notes: "Aggressive dog"<br>
+              <span style="color:#ef4444;">version: 5</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;padding-top:40px;color:#64748b;font-size:20px;">→</div>
+
+        <div style="flex:1;min-width:200px;text-align:center;">
+          <div style="background:#d9770620;border:1px solid #d9770640;border-radius:8px;padding:16px;">
+            <div style="font-size:28px;margin-bottom:6px;">🔀</div>
+            <div style="font-weight:600;color:#d97706;font-size:12px;">Conflict Dialog</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;">
+              "Address #42 was updated by another user"<br><br>
+              <span style="color:#3b82f6;">[Keep Mine]</span>
+              <span style="color:#64748b;"> · </span>
+              <span style="color:#ef4444;">[Use Theirs]</span>
+              <span style="color:#64748b;"> · </span>
+              <span style="color:#22c55e;">[Review Both]</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Server-side version tracking -->
+<div style="margin-top:24px;">
+  <h3>Version Tracking — Backend</h3>
+  <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;line-height:1.8;">
+    <strong style="color:#e2e8f0;">Prisma schema addition (all syncable models):</strong>
+    <pre style="background:#0d1117;padding:12px;border-radius:6px;margin-top:8px;overflow-x:auto;color:#e2e8f0;font-size:11px;">model Address {
+  ...existing fields...
+  version    Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?  // soft-delete for sync
+}</pre>
+    <div style="margin-top:8px;">
+      • Every mutation increments <code>version</code> automatically via Prisma middleware<br>
+      • Soft-delete (<code>deletedAt</code>) instead of hard delete — sync needs to propagate deletes<br>
+      • Push endpoint: <code>WHERE version = clientVersion</code> — 0 rows updated = conflict
+    </div>
+  </div>
+</div>
