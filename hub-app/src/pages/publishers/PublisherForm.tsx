@@ -688,7 +688,6 @@ export function PublisherForm() {
                 <FormattedMessage id="publishers.reactivate" />
               </button>
             )}
-            </div>
           </div>
           {resendError && (
             <div className="w-full text-xs text-[var(--red)]">{resendError}</div>
