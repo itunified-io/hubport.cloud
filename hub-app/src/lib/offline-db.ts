@@ -222,6 +222,11 @@ export function initOfflineDB(tenantId: string, key: CryptoKey): HubportOfflineD
   return _db;
 }
 
+/** Returns true if the offline DB has been initialised (safe to call getOfflineDB). */
+export function isOfflineReady(): boolean {
+  return _db !== null && _encryptionKey !== null;
+}
+
 /** Returns the singleton DB instance (must call initOfflineDB first). */
 export function getOfflineDB(): HubportOfflineDB {
   if (!_db) throw new Error("OfflineDB not initialised — call initOfflineDB first");

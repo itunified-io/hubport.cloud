@@ -291,6 +291,44 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // ─── GET /admin/devices/publisher/:publisherId ──────────────────
+  // Admin: list devices for a specific publisher (by publisher ID → keycloakSub).
+
+  app.get<{ Params: { publisherId: string } }>(
+    "/admin/devices/publisher/:publisherId",
+    {
+      preHandler: requirePermission(PERMISSIONS.ADMIN_DEVICES_VIEW),
+      schema: { params: Type.Object({ publisherId: Type.String({ format: "uuid" }) }) },
+    },
+    async (request, reply) => {
+      const publisher = await prisma.publisher.findUnique({
+        where: { id: request.params.publisherId },
+        select: { keycloakSub: true },
+      });
+
+      if (!publisher?.keycloakSub) {
+        return reply.code(200).send([]);
+      }
+
+      return prisma.device.findMany({
+        where: { userId: publisher.keycloakSub },
+        orderBy: { registeredAt: "desc" },
+        select: {
+          id: true,
+          deviceUuid: true,
+          displayName: true,
+          platform: true,
+          screenSize: true,
+          status: true,
+          revokedAt: true,
+          revokeReason: true,
+          registeredAt: true,
+          lastSyncAt: true,
+        },
+      });
+    },
+  );
+
   // ─── DELETE /admin/devices/:id ───────────────────────────────────
   // Admin: revoke a device (sets status=revoked, clears encSalt).
 

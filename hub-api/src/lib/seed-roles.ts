@@ -361,6 +361,17 @@ const SYSTEM_ROLES: SeedRole[] = [
     ],
   },
   {
+    name: "Predigtdienst Treffpunkt Leiter",
+    description: "Service meeting point conductor — can hold field service meeting points",
+    scope: "all",
+    permissions: [
+      P.PRIVILEGE_SERVICE_MEETING_CONDUCTOR,
+      P.SERVICE_MEETINGS_VIEW, P.SERVICE_MEETINGS_CONDUCT,
+      P.FIELD_SERVICE_VIEW, P.MEETING_POINTS_VIEW,
+      P.PUBLISHERS_VIEW_MINIMAL,
+    ],
+  },
+  {
     name: "Grundreinigung",
     description: "Deep cleaning team member",
     scope: "all",

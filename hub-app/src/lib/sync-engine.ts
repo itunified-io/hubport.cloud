@@ -379,8 +379,22 @@ export async function resolveUseTheirs(changeId: number): Promise<void> {
  * state with the server's view.
  */
 export async function fullSync(token: string, deviceId: string): Promise<void> {
-  await pushChanges(token, deviceId);
+  // Push first, but don't let push failure prevent pull.
+  // On iOS, push can fail due to transient connectivity or crypto issues;
+  // pull should still proceed so the user sees up-to-date data.
+  let pushError: unknown = null;
+  try {
+    await pushChanges(token, deviceId);
+  } catch (err) {
+    pushError = err;
+  }
+
+  // Pull always runs, even if push failed
   await pullChanges(token);
+
+  // If push failed but pull succeeded (state is now "idle"),
+  // re-throw so callers know there was a partial failure.
+  if (pushError) throw pushError;
 }
 
 // ─── Storage Persistence ─────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle, Lock } from "lucide-react";
+import { ArrowLeft, Save, Shield, UserCheck, UserX, Plus, Trash2, Copy, Mail, RotateCw, AlertTriangle, Lock, Smartphone, Ban } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
 import { getApiUrl } from "@/lib/config";
@@ -42,6 +42,18 @@ interface AppRole {
   description: string | null;
 }
 
+interface PublisherDevice {
+  id: string;
+  deviceUuid: string;
+  displayName: string;
+  platform: string;
+  status: "active" | "revoked";
+  revokedAt: string | null;
+  revokeReason: string | null;
+  registeredAt: string;
+  lastSyncAt: string | null;
+}
+
 // ─── Constants ──────────────────────────────────────────────────────
 
 const COMMON_FLAGS = [
@@ -80,6 +92,7 @@ const DUTY_ROLE_NAMES = [
   // Service
   "Ordnungsdienst",
   "Cleaning Responsible",
+  "Predigtdienst Treffpunkt Leiter",
   // Cleaning & Garden
   "Grundreinigung",
   "Sichtreinigung",
@@ -115,8 +128,44 @@ const WEEKEND_ROLES = [
   { name: "Assistent Weekend", labelKey: "program.role.assistentWeekend" },
 ];
 
-const TABS = ["personal", "congregation", "duties", "program", "roles"] as const;
+const TABS = ["personal", "congregation", "duties", "program", "roles", "danger"] as const;
 type Tab = typeof TABS[number];
+
+/** Program roles that female publishers CAN be assigned to */
+const FEMALE_ALLOWED_ROLES = new Set([
+  "Erstes Gespräch",
+  "Assistent Midweek",
+  "Rückbesuch",
+  "Bibelstudium",
+]);
+
+/** Duty roles that female publishers CAN be assigned to */
+const FEMALE_ALLOWED_DUTIES = new Set([
+  "Grundreinigung",
+  "Sichtreinigung",
+  "Rasen",
+  "Winterdienst",
+]);
+
+/** Roles restricted to elders only */
+const ELDER_ONLY_ROLES = new Set([
+  "LM Overseer",
+  "VBS Leiter",
+  "WT Conductor",
+]);
+
+/** Filter program roles based on publisher gender and congregation role */
+function filterProgramRoles(
+  roles: { name: string; labelKey: string }[],
+  gender: string | null,
+  congregationRole: string,
+): { name: string; labelKey: string }[] {
+  return roles.filter((r) => {
+    if (gender === "female") return FEMALE_ALLOWED_ROLES.has(r.name);
+    if (congregationRole !== "elder" && ELDER_ONLY_ROLES.has(r.name)) return false;
+    return true;
+  });
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -193,6 +242,7 @@ export function PublisherForm() {
 
   // ─── Tab state ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>("personal");
+  const [programSubTab, setProgramSubTab] = useState<"midweek" | "weekend">("midweek");
 
   // ─── Form state ─────────────────────────────────────────────────
   const [firstName, setFirstName] = useState("");
@@ -234,6 +284,11 @@ export function PublisherForm() {
   // ─── Delete state ──────────────────────────────────────────────
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // ─── Device state ─────────────────────────────────────────────
+  const [devices, setDevices] = useState<PublisherDevice[]>([]);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
   // ─── Load data ──────────────────────────────────────────────────
   useEffect(() => {
@@ -416,6 +471,35 @@ export function PublisherForm() {
     }
   };
 
+  // ─── Load devices (lazy, on danger tab) ────────────────────────
+  const loadDevices = useCallback(async () => {
+    if (!id || devicesLoaded) return;
+    try {
+      const res = await fetch(`${apiUrl}/admin/devices/publisher/${id}`, { headers });
+      if (res.ok) setDevices(await res.json() as PublisherDevice[]);
+    } finally {
+      setDevicesLoaded(true);
+    }
+  }, [id, devicesLoaded, apiUrl]);
+
+  useEffect(() => {
+    if (activeTab === "danger" && !devicesLoaded) loadDevices();
+  }, [activeTab, devicesLoaded, loadDevices]);
+
+  const revokeDevice = async (deviceId: string) => {
+    setRevokingDeviceId(deviceId);
+    try {
+      const res = await fetch(`${apiUrl}/admin/devices/${deviceId}`, {
+        method: "DELETE", headers, body: JSON.stringify({ reason: "Admin wipe from publisher detail" }),
+      });
+      if (res.ok) {
+        setDevices((prev) => prev.map((d) => d.id === deviceId ? { ...d, status: "revoked" as const, revokedAt: new Date().toISOString() } : d));
+      }
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
   // ─── Save ───────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -497,95 +581,72 @@ export function PublisherForm() {
         </h1>
       </div>
 
-      {/* ── Status Management Bar (edit mode only) ────────────────── */}
-      {isEdit && canManageUsers && (
-        <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-[var(--text-muted)]"><FormattedMessage id="publishers.status" />:</span>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                publisherStatus === "active" ? "text-[var(--green)] bg-[#22c55e14]" :
-                publisherStatus === "invited" || publisherStatus === "pending_approval" ? "text-[var(--amber)] bg-[#d9770614]" :
-                publisherStatus === "rejected" ? "text-[var(--red)] bg-[#ef444414]" :
-                "text-[var(--text-muted)] bg-[var(--glass)]"
-              }`}>
-                {publisherStatus === "active" && <UserCheck size={12} />}
-                {(publisherStatus === "invited" || publisherStatus === "pending_approval") && <Mail size={12} />}
-                {publisherStatus === "rejected" && <UserX size={12} />}
-                {publisherStatus === "inactive" && <UserX size={12} />}
-                {publisherStatus.replace("_", " ")}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(publisherStatus === "pending_approval" || publisherStatus === "invited") && (
-                <>
-                  <button type="button" onClick={() => doStatusAction("approve")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--green)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
-                    <UserCheck size={14} />
-                    <FormattedMessage id="publishers.approve" />
-                  </button>
-                  <button type="button" onClick={() => doStatusAction("reject")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
-                    <UserX size={14} />
-                    <FormattedMessage id="publishers.reject" />
-                  </button>
-                  {email && (
-                    <button
-                      type="button"
-                      onClick={resendInvite}
-                      disabled={resending}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 transition-colors ${
-                        resendSuccess
-                          ? "text-[var(--green)] border-[var(--green)]/30 bg-[var(--green)]/5"
-                          : "text-[var(--amber)] border-[var(--amber)]/30 hover:bg-[var(--glass)]"
-                      }`}
-                    >
-                      <RotateCw size={14} className={resending ? "animate-spin" : ""} />
-                      {resendSuccess
-                        ? <FormattedMessage id="publishers.resendInvite.success" />
-                        : <FormattedMessage id="publishers.resendInvite" />
-                      }
-                    </button>
-                  )}
-                </>
-              )}
-              {publisherStatus === "active" && (
-                <button type="button" onClick={() => doStatusAction("deactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--red)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
-                  <UserX size={14} />
-                  <FormattedMessage id="publishers.deactivate" />
+      {/* ── Compact Status + Info Bar (edit mode only) ──────────────── */}
+      {isEdit && (
+        <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
+          <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+              publisherStatus === "active" ? "text-[var(--green)] bg-[#22c55e14]" :
+              publisherStatus === "invited" || publisherStatus === "pending_approval" ? "text-[var(--amber)] bg-[#d9770614]" :
+              publisherStatus === "rejected" ? "text-[var(--red)] bg-[#ef444414]" :
+              "text-[var(--text-muted)] bg-[var(--glass)]"
+            }`}>
+              {publisherStatus === "active" && <UserCheck size={10} />}
+              {(publisherStatus === "invited" || publisherStatus === "pending_approval") && <Mail size={10} />}
+              {(publisherStatus === "rejected" || publisherStatus === "inactive") && <UserX size={10} />}
+              {publisherStatus.replace("_", " ")}
+            </span>
+            {gender && <span>{gender}</span>}
+            {email && <span className="hidden sm:inline truncate max-w-[200px]">{email}</span>}
+            {privacyAccepted && <span>Privacy ✓</span>}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {canManageUsers && (publisherStatus === "pending_approval" || publisherStatus === "invited") && (
+              <>
+                <button type="button" onClick={() => doStatusAction("approve")} className="flex items-center gap-1 px-2.5 py-1 text-xs bg-[var(--green)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                  <UserCheck size={12} />
+                  <FormattedMessage id="publishers.approve" />
                 </button>
-              )}
-              {publisherStatus === "inactive" && (
-                <button type="button" onClick={() => doStatusAction("reactivate")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--green)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
-                  <UserCheck size={14} />
-                  <FormattedMessage id="publishers.reactivate" />
+                <button type="button" onClick={() => doStatusAction("reject")} className="flex items-center gap-1 px-2.5 py-1 text-xs bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer">
+                  <UserX size={12} />
+                  <FormattedMessage id="publishers.reject" />
                 </button>
-              )}
-            </div>
+                {email && (
+                  <button
+                    type="button"
+                    onClick={resendInvite}
+                    disabled={resending}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-xs border rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-50 transition-colors ${
+                      resendSuccess
+                        ? "text-[var(--green)] border-[var(--green)]/30 bg-[var(--green)]/5"
+                        : "text-[var(--amber)] border-[var(--amber)]/30 hover:bg-[var(--glass)]"
+                    }`}
+                  >
+                    <RotateCw size={12} className={resending ? "animate-spin" : ""} />
+                    {resendSuccess
+                      ? <FormattedMessage id="publishers.resendInvite.success" />
+                      : <FormattedMessage id="publishers.resendInvite" />
+                    }
+                  </button>
+                )}
+              </>
+            )}
+            {canManageUsers && publisherStatus === "active" && (
+              <button type="button" onClick={() => doStatusAction("deactivate")} className="flex items-center gap-1 px-2.5 py-1 text-xs text-[var(--red)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                <UserX size={12} />
+                <FormattedMessage id="publishers.deactivate" />
+              </button>
+            )}
+            {canManageUsers && publisherStatus === "inactive" && (
+              <button type="button" onClick={() => doStatusAction("reactivate")} className="flex items-center gap-1 px-2.5 py-1 text-xs text-[var(--green)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer">
+                <UserCheck size={12} />
+                <FormattedMessage id="publishers.reactivate" />
+              </button>
+            )}
           </div>
           {resendError && (
-            <div className="text-xs text-[var(--red)] px-1">{resendError}</div>
+            <div className="w-full text-xs text-[var(--red)]">{resendError}</div>
           )}
-        </div>
-      )}
-
-      {/* ── Info Card (edit mode only) ───────────────────────────── */}
-      {isEdit && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)]">
-          <div>
-            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.email" /></p>
-            <p className="text-sm text-[var(--text)]">{email || "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.status" /></p>
-            <p className="text-sm text-[var(--text)]">{publisherStatus.replace("_", " ")}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]"><FormattedMessage id="publishers.gender" /></p>
-            <p className="text-sm text-[var(--text)]">{gender || "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]">Privacy</p>
-            <p className="text-sm text-[var(--text)]">{privacyAccepted ? "✓" : "—"}</p>
-          </div>
         </div>
       )}
 
@@ -637,18 +698,16 @@ export function PublisherForm() {
 
       {/* ── Tab Bar (edit mode: 4 tabs, create mode: form inline) ── */}
       {isEdit && (
-        <div className="flex border-b border-[var(--border)]">
+        <div className="flex overflow-x-auto border-b border-[var(--border)] -mx-1 scrollbar-hide">
           {TABS.map((tab) => {
-            // Only show duties/roles tabs in edit mode
-            if ((tab === "duties" || tab === "roles") && !isEdit) return null;
-            // Only show roles tab if user can manage users
-            if (tab === "roles" && !canManageUsers) return null;
+            if ((tab === "duties" || tab === "roles" || tab === "danger") && !isEdit) return null;
+            if ((tab === "roles" || tab === "danger") && !canManageUsers) return null;
             return (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                   activeTab === tab
                     ? "text-[var(--amber)] border-b-2 border-[var(--amber)] -mb-px"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -866,7 +925,9 @@ export function PublisherForm() {
           <div className={sectionCls}>
             <SectionHeader id="publishers.duties" />
             <div className="divide-y divide-[var(--border)]">
-              {DUTY_ROLE_NAMES.map((name) => {
+              {DUTY_ROLE_NAMES
+                .filter((name) => gender !== "female" || FEMALE_ALLOWED_DUTIES.has(name))
+                .map((name) => {
                 const role = roleByName(name);
                 if (!role) return null;
                 return (
@@ -886,31 +947,32 @@ export function PublisherForm() {
         {/* ── Tab: Program (dedicated meeting roles) ─────────── */}
         {isEdit && activeTab === "program" && (
           <>
-            {/* Midweek Meeting */}
-            <div className={sectionCls}>
-              <SectionHeader id="program.midweek.title" />
-              <div className="divide-y divide-[var(--border)]">
-                {MIDWEEK_ROLES.map(({ name, labelKey }) => {
-                  const role = roleByName(name);
-                  if (!role) return null;
-                  return (
-                    <Toggle
-                      key={name}
-                      label={intl.formatMessage({ id: labelKey })}
-                      scope={role.scope}
-                      checked={isRoleAssigned(name)}
-                      onChange={(v) => toggleRole(name, v)}
-                    />
-                  );
-                })}
-              </div>
+            {/* Sub-tab bar */}
+            <div className="flex gap-1 mb-4">
+              {(["midweek", "weekend"] as const).map((sub) => (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => setProgramSubTab(sub)}
+                  className={`px-4 py-2 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors cursor-pointer ${
+                    programSubTab === sub
+                      ? "bg-[var(--amber)] text-black"
+                      : "bg-[var(--glass-1)] text-[var(--text-muted)] hover:bg-[var(--glass-2)]"
+                  }`}
+                >
+                  <FormattedMessage id={`program.${sub}.title`} />
+                </button>
+              ))}
             </div>
 
-            {/* Weekend Meeting */}
+            {/* Sub-tab content */}
             <div className={sectionCls}>
-              <SectionHeader id="program.weekend.title" />
               <div className="divide-y divide-[var(--border)]">
-                {WEEKEND_ROLES.map(({ name, labelKey }) => {
+                {filterProgramRoles(
+                  programSubTab === "midweek" ? MIDWEEK_ROLES : WEEKEND_ROLES,
+                  gender || null,
+                  congregationRole,
+                ).map(({ name, labelKey }) => {
                   const role = roleByName(name);
                   if (!role) return null;
                   return (
@@ -1032,7 +1094,101 @@ export function PublisherForm() {
           </>
         )}
 
+        {/* ── Tab: Danger Zone ─────────────────────────────────────── */}
+        {isEdit && activeTab === "danger" && canManageUsers && (
+          <div className="space-y-4">
+            {/* Registered Devices */}
+            <div className={sectionCls}>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--amber)] uppercase tracking-wide">
+                <Smartphone size={16} />
+                <FormattedMessage id="publishers.devices" />
+              </h2>
+              {!devicesLoaded ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-[var(--amber)] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : devices.length === 0 ? (
+                <p className="text-sm text-[var(--text-muted)]">
+                  <FormattedMessage id="publishers.devices.none" />
+                </p>
+              ) : (
+                <div className="divide-y divide-[var(--border)]">
+                  {devices.map((d) => (
+                    <div key={d.id} className={`flex items-center justify-between py-3 ${d.status === "revoked" ? "opacity-50" : ""}`}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--text)] truncate">{d.displayName}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {d.platform} · {d.status === "revoked" ? (
+                            <span className="text-[var(--red)]"><FormattedMessage id="publishers.devices.revoked" /></span>
+                          ) : (
+                            <span className="text-[var(--green)]"><FormattedMessage id="publishers.devices.active" /></span>
+                          )}
+                          {d.lastSyncAt && ` · ${new Date(d.lastSyncAt).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      {d.status === "active" && (
+                        <button
+                          type="button"
+                          onClick={() => revokeDevice(d.id)}
+                          disabled={revokingDeviceId === d.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[var(--red)] border border-[var(--red)]/30 rounded-[var(--radius-sm)] hover:bg-[var(--red)]/10 cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          <Ban size={12} />
+                          {revokingDeviceId === d.id ? "..." : <FormattedMessage id="publishers.devices.wipe" />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Deactivate & Delete */}
+            <div className="border border-[var(--red)]/30 rounded-[var(--radius)] bg-[var(--red)]/5 p-6 space-y-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--red)] uppercase tracking-wide">
+                <AlertTriangle size={16} />
+                <FormattedMessage id="publishers.dangerZone" />
+              </h2>
+              {!showDeleteConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--red)] border border-[var(--red)]/30 rounded-[var(--radius-sm)] hover:bg-[var(--red)]/10 cursor-pointer transition-colors"
+                >
+                  <Trash2 size={14} />
+                  <FormattedMessage id="publishers.delete" />
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    <FormattedMessage id="publishers.delete.confirm" />
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={deletePublisher}
+                      disabled={deleting}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 size={14} />
+                      {deleting ? "..." : <FormattedMessage id="publishers.delete" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+                    >
+                      <FormattedMessage id="common.cancel" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Actions ─────────────────────────────────────────────── */}
+        {activeTab !== "danger" && (
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -1050,51 +1206,8 @@ export function PublisherForm() {
             <FormattedMessage id="common.cancel" />
           </button>
         </div>
+        )}
       </form>
-
-      {/* ── Danger Zone (edit mode, admin only) ───────────────────── */}
-      {isEdit && canManageUsers && (
-        <div className="border border-[var(--red)]/30 rounded-[var(--radius)] bg-[var(--red)]/5 p-6 space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--red)] uppercase tracking-wide">
-            <AlertTriangle size={16} />
-            <FormattedMessage id="publishers.dangerZone" />
-          </h2>
-          {!showDeleteConfirm ? (
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--red)] border border-[var(--red)]/30 rounded-[var(--radius-sm)] hover:bg-[var(--red)]/10 cursor-pointer transition-colors"
-            >
-              <Trash2 size={14} />
-              <FormattedMessage id="publishers.delete" />
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-[var(--text-muted)]">
-                <FormattedMessage id="publishers.delete.confirm" />
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={deletePublisher}
-                  disabled={deleting}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--red)] text-white rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer disabled:opacity-50"
-                >
-                  <Trash2 size={14} />
-                  {deleting ? "..." : <FormattedMessage id="publishers.delete" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 text-sm text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
-                >
-                  <FormattedMessage id="common.cancel" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
