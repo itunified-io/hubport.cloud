@@ -499,6 +499,21 @@ export async function importKml(file: File, token: string): Promise<ImportKmlRes
   });
 }
 
+export interface ImportBranchKmlResult {
+  updated: number;
+  created: number;
+  skipped: number;
+  warnings: string[];
+}
+
+export async function importBranchKml(file: File, token: string): Promise<ImportBranchKmlResult> {
+  const kml = await file.text();
+  return apiFetch("/territories/import/kml/branch", token, {
+    method: "POST",
+    body: JSON.stringify({ kml }),
+  });
+}
+
 export async function previewCsv(file: File, token: string): Promise<CsvPreviewResult> {
   const csv = await file.text();
   return apiFetch("/territories/import/csv/preview", token, {
@@ -616,6 +631,30 @@ export function previewFix(
 
 export function getViolations(token: string): Promise<TerritoryViolation[]> {
   return apiFetch("/territories/violations", token);
+}
+
+export function deleteBoundary(
+  token: string,
+  territoryId: string,
+): Promise<TerritoryListItem> {
+  return apiFetch(`/territories/${territoryId}/boundaries`, token, {
+    method: "DELETE",
+  });
+}
+
+export interface BulkFixResult {
+  fixed: number;
+  failed: Array<{ id: string; number: string; error: string }>;
+}
+
+export function bulkFixViolations(
+  token: string,
+  territoryIds: string[],
+): Promise<BulkFixResult> {
+  return apiFetch("/territories/fix/bulk", token, {
+    method: "POST",
+    body: JSON.stringify({ territoryIds }),
+  });
 }
 
 export function getVersions(token: string, territoryId: string): Promise<BoundaryVersion[]> {

@@ -3,7 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission, requireAnyPermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { runAutoFixPipeline, detectOverlaps, type AutoFixResult, type OverlapInfo } from "../lib/postgis-helpers.js";
+import { runAutoFixPipeline, clipToCongregation, clipToNeighbors, detectOverlaps, type AutoFixResult, type OverlapInfo } from "../lib/postgis-helpers.js";
 import {
   queryRoadsInBBox,
   queryBuildingsInBBox,
@@ -46,6 +46,11 @@ const AssignBody = Type.Object({
 });
 
 type AssignBodyType = Static<typeof AssignBody>;
+
+const BulkFixBody = Type.Object({
+  territoryIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 50 }),
+});
+type BulkFixBodyType = Static<typeof BulkFixBody>;
 
 async function createBoundaryVersion(
   territoryId: string,
@@ -582,6 +587,144 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         where: { id: request.params.id },
       });
       return reply.code(204).send();
+    },
+  );
+
+  // Delete territory boundary (polygon only) — preserves territory + addresses
+  app.delete<{ Params: IdParamsType }>(
+    "/territories/:id/boundaries",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const territory = await prisma.territory.findUnique({ where: { id } });
+
+      if (!territory) {
+        return reply.code(404).send({ error: "Territory not found" });
+      }
+      if (!territory.boundaries) {
+        return reply.code(400).send({ error: "Territory has no boundary" });
+      }
+
+      // Save PREVIOUS boundary in version history (enables future restore)
+      await createBoundaryVersion(
+        id,
+        territory.boundaries as object,
+        "boundary_deleted",
+        `Boundary deleted for territory #${territory.number}`
+      );
+
+      // Null out boundaries, preserve everything else
+      const updated = await prisma.territory.update({
+        where: { id },
+        data: { boundaries: null } as any,
+      });
+
+      return reply.code(200).send(updated);
+    },
+  );
+
+  // Bulk fix violations — auto-fix pipeline on multiple territories
+  app.post<{ Body: BulkFixBodyType }>(
+    "/territories/fix/bulk",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
+      schema: { body: BulkFixBody },
+    },
+    async (request, reply) => {
+      const { territoryIds } = request.body;
+
+      // Fetch all requested territories
+      const territories = await prisma.territory.findMany({
+        where: { id: { in: territoryIds } },
+        orderBy: { number: "asc" },
+      });
+
+      if (territories.length === 0) {
+        return reply.code(404).send({ error: "No territories found" });
+      }
+
+      let fixed = 0;
+      const failed: Array<{ id: string; number: string; error: string }> = [];
+
+      // Two-pass approach per spec:
+      // Pass 1: Clip all to congregation boundary (no neighbor dependencies)
+      // Pass 2: Resolve overlaps in number order (clips against latest DB state)
+
+      // Track intermediate state: territoryId → clipped boundary after pass 1
+      const pass1Results = new Map<string, object>();
+
+      // Pass 1 — Congregation clip
+      for (const territory of territories) {
+        if (!territory.boundaries) {
+          failed.push({ id: territory.id, number: territory.number, error: "No boundary" });
+          continue;
+        }
+
+        try {
+          // Save previous boundary for undo
+          await createBoundaryVersion(
+            territory.id,
+            territory.boundaries as object,
+            "bulk_fix",
+            `Previous boundary before bulk fix`
+          );
+
+          // Validate + clip to congregation boundary
+          const validated = await prisma.$queryRaw<Array<{ valid: string }>>`
+            SELECT ST_AsGeoJSON(ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)}))) as valid
+          `;
+          let current: object = JSON.parse(validated[0].valid);
+
+          const congResult = await clipToCongregation(prisma, current);
+          if (congResult?.wasModified) {
+            current = congResult.clipped;
+          }
+
+          pass1Results.set(territory.id, current);
+
+          // Persist pass 1 result immediately so pass 2 reads latest state
+          await prisma.territory.update({
+            where: { id: territory.id },
+            data: { boundaries: current } as any,
+          });
+        } catch (err) {
+          failed.push({
+            id: territory.id,
+            number: territory.number,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Pass 2 — Neighbor overlap resolution (in number order, reads latest DB state)
+      for (const territory of territories) {
+        const pass1Boundary = pass1Results.get(territory.id);
+        if (!pass1Boundary) continue; // Failed in pass 1 or had no boundary
+
+        try {
+          const neighborResult = await clipToNeighbors(prisma, pass1Boundary, territory.id);
+
+          if (neighborResult.removedFrom.length > 0) {
+            await prisma.territory.update({
+              where: { id: territory.id },
+              data: { boundaries: neighborResult.clipped } as any,
+            });
+          }
+
+          fixed++;
+        } catch (err) {
+          failed.push({
+            id: territory.id,
+            number: territory.number,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      return reply.send({ fixed, failed });
     },
   );
 

@@ -421,5 +421,20 @@
   "invite.complete.email": "E-Mail",
   "invite.complete.tempPassword": "Temporäres Passwort",
   "invite.complete.securityNote": "Dieses Passwort ist temporär — du musst es bei der ersten Anmeldung ändern. Teile es mit niemandem.",
-  "invite.complete.login": "Jetzt anmelden"
+  "invite.complete.login": "Jetzt anmelden",
+  "territory.boundary.delete": "Grenze l\u00f6schen",
+  "territory.boundary.delete.confirm": "M\u00f6chten Sie die Grenze f\u00fcr Gebiet {number} \u2014 {name} wirklich l\u00f6schen? Dies kann nicht r\u00fcckg\u00e4ngig gemacht werden.",
+  "territory.boundary.delete.success": "Grenze gel\u00f6scht",
+  "import.branch.title": "Branch-KML-Import",
+  "import.branch.subtitle": "Gebietsgrenzen aus Branch-KML-Dateien aktualisieren",
+  "import.branch.updated": "{count} Gebiete aktualisiert",
+  "import.branch.created": "{count} neue Gebiete erstellt",
+  "import.branch.skipped": "{count} \u00fcbersprungen (kein Polygon)",
+  "import.branch.warnings": "{count} Warnungen",
+  "territory.fix.button": "Verst\u00f6\u00dfe beheben",
+  "territory.fix.selectAll": "Alle ausw\u00e4hlen",
+  "territory.fix.selected": "{count} ausgew\u00e4hlt",
+  "territory.fix.run": "Ausgew\u00e4hlte beheben",
+  "territory.fix.success": "{count, plural, one {# Gebiet behoben} other {# Gebiete behoben}}",
+  "territory.fix.partial": "{fixed} behoben, {failed} fehlgeschlagen"
 }

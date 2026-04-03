@@ -8,19 +8,21 @@ import { FormattedMessage } from "react-intl";
 import { useNavigate } from "react-router";
 import {
   Upload, ArrowLeft, CheckCircle2, AlertTriangle,
-  XCircle, Loader2, ArrowRight, Table, Map,
+  XCircle, Loader2, ArrowRight, Table, Map, GitBranch,
 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import {
   importKml,
+  importBranchKml,
   previewCsv,
   confirmCsvImport,
   type ImportKmlResult,
+  type ImportBranchKmlResult,
   type CsvPreviewResult,
   type CsvImportResult,
 } from "@/lib/territory-api";
 
-type ImportMode = "select" | "kml" | "csv-upload" | "csv-preview" | "csv-confirm" | "done";
+type ImportMode = "select" | "kml" | "branch-kml" | "csv-upload" | "csv-preview" | "csv-confirm" | "done";
 
 export function ImportWizard() {
   const { user } = useAuth();
@@ -33,6 +35,7 @@ export function ImportWizard() {
 
   // KML state
   const [kmlResult, setKmlResult] = useState<ImportKmlResult | null>(null);
+  const [branchResult, setBranchResult] = useState<ImportBranchKmlResult | null>(null);
 
   // CSV state
   const [csvRawText, setCsvRawText] = useState<string>("");
@@ -130,7 +133,7 @@ export function ImportWizard() {
 
       {/* Mode: select import type */}
       {mode === "select" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
           <button
             onClick={() => setMode("kml")}
             className="flex flex-col items-center gap-3 p-8 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] hover:border-[var(--amber)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
@@ -156,6 +159,19 @@ export function ImportWizard() {
                 id="territories.csvDescription"
                 defaultMessage="Import addresses or territories from CSV spreadsheets"
               />
+            </span>
+          </button>
+
+          <button
+            onClick={() => setMode("branch-kml")}
+            className="flex flex-col items-center gap-3 p-8 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] hover:border-[var(--amber)] hover:bg-[var(--glass)] transition-colors cursor-pointer"
+          >
+            <GitBranch size={32} className="text-[var(--amber)]" />
+            <span className="text-sm font-semibold text-[var(--text)]">
+              <FormattedMessage id="import.branch.title" />
+            </span>
+            <span className="text-xs text-[var(--text-muted)] text-center">
+              <FormattedMessage id="import.branch.subtitle" />
             </span>
           </button>
         </div>
@@ -189,6 +205,53 @@ export function ImportWizard() {
               onChange={handleKmlUpload}
               disabled={loading}
               className="hidden"
+            />
+          </label>
+        </div>
+      )}
+
+      {/* Mode: Branch KML upload */}
+      {mode === "branch-kml" && (
+        <div className="max-w-md">
+          <label className="flex flex-col items-center gap-4 p-12 border-2 border-dashed border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] hover:border-[var(--amber)] transition-colors cursor-pointer">
+            {loading ? (
+              <>
+                <Loader2 size={32} className="text-[var(--amber)] animate-spin" />
+                <span className="text-sm text-[var(--text-muted)]">
+                  <FormattedMessage id="territories.importing" defaultMessage="Importing..." />
+                </span>
+              </>
+            ) : (
+              <>
+                <Upload size={32} className="text-[var(--text-muted)]" />
+                <span className="text-sm text-[var(--text-muted)]">
+                  <FormattedMessage
+                    id="territories.kmlDrop"
+                    defaultMessage="Drop a KML file here or click to browse"
+                  />
+                </span>
+              </>
+            )}
+            <input
+              type="file"
+              accept=".kml"
+              className="hidden"
+              disabled={loading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !token) return;
+                setLoading(true);
+                setError(null);
+                try {
+                  const result = await importBranchKml(file, token);
+                  setBranchResult(result);
+                  setMode("done");
+                } catch (err: any) {
+                  setError(err.message ?? "Branch KML import failed");
+                } finally {
+                  setLoading(false);
+                }
+              }}
             />
           </label>
         </div>
@@ -394,6 +457,39 @@ export function ImportWizard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Branch KML results */}
+          {branchResult && (
+            <div className="p-4 border border-[var(--border)] rounded-[var(--radius)] bg-[var(--bg-1)] space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--green)]">
+                <CheckCircle2 size={18} />
+                <FormattedMessage id="territories.importComplete" defaultMessage="Import Complete" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-[var(--text)]">
+                  <FormattedMessage id="import.branch.updated" values={{ count: branchResult.updated }} />
+                </p>
+                <p className="text-sm text-[var(--text)]">
+                  <FormattedMessage id="import.branch.created" values={{ count: branchResult.created }} />
+                </p>
+                {branchResult.skipped > 0 && (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    <FormattedMessage id="import.branch.skipped" values={{ count: branchResult.skipped }} />
+                  </p>
+                )}
+                {branchResult.warnings.length > 0 && (
+                  <details className="text-xs text-[var(--text-muted)]">
+                    <summary className="cursor-pointer">
+                      <FormattedMessage id="import.branch.warnings" values={{ count: branchResult.warnings.length }} />
+                    </summary>
+                    <ul className="mt-1 space-y-0.5 pl-4 list-disc">
+                      {branchResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
             </div>
           )}
 

@@ -7,6 +7,8 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
+import { parseKmlPolygons, type ParsedPolygon } from "../lib/kml-parser.js";
+import { runAutoFixPipeline } from "../lib/postgis-helpers.js";
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -28,66 +30,6 @@ const KmlBody = Type.Object({
   name: Type.Optional(Type.String()),
 });
 type KmlBodyType = Static<typeof KmlBody>;
-
-// ─── KML Parser ─────────────────────────────────────────────────
-
-interface ParsedPolygon {
-  name: string | null;
-  coordinates: number[][][]; // [ring[point[lng, lat, alt?]]]
-}
-
-/**
- * Minimal KML XML parser — extracts Placemark polygons.
- * Does not require a full XML parser dependency.
- */
-function parseKmlPolygons(kml: string): ParsedPolygon[] {
-  const results: ParsedPolygon[] = [];
-
-  // Extract all Placemarks
-  const placemarkRegex = /<Placemark[^>]*>([\s\S]*?)<\/Placemark>/gi;
-  let placemarkMatch: RegExpExecArray | null;
-
-  while ((placemarkMatch = placemarkRegex.exec(kml)) !== null) {
-    const content = placemarkMatch[1]!;
-
-    // Extract name (handle xmlns="" attributes)
-    const nameMatch = content.match(/<name[^>]*>([^<]*)<\/name>/i);
-    const name = nameMatch ? nameMatch[1]!.trim() : null;
-
-    // Extract coordinates from Polygon elements (handle xmlns="" attributes)
-    const coordsRegex = /<coordinates[^>]*>\s*([\s\S]*?)\s*<\/coordinates>/gi;
-    let coordsMatch: RegExpExecArray | null;
-    const rings: number[][][] = [];
-
-    while ((coordsMatch = coordsRegex.exec(content)) !== null) {
-      const coordStr = coordsMatch[1]!.trim();
-      const points = coordStr
-        .split(/\s+/)
-        .filter((s) => s.length > 0)
-        .map((s) => {
-          const parts = s.split(",").map(Number);
-          return parts.length >= 2 ? parts : null;
-        })
-        .filter((p): p is number[] => p !== null && !p.some(isNaN));
-
-      if (points.length >= 3) {
-        // Auto-close ring if needed
-        const first = points[0]!;
-        const last = points[points.length - 1]!;
-        if (first[0] !== last[0] || first[1] !== last[1]) {
-          points.push([...first]);
-        }
-        rings.push(points);
-      }
-    }
-
-    if (rings.length > 0) {
-      results.push({ name, coordinates: rings });
-    }
-  }
-
-  return results;
-}
 
 // ─── CSV Parser ─────────────────────────────────────────────────
 
@@ -289,6 +231,123 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
         warnings,
         errors: [],
       });
+    },
+  );
+
+  // ─── Branch KML import ──────────────────────────────────────────
+  app.post<{ Body: KmlBodyType }>(
+    "/territories/import/kml/branch",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_IMPORT),
+      schema: { body: KmlBody },
+    },
+    async (request, reply) => {
+      const polygons = parseKmlPolygons(request.body.kml);
+
+      if (polygons.length === 0) {
+        return reply.code(400).send({
+          error: "Bad Request",
+          message: "No valid polygons found in KML",
+        });
+      }
+
+      let updated = 0;
+      let created = 0;
+      let skipped = 0;
+      const warnings: string[] = [];
+
+      // Extract territory number from Placemark name
+      const numberRegex = /^T?-?(\d+)/i;
+
+      for (const poly of polygons) {
+        if (poly.coordinates.length === 0) {
+          skipped++;
+          warnings.push(`Skipped placemark "${poly.name ?? "(unnamed)"}": no polygon geometry`);
+          continue;
+        }
+
+        // Extract territory number
+        const nameStr = poly.name ?? "";
+        const numMatch = nameStr.match(numberRegex);
+        if (!numMatch) {
+          skipped++;
+          warnings.push(`Skipped placemark "${nameStr}": no territory number found`);
+          continue;
+        }
+        const territoryNumber = numMatch[1]!;
+
+        // Convert to GeoJSON
+        const geojsonCoords = poly.coordinates.map((ring) =>
+          ring.map((pt) => [pt[0]!, pt[1]!]),
+        );
+        const boundaries =
+          poly.coordinates.length === 1
+            ? { type: "Polygon" as const, coordinates: geojsonCoords }
+            : { type: "MultiPolygon" as const, coordinates: geojsonCoords.map((ring) => [ring]) };
+
+        // Find existing territory by number
+        const existing = await prisma.territory.findFirst({
+          where: { number: territoryNumber },
+        });
+
+        if (existing) {
+          // Update existing territory boundary
+          try {
+            // Save previous boundary in version history
+            if (existing.boundaries) {
+              const lastVersion = await prisma.territoryBoundaryVersion.findFirst({
+                where: { territoryId: existing.id },
+                orderBy: { version: "desc" },
+                select: { version: true },
+              });
+              const nextVersion = (lastVersion?.version ?? 0) + 1;
+              await prisma.territoryBoundaryVersion.create({
+                data: {
+                  territoryId: existing.id,
+                  version: nextVersion,
+                  boundaries: existing.boundaries as any,
+                  changeType: "branch_import",
+                  changeSummary: `Previous boundary before branch KML import`,
+                },
+              });
+            }
+
+            // Run auto-fix pipeline on new boundary
+            let finalBoundaries: object = boundaries;
+            try {
+              const autoFix = await runAutoFixPipeline(prisma, boundaries, existing.id);
+              finalBoundaries = autoFix.clipped;
+            } catch {
+              // PostGIS not available, use as-is
+            }
+
+            await prisma.territory.update({
+              where: { id: existing.id },
+              data: { boundaries: finalBoundaries } as any,
+            });
+            updated++;
+          } catch (err) {
+            warnings.push(`Failed to update territory #${territoryNumber}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        } else {
+          // Create new territory
+          try {
+            await prisma.territory.create({
+              data: {
+                number: territoryNumber,
+                name: nameStr.replace(numberRegex, "").trim() || `Territory ${territoryNumber}`,
+                type: "territory",
+                boundaries,
+              },
+            });
+            created++;
+          } catch (err) {
+            warnings.push(`Failed to create territory #${territoryNumber}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+
+      return reply.code(200).send({ updated, created, skipped, warnings });
     },
   );
 

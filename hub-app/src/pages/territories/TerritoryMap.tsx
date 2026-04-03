@@ -1,11 +1,11 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Map, Plus, Loader2, X } from "lucide-react";
+import { ArrowLeft, Map, Plus, Loader2, X, ShieldAlert } from "lucide-react";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "../../hooks/useMapLibre";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
-import { listTerritories, createTerritory, suggestTerritory, type TerritoryListItem, type TerritorySuggestion } from "@/lib/territory-api";
+import { listTerritories, createTerritory, suggestTerritory, bulkFixViolations, type TerritoryListItem, type TerritorySuggestion, type TerritoryViolation } from "@/lib/territory-api";
 import { CreationFlow } from "./CreationFlow";
 import { CreateTerritoryModal } from "./CreateTerritoryModal";
 import { ViolationBadges } from "./ViolationBadges";
@@ -99,6 +99,8 @@ export function TerritoryMap() {
   });
 
   const { can } = usePermissions();
+  const intl = useIntl();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [territories, setTerritories] = useState<TerritoryListItem[]>([]);
   const [congBoundary, setCongBoundary] = useState<TerritoryListItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +110,11 @@ export function TerritoryMap() {
   const [pendingBoundaries, setPendingBoundaries] = useState<unknown>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [fixMode, setFixMode] = useState(false);
+  const [fixSelectedIds, setFixSelectedIds] = useState<Set<string>>(new Set());
+  const [fixRunning, setFixRunning] = useState(false);
+  const [violationList, setViolationList] = useState<TerritoryViolation[]>([]);
+  const [fixResultMessage, setFixResultMessage] = useState<string | null>(null);
   const layersAdded = useRef(false);
   const territoriesRef = useRef<TerritoryListItem[]>([]);
   const congBoundaryRef = useRef<TerritoryListItem | null>(null);
@@ -129,7 +136,7 @@ export function TerritoryMap() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, refreshKey]);
 
   /** Add all map layers */
   const addAllLayers = useCallback(() => {
@@ -260,6 +267,49 @@ export function TerritoryMap() {
     }
   }, [isLoaded, territories, congBoundary, addAllLayers, fitBounds]);
 
+  const handleToggleFixSelect = useCallback((id: string) => {
+    setFixSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAllViolations = useCallback(() => {
+    setFixSelectedIds(new Set(violationList.map((v) => v.territoryId)));
+  }, [violationList]);
+
+  const handleFixSelected = useCallback(async () => {
+    if (!token || fixSelectedIds.size === 0) return;
+    setFixRunning(true);
+    try {
+      const result = await bulkFixViolations(token, Array.from(fixSelectedIds));
+      if (result.failed.length === 0) {
+        setFixResultMessage(intl.formatMessage({ id: "territory.fix.success" }, { count: result.fixed }));
+      } else {
+        setFixResultMessage(intl.formatMessage({ id: "territory.fix.partial" }, { fixed: result.fixed, failed: result.failed.length }));
+      }
+      // Exit fix mode and re-fetch data
+      setFixMode(false);
+      setFixSelectedIds(new Set());
+      setViolationList([]);
+      setRefreshKey((k) => k + 1);
+      // Auto-clear message after 5s
+      setTimeout(() => setFixResultMessage(null), 5000);
+    } catch (err) {
+      console.error("Bulk fix failed:", err);
+      setFixResultMessage("Bulk fix failed");
+      setTimeout(() => setFixResultMessage(null), 5000);
+    } finally {
+      setFixRunning(false);
+    }
+  }, [token, fixSelectedIds, intl]);
+
+  const handleViolationsLoaded = useCallback((violations: TerritoryViolation[]) => {
+    setViolationList(violations);
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -332,6 +382,20 @@ export function TerritoryMap() {
           </div>
         )}
 
+        {/* Fix Violations button — top right (before New Territory) */}
+        {violationList.length > 0 && can("app:territories.edit") && !fixMode && !creationMode && (
+          <button
+            onClick={() => setFixMode(true)}
+            className="absolute top-3 right-44 z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-[var(--radius-sm)] hover:bg-amber-500/30 transition-colors cursor-pointer shadow-lg"
+          >
+            <ShieldAlert size={13} />
+            <FormattedMessage id="territory.fix.button" />
+            <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-500/30 rounded-full">
+              {violationList.length}
+            </span>
+          </button>
+        )}
+
         {/* New territory button — top right */}
         {can("app:territories.edit") && (
           creationMode ? (
@@ -351,6 +415,34 @@ export function TerritoryMap() {
               <FormattedMessage id="territories.newTerritory" defaultMessage="New Territory" />
             </button>
           )
+        )}
+
+        {/* Fix mode floating toolbar — top center */}
+        {fixMode && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-2 bg-[var(--bg-2)] border border-[var(--amber)]/40 rounded-[var(--radius)] shadow-xl">
+            <span className="text-xs text-[var(--text-muted)]">
+              <FormattedMessage id="territory.fix.selected" values={{ count: fixSelectedIds.size }} />
+            </span>
+            <button
+              onClick={handleSelectAllViolations}
+              className="px-2 py-1 text-[10px] font-medium border border-[var(--border)] text-[var(--text-muted)] rounded hover:bg-[var(--glass)] transition-colors cursor-pointer"
+            >
+              <FormattedMessage id="territory.fix.selectAll" />
+            </button>
+            <button
+              onClick={handleFixSelected}
+              disabled={fixSelectedIds.size === 0 || fixRunning}
+              className="px-3 py-1 text-xs font-semibold bg-amber-500/80 text-black rounded hover:bg-amber-400 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {fixRunning ? "..." : <FormattedMessage id="territory.fix.run" />}
+            </button>
+            <button
+              onClick={() => { setFixMode(false); setFixSelectedIds(new Set()); }}
+              className="p-1 text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
         )}
 
         {/* Creation flow drawing overlay */}
@@ -391,7 +483,19 @@ export function TerritoryMap() {
           maplibreModule={maplibreModule}
           token={token}
           territories={territories}
+          fixMode={fixMode}
+          selectedIds={fixSelectedIds}
+          onToggleSelect={handleToggleFixSelect}
+          onViolationsLoaded={handleViolationsLoaded}
+          key={refreshKey}
         />
+
+        {/* Fix result message */}
+        {fixResultMessage && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-[var(--bg-2)] border border-[var(--amber)]/40 rounded-[var(--radius)] shadow-xl text-xs text-[var(--text)]">
+            {fixResultMessage}
+          </div>
+        )}
       </div>
 
       {/* Smart create modal (after drawing) */}
