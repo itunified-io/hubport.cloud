@@ -6,8 +6,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { FormattedMessage } from "react-intl";
 import { Download, Loader2, ChevronDown } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
-import { getApiUrl } from "@/lib/config";
 import type { TerritoryListItem } from "@/lib/territory-api";
+import { exportPdf } from "@/lib/territory-api";
 import {
   exportToKml,
   exportToGeoJson,
@@ -90,26 +90,13 @@ export default function ExportDropdown({ territories, compact }: ExportDropdownP
     setOpen(false);
 
     try {
-      const res = await fetch(`${getApiUrl()}/territories/export/pdf`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${user.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ territoryIds: ids }),
-      });
-
-      if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
-
-      const blob = await res.blob();
+      const blob = await exportPdf(ids, user.access_token);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const disposition = res.headers.get("Content-Disposition");
-      const match = disposition?.match(/filename="?([^"]+)"?/);
-      a.download = match?.[1] ?? (isSingle
+      a.download = isSingle
         ? territoryFilename(territories[0]!, "zip")
-        : `territories-maps-${new Date().toISOString().slice(0, 10)}.zip`);
+        : `territories-maps-${new Date().toISOString().slice(0, 10)}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
