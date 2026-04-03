@@ -90,6 +90,9 @@ export function TerritoryDetail() {
 
   // Clip segment hook — initialized with current editCoords and snap targets
   const clipSegment = useClipSegment(editCoords, clipSnapTargets);
+  // Ref to always access latest selectVertex (avoids stale closure in click handlers)
+  const clipSelectVertexRef = useRef(clipSegment.selectVertex);
+  clipSelectVertexRef.current = clipSegment.selectVertex;
 
   // Address state
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -583,7 +586,7 @@ export function TerritoryDetail() {
       const idx = i;
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        clipSegment.selectVertex(idx);
+        clipSelectVertexRef.current(idx);
       });
 
       clipMarkersRef.current.push(marker);
