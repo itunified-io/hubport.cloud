@@ -585,6 +585,42 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Delete territory boundary (polygon only) — preserves territory + addresses
+  app.delete<{ Params: IdParamsType }>(
+    "/territories/:id/boundaries",
+    {
+      preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
+      schema: { params: IdParams },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const territory = await prisma.territory.findUnique({ where: { id } });
+
+      if (!territory) {
+        return reply.code(404).send({ error: "Territory not found" });
+      }
+      if (!territory.boundaries) {
+        return reply.code(400).send({ error: "Territory has no boundary" });
+      }
+
+      // Save PREVIOUS boundary in version history (enables future restore)
+      await createBoundaryVersion(
+        id,
+        territory.boundaries as object,
+        "boundary_deleted",
+        `Boundary deleted for territory #${territory.number}`
+      );
+
+      // Null out boundaries, preserve everything else
+      const updated = await prisma.territory.update({
+        where: { id },
+        data: { boundaries: null } as any,
+      });
+
+      return reply.code(200).send(updated);
+    },
+  );
+
   // Assign territory to publisher — requires assignments.manage or campaigns.assist
   app.post<{ Params: IdParamsType; Body: AssignBodyType }>(
     "/territories/:id/assign",
