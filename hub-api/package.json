@@ -1,6 +1,6 @@
 {
   "name": "@itunified-io/hub-api",
-  "version": "2026.04.04.23",
+  "version": "2026.04.04.24",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
