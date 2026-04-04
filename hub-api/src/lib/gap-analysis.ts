@@ -157,13 +157,15 @@ export async function runSmartResolveAnalysis(
     const effectiveHasAddress = (override?.overriddenAddress != null) || !!props.streetAddress;
     const severity = classifySeverity(effectiveType, effectiveHasAddress);
 
-    // Include: confirmed_residential override OR high/medium severity
-    const isResidential =
+    // Include: confirmed_residential override OR high/medium/low severity
+    // (low = uncertain, e.g. building=yes without address — still worth resolving)
+    const isResolvable =
       override?.triageStatus === "confirmed_residential" ||
       severity === "high" ||
-      severity === "medium";
+      severity === "medium" ||
+      severity === "low";
 
-    if (isResidential) {
+    if (isResolvable) {
       residentialBuildings.push({
         osmId: props.osmId,
         lng: coords[0],

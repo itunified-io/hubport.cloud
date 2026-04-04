@@ -1,6 +1,12 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.04.25
+
+### Fix: Smart Resolve includes uncertain buildings
+- fix: include "low" severity buildings (building=yes without address) in Smart Resolve analysis
+- fix: 94 of 102 uncovered buildings were silently excluded because `yes` type → "low" severity was filtered out
+
 ## v2026.04.04.24
 
 ### Fix: H3 Hex Grid Resolution & Concurrency
