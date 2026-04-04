@@ -4,7 +4,10 @@
  * for territory snap context.
  */
 
-const OVERPASS_API = "https://overpass-api.de/api/interpreter";
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
 const USER_AGENT = "HubportCloud/1.0 (territory-management)";
 
 export interface OverpassBuilding {
@@ -45,56 +48,57 @@ export interface OverpassWaterBody {
 }
 
 async function overpassFetch(query: string, timeoutMs = 100_000): Promise<any> {
-  const MAX_RETRIES = 2;
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      const delay = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(OVERPASS_API, {
-        method: "POST",
-        headers: {
-          "User-Agent": USER_AGENT,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (
-        response.status === 504 ||
-        response.status === 429 ||
-        response.status === 503
-      ) {
-        lastError = new Error(
-          `Overpass API error: ${response.status} ${response.statusText}`,
-        );
-        continue;
+  // Try each endpoint with retries
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 5000));
       }
 
-      if (!response.ok) {
-        throw new Error(
-          `Overpass API error: ${response.status} ${response.statusText}`,
-        );
-      }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-      return await response.json();
-    } catch (err: unknown) {
-      clearTimeout(timeout);
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt === MAX_RETRIES - 1) throw lastError;
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (
+          response.status === 504 ||
+          response.status === 502 ||
+          response.status === 429 ||
+          response.status === 503
+        ) {
+          lastError = new Error(
+            `Overpass API error (${endpoint}): ${response.status} ${response.statusText}`,
+          );
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            `Overpass API error (${endpoint}): ${response.status} ${response.statusText}`,
+          );
+        }
+
+        return await response.json();
+      } catch (err: unknown) {
+        clearTimeout(timeout);
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
   }
 
-  throw lastError || new Error("Overpass API failed after retries");
+  throw lastError || new Error("Overpass API failed after retries on all endpoints");
 }
 
 /**
