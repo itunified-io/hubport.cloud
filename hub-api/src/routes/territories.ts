@@ -48,7 +48,7 @@ const AssignBody = Type.Object({
 type AssignBodyType = Static<typeof AssignBody>;
 
 const BulkFixBody = Type.Object({
-  territoryIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 50 }),
+  territoryIds: Type.Array(Type.String({ format: "uuid" }), { minItems: 1, maxItems: 500 }),
 });
 type BulkFixBodyType = Static<typeof BulkFixBody>;
 
@@ -246,6 +246,10 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         }> = [];
 
         for (const territory of territories) {
+          // Skip territories with invalid boundaries (null coordinates)
+          const tGeo = territory.boundaries as { coordinates?: unknown } | null;
+          if (!tGeo?.coordinates || !Array.isArray(tGeo.coordinates)) continue;
+
           const territoryViolations: string[] = [];
 
           // Check congregation boundary violation (with 1 m² tolerance for floating-point artifacts)
@@ -636,7 +640,6 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { territoryIds } = request.body;
 
-      // Fetch all requested territories
       const territories = await prisma.territory.findMany({
         where: { id: { in: territoryIds } },
         orderBy: { number: "asc" },
@@ -649,14 +652,7 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
       let fixed = 0;
       const failed: Array<{ id: string; number: string; error: string }> = [];
 
-      // Two-pass approach per spec:
-      // Pass 1: Clip all to congregation boundary (no neighbor dependencies)
-      // Pass 2: Resolve overlaps in number order (clips against latest DB state)
-
-      // Track intermediate state: territoryId → clipped boundary after pass 1
-      const pass1Results = new Map<string, object>();
-
-      // Pass 1 — Congregation clip
+      // Process each territory using the same pipeline as single-fix
       for (const territory of territories) {
         if (!territory.boundaries) {
           failed.push({ id: territory.id, number: territory.number, error: "No boundary" });
@@ -664,53 +660,23 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         }
 
         try {
-          // Save previous boundary for undo
-          await createBoundaryVersion(
-            territory.id,
+          const result = await runAutoFixPipeline(
+            prisma,
             territory.boundaries as object,
-            "bulk_fix",
-            `Previous boundary before bulk fix`
+            territory.id,
           );
 
-          // Validate + clip to congregation boundary
-          const validated = await prisma.$queryRaw<Array<{ valid: string }>>`
-            SELECT ST_AsGeoJSON(ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)}))) as valid
-          `;
-          let current: object = JSON.parse(validated[0].valid);
+          if (result.geometryModified) {
+            await createBoundaryVersion(
+              territory.id,
+              territory.boundaries as object,
+              "bulk_fix",
+              `Bulk fix: ${result.applied.join("; ")}`,
+            );
 
-          const congResult = await clipToCongregation(prisma, current);
-          if (congResult?.wasModified) {
-            current = congResult.clipped;
-          }
-
-          pass1Results.set(territory.id, current);
-
-          // Persist pass 1 result immediately so pass 2 reads latest state
-          await prisma.territory.update({
-            where: { id: territory.id },
-            data: { boundaries: current } as any,
-          });
-        } catch (err) {
-          failed.push({
-            id: territory.id,
-            number: territory.number,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      // Pass 2 — Neighbor overlap resolution (in number order, reads latest DB state)
-      for (const territory of territories) {
-        const pass1Boundary = pass1Results.get(territory.id);
-        if (!pass1Boundary) continue; // Failed in pass 1 or had no boundary
-
-        try {
-          const neighborResult = await clipToNeighbors(prisma, pass1Boundary, territory.id);
-
-          if (neighborResult.removedFrom.length > 0) {
             await prisma.territory.update({
               where: { id: territory.id },
-              data: { boundaries: neighborResult.clipped } as any,
+              data: { boundaries: result.clipped } as any,
             });
           }
 
@@ -799,6 +765,11 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // In-memory cache for snap-context (Overpass data doesn't change frequently)
+  // Key: rounded bbox string, Value: { data, timestamp }
+  const snapContextCache = new Map<string, { data: unknown; ts: number }>();
+  const SNAP_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
   // Snap context — returns combined GeoJSON for snap targets (roads, buildings, water)
   app.get<{ Querystring: { bbox: string } }>(
     "/territories/snap-context",
@@ -842,12 +813,26 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Check server-side cache (rounded to 3 decimal places ≈ 100m precision)
+      const cacheKey = [minLng, minLat, maxLng, maxLat].map((n) => n.toFixed(3)).join(",");
+      const cached = snapContextCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < SNAP_CACHE_TTL) {
+        return reply.send(cached.data);
+      }
+
       // Fetch roads, buildings, water in parallel from Overpass
-      const [roads, buildings, waterBodies] = await Promise.all([
+      // Use allSettled so one failing (e.g. Overpass 504) doesn't block the others
+      const [roadsResult, buildingsResult, waterResult] = await Promise.allSettled([
         queryRoadsInBBox(minLat, minLng, maxLat, maxLng),
         queryBuildingsInBBox(minLat, minLng, maxLat, maxLng),
         queryWaterBodiesInBBox(minLat, minLng, maxLat, maxLng),
       ]);
+      const roads = roadsResult.status === "fulfilled" ? roadsResult.value : [];
+      const buildings = buildingsResult.status === "fulfilled" ? buildingsResult.value : [];
+      const waterBodies = waterResult.status === "fulfilled" ? waterResult.value : [];
+      if (roadsResult.status === "rejected") request.log.warn("Overpass roads fetch failed: %s", roadsResult.reason);
+      if (buildingsResult.status === "rejected") request.log.warn("Overpass buildings fetch failed: %s", buildingsResult.reason);
+      if (waterResult.status === "rejected") request.log.warn("Overpass water fetch failed: %s", waterResult.reason);
 
       // Combine into a single GeoJSON FeatureCollection
       const features: object[] = [];
@@ -921,10 +906,17 @@ export async function territoryRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      return {
+      const result = {
         type: "FeatureCollection",
         features,
       };
+
+      // Cache the result (only if we got at least some data)
+      if (features.length > 0) {
+        snapContextCache.set(cacheKey, { data: result, ts: Date.now() });
+      }
+
+      return result;
     },
   );
 }

@@ -733,3 +733,150 @@ export function joinFieldGroupByCode(
     body: JSON.stringify({ code, publisherId }),
   });
 }
+
+// ─── Smart Resolve (Building-Centric) ────────────────────────────────
+
+export interface ClusterBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
+  distanceM: number;
+}
+
+export interface BuildingCluster {
+  territoryId: string;
+  territoryNumber: string;
+  territoryName: string;
+  maxDistanceM: number;
+  buildings: ClusterBuilding[];
+}
+
+export interface UnassignedBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
+}
+
+export interface SmartResolveAnalysis {
+  clusters: BuildingCluster[];
+  unassigned: UnassignedBuilding[];
+  thresholds: { maxDistanceM: number };
+}
+
+export async function fetchSmartResolveAnalysis(
+  token: string,
+  maxDistanceM = 200,
+): Promise<SmartResolveAnalysis> {
+  const params = new URLSearchParams({
+    maxDistanceM: String(maxDistanceM),
+  });
+  return apiFetch(`/territories/gap-analysis?${params}`, token);
+}
+
+export interface ClusterExpandRequest {
+  action: "expand_cluster";
+  territoryId: string;
+  buildingCoords: [number, number][];
+}
+
+export interface ClusterExpandResponse {
+  success: boolean;
+  action: string;
+  territoryId: string;
+  number: string;
+  buildingCount: number;
+  autoFixApplied: string[];
+}
+
+export async function resolveCluster(
+  token: string,
+  body: ClusterExpandRequest,
+): Promise<ClusterExpandResponse> {
+  return apiFetch("/territories/gap-resolve", token, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ─── Building Override (Triage Workflow) ────────────────────────────
+
+export type TriageStatus = "unreviewed" | "confirmed_residential" | "ignored" | "needs_visit";
+
+export interface BuildingOverride {
+  id: string;
+  osmId: string;
+  overriddenType: string | null;
+  overriddenAddress: string | null;
+  triageStatus: TriageStatus;
+  notes: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BuildingOverridesResponse {
+  overrides: BuildingOverride[];
+  total: number;
+}
+
+export interface OverrideInput {
+  overriddenType?: string;
+  overriddenAddress?: string;
+  triageStatus?: TriageStatus;
+  notes?: string;
+}
+
+export interface BatchOverrideInput {
+  osmId: string;
+  overriddenType?: string;
+  overriddenAddress?: string;
+  triageStatus?: TriageStatus;
+  notes?: string;
+}
+
+export function fetchBuildingOverrides(
+  token: string,
+  options?: { triageStatus?: TriageStatus; limit?: number; offset?: number },
+): Promise<BuildingOverridesResponse> {
+  const params = new URLSearchParams();
+  if (options?.triageStatus) params.set("triageStatus", options.triageStatus);
+  if (options?.limit) params.set("limit", String(options.limit));
+  if (options?.offset) params.set("offset", String(options.offset));
+  const qs = params.toString();
+  return apiFetch(`/territories/gap-detection/overrides${qs ? `?${qs}` : ""}`, token);
+}
+
+export function upsertBuildingOverride(
+  token: string,
+  osmId: string,
+  data: OverrideInput,
+): Promise<BuildingOverride> {
+  return apiFetch(`/territories/gap-detection/overrides/${encodeURIComponent(osmId)}`, token, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export function batchOverrides(
+  token: string,
+  overrides: BatchOverrideInput[],
+): Promise<{ updated: number }> {
+  return apiFetch("/territories/gap-detection/overrides/batch", token, {
+    method: "POST",
+    body: JSON.stringify({ overrides }),
+  });
+}
+
+export function deleteBuildingOverride(
+  token: string,
+  osmId: string,
+): Promise<void> {
+  return apiFetch(`/territories/gap-detection/overrides/${encodeURIComponent(osmId)}`, token, {
+    method: "DELETE",
+  });
+}

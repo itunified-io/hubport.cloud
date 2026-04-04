@@ -152,6 +152,10 @@ export async function clipToCongregation(
   });
   if (!congregation || !congregation.boundaries) return null;
 
+  // Guard against invalid boundaries (null coordinates from bad normalization)
+  const congGeo = congregation.boundaries as { coordinates?: unknown };
+  if (!congGeo.coordinates || !Array.isArray(congGeo.coordinates)) return null;
+
   const result = await prisma.$queryRaw<
     Array<{ clipped: string; is_empty: boolean; original_area: number; clipped_area: number }>
   >`
@@ -199,6 +203,8 @@ export async function clipToNeighbors(
     FROM "Territory" t
     WHERE t.boundaries IS NOT NULL
       AND t.type = 'territory'
+      AND t.boundaries->>'coordinates' IS NOT NULL
+      AND jsonb_typeof(t.boundaries->'coordinates') = 'array'
       ${excludeTerritoryId ? Prisma.sql`AND t.id != ${excludeTerritoryId}` : Prisma.empty}
       AND ST_Intersects(
         ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(geojson)})),
@@ -265,6 +271,8 @@ export async function detectOverlaps(
     FROM "Territory" t
     WHERE t.boundaries IS NOT NULL
       AND t.type = 'territory'
+      AND t.boundaries->>'coordinates' IS NOT NULL
+      AND jsonb_typeof(t.boundaries->'coordinates') = 'array'
       ${excludeTerritoryId ? Prisma.sql`AND t.id != ${excludeTerritoryId}` : Prisma.empty}
       AND ST_Intersects(
         ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(geojson)})),
@@ -321,10 +329,196 @@ export async function runAutoFixPipeline(
     applied.push(`Removed overlap with #${removed.number} ${removed.name}`);
   }
 
-  // Step 4: Overlap detect (informational)
+  // Step 4: Normalize non-Polygon geometries → Polygon via PostGIS
+  // PostGIS operations (ST_MakeValid, ST_Difference, ST_Intersection) often produce
+  // MultiPolygon or GeometryCollection with tiny sliver/point artifacts.
+  // Use ST_CollectionExtract + ST_Dump to reliably extract the largest polygon.
+  const currentObj = current as { type?: string; coordinates?: unknown };
+  if (currentObj.type !== "Polygon") {
+    const normalized = await prisma.$queryRaw<Array<{ geojson: string }>>`
+      SELECT ST_AsGeoJSON(
+        (SELECT geom FROM (
+          SELECT (ST_Dump(ST_CollectionExtract(ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(current)})), 3))).geom
+        ) d ORDER BY ST_Area(geom) DESC LIMIT 1)
+      ) as geojson
+    `;
+    if (normalized[0]?.geojson) {
+      const parsed = JSON.parse(normalized[0].geojson);
+      if (parsed?.coordinates && Array.isArray(parsed.coordinates)) {
+        current = parsed;
+        applied.push(`Normalized ${currentObj.type} to Polygon`);
+      }
+    }
+  }
+
+  // Step 5: Overlap detect (informational)
   const overlaps = await detectOverlaps(prisma, current, excludeTerritoryId);
 
   const geometryModified = applied.length > 0;
 
   return { original, clipped: current, applied, overlaps, geometryModified };
+}
+
+export interface GapPolygon {
+  geojson: object;
+  areaMeter2: number;
+  bbox: { south: number; west: number; north: number; east: number };
+}
+
+/**
+ * Compute gap polygons — areas inside the congregation boundary
+ * that are NOT covered by any territory polygon.
+ * Returns null if no congregation boundary exists.
+ */
+export async function computeGapPolygons(
+  prisma: PrismaLike,
+): Promise<GapPolygon[] | null> {
+  // Check congregation boundary exists
+  const congregation = await prisma.territory.findFirst({
+    where: { type: "congregation_boundary", boundaries: { not: Prisma.DbNull } },
+    select: { boundaries: true },
+  });
+  if (!congregation?.boundaries) return null;
+
+  const congGeo = congregation.boundaries as { coordinates?: unknown };
+  if (!congGeo.coordinates || !Array.isArray(congGeo.coordinates)) return null;
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      geojson: string;
+      area_m2: number;
+      west: number;
+      south: number;
+      east: number;
+      north: number;
+    }>
+  >`
+    WITH all_territories AS (
+      SELECT ST_Union(
+        ST_MakeValid(ST_GeomFromGeoJSON(boundaries::text))
+      ) AS combined
+      FROM "Territory"
+      WHERE boundaries IS NOT NULL
+        AND type = 'territory'
+        AND boundaries->>'coordinates' IS NOT NULL
+        AND jsonb_typeof(boundaries->'coordinates') = 'array'
+    ),
+    congregation AS (
+      SELECT ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(congregation.boundaries)})) AS geom
+    ),
+    gaps AS (
+      SELECT (ST_Dump(
+        CASE
+          WHEN (SELECT combined FROM all_territories) IS NOT NULL
+          THEN ST_Difference(congregation.geom, (SELECT combined FROM all_territories))
+          ELSE congregation.geom
+        END
+      )).geom AS geom
+      FROM congregation
+    )
+    SELECT
+      ST_AsGeoJSON(geom) AS geojson,
+      ST_Area(geom::geography) AS area_m2,
+      ST_XMin(geom) AS west,
+      ST_YMin(geom) AS south,
+      ST_XMax(geom) AS east,
+      ST_YMax(geom) AS north
+    FROM gaps
+    WHERE ST_Area(geom::geography) > 100
+      AND ST_Area(geom::geography) / NULLIF(
+        ST_Perimeter(geom::geography) * ST_Perimeter(geom::geography), 0
+      ) > 0.001
+    ORDER BY ST_Area(geom::geography) DESC
+  `;
+
+  return rows.map((r: { geojson: string; area_m2: number; south: number; west: number; north: number; east: number }) => ({
+    geojson: JSON.parse(r.geojson),
+    areaMeter2: Number(r.area_m2),
+    bbox: {
+      south: Number(r.south),
+      west: Number(r.west),
+      north: Number(r.north),
+      east: Number(r.east),
+    },
+  }));
+}
+
+/**
+ * Bulk check which building points are covered by ANY territory polygon.
+ * Uses PostGIS ST_Contains against ST_Union of all territories — handles
+ * holes, complex geometries, and edge cases correctly (unlike JS ray-casting).
+ *
+ * Returns the set of osmIds that ARE covered by a territory.
+ */
+export async function checkBuildingCoveragePostGIS(
+  prisma: PrismaLike,
+  buildings: Array<{ osmId: string; lat: number; lng: number }>,
+): Promise<Set<string>> {
+  if (buildings.length === 0) return new Set();
+
+  // Pass building data as JSON array to PostGIS
+  const buildingsJson = JSON.stringify(
+    buildings.map((b) => ({ osmId: b.osmId, lng: b.lng, lat: b.lat })),
+  );
+
+  const rows = await prisma.$queryRaw<Array<{ osm_id: string }>>`
+    WITH territory_union AS (
+      SELECT ST_Union(
+        ST_MakeValid(ST_GeomFromGeoJSON(boundaries::text))
+      ) AS geom
+      FROM "Territory"
+      WHERE boundaries IS NOT NULL
+        AND type = 'territory'
+        AND boundaries->>'coordinates' IS NOT NULL
+        AND jsonb_typeof(boundaries->'coordinates') = 'array'
+    ),
+    buildings AS (
+      SELECT
+        elem->>'osmId' AS osm_id,
+        (elem->>'lng')::float8 AS lng,
+        (elem->>'lat')::float8 AS lat
+      FROM jsonb_array_elements(${buildingsJson}::jsonb) elem
+    )
+    SELECT b.osm_id
+    FROM buildings b, territory_union tu
+    WHERE tu.geom IS NOT NULL
+      AND ST_Contains(tu.geom, ST_SetSRID(ST_MakePoint(b.lng, b.lat), 4326))
+  `;
+
+  return new Set(rows.map((r: { osm_id: string }) => r.osm_id));
+}
+
+/**
+ * Check which building points are inside the congregation boundary using PostGIS.
+ * Returns the set of osmIds that are inside the congregation boundary.
+ */
+export async function checkCongregationContainsPostGIS(
+  prisma: PrismaLike,
+  buildings: Array<{ osmId: string; lat: number; lng: number }>,
+  congregationBoundaries: object,
+): Promise<Set<string>> {
+  if (buildings.length === 0) return new Set();
+
+  const buildingsJson = JSON.stringify(
+    buildings.map((b) => ({ osmId: b.osmId, lng: b.lng, lat: b.lat })),
+  );
+  const congStr = JSON.stringify(congregationBoundaries);
+
+  const rows = await prisma.$queryRaw<Array<{ osm_id: string }>>`
+    WITH congregation AS (
+      SELECT ST_MakeValid(ST_GeomFromGeoJSON(${congStr})) AS geom
+    ),
+    buildings AS (
+      SELECT
+        elem->>'osmId' AS osm_id,
+        (elem->>'lng')::float8 AS lng,
+        (elem->>'lat')::float8 AS lat
+      FROM jsonb_array_elements(${buildingsJson}::jsonb) elem
+    )
+    SELECT b.osm_id
+    FROM buildings b, congregation c
+    WHERE ST_Contains(c.geom, ST_SetSRID(ST_MakePoint(b.lng, b.lat), 4326))
+  `;
+
+  return new Set(rows.map((r: { osm_id: string }) => r.osm_id));
 }

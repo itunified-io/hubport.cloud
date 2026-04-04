@@ -35,6 +35,7 @@ import { territoryShareRoutes } from "./routes/territory-shares.js";
 import { addressRoutes } from "./routes/addresses.js";
 import { osmRefreshRoutes } from "./routes/osm-refresh.js";
 import { gapDetectionRoutes } from "./routes/gap-detection.js";
+import { gapResolutionRoutes } from "./routes/gap-resolution.js";
 import { localOsmRoutes } from "./routes/local-osm.js";
 import { heatmapRoutes } from "./routes/heatmap.js";
 import { importRoutes } from "./routes/import.js";
@@ -121,6 +122,7 @@ async function start(): Promise<void> {
   await app.register(addressRoutes);
   await app.register(osmRefreshRoutes);
   await app.register(gapDetectionRoutes);
+  await app.register(gapResolutionRoutes);
   await app.register(localOsmRoutes);
   await app.register(heatmapRoutes);
   await app.register(importRoutes);
