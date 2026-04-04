@@ -1,6 +1,13 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.04.24
+
+### Fix: H3 Hex Grid Resolution & Concurrency
+- fix: reduce H3 resolution from 8 to 7 — 265 hexes → ~38 hexes for congregation polygon
+- fix: batch 3 concurrent Overpass queries per round with 1.5s inter-batch delay
+- fix: resolves "Failed to fetch" timeout on gap detection run (~265s → ~20s)
+
 ## v2026.04.04.23
 
 ### H3 Hexagonal Grid for Overpass Spatial Tiling

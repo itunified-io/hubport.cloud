@@ -218,7 +218,7 @@ export async function queryBuildingsInBBox(
  */
 export async function queryBuildingsInPolygon(
   geojson: { type: string; coordinates: unknown },
-  resolution = 8,
+  resolution = 7,
 ): Promise<OverpassBuilding[]> {
   const { polygonToHexes, hexToBBox } = await import("./hex-grid.js");
 
@@ -244,26 +244,41 @@ export async function queryBuildingsInPolygon(
   const seen = new Set<string>();
   const results: OverpassBuilding[] = [];
 
-  for (let i = 0; i < hexes.length; i++) {
-    // Brief delay between hex queries to avoid Overpass rate-limiting
-    if (i > 0) {
-      await new Promise((r) => setTimeout(r, 1000));
+  // Process hexes in batches of CONCURRENCY with staggered starts
+  const CONCURRENCY = 3;
+
+  for (let batchStart = 0; batchStart < hexes.length; batchStart += CONCURRENCY) {
+    const batch = hexes.slice(batchStart, batchStart + CONCURRENCY);
+
+    // Brief delay between batches to avoid Overpass rate-limiting
+    if (batchStart > 0) {
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
-    const bbox = hexToBBox(hexes[i]!);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (hex, idx) => {
+        const globalIdx = batchStart + idx;
+        const bbox = hexToBBox(hex);
+        const tileBuildings = await queryBuildingsTile(bbox.south, bbox.west, bbox.north, bbox.east);
+        return { globalIdx, tileBuildings };
+      }),
+    );
 
-    try {
-      const tileBuildings = await queryBuildingsTile(bbox.south, bbox.west, bbox.north, bbox.east);
-      for (const b of tileBuildings) {
-        if (!seen.has(b.osmId)) {
-          seen.add(b.osmId);
-          results.push(b);
+    for (const result of batchResults) {
+      if (result.status === "fulfilled") {
+        const { globalIdx, tileBuildings } = result.value;
+        for (const b of tileBuildings) {
+          if (!seen.has(b.osmId)) {
+            seen.add(b.osmId);
+            results.push(b);
+          }
         }
+        console.log(`[overpass] Hex ${globalIdx + 1}/${hexes.length}: +${tileBuildings.length} buildings (total: ${results.length})`);
+      } else {
+        const globalIdx = batchStart;
+        console.error(`[overpass] Hex ${globalIdx + 1}/${hexes.length} failed:`, result.reason instanceof Error ? result.reason.message : result.reason);
+        throw result.reason;
       }
-      console.log(`[overpass] Hex ${i + 1}/${hexes.length}: +${tileBuildings.length} buildings (total: ${results.length})`);
-    } catch (err) {
-      console.error(`[overpass] Hex ${i + 1}/${hexes.length} failed:`, err instanceof Error ? err.message : err);
-      throw err;
     }
   }
 
