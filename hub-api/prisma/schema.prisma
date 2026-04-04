@@ -1494,3 +1494,14 @@ model TenantAuditLog {
   @@index([tenantId, createdAt])
   @@ignore
 }
+
+model HexGridCache {
+  id            String   @id @default(uuid())
+  boundaryHash  String
+  resolution    Int
+  hexIndexes    String[]
+  buildingCount Int?
+  createdAt     DateTime @default(now())
+
+  @@unique([boundaryHash, resolution])
+}

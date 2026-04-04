@@ -102,9 +102,9 @@ async function overpassFetch(query: string, timeoutMs = 100_000): Promise<any> {
 }
 
 /**
- * Query buildings within a bounding box.
+ * Query buildings within a single tile bounding box (internal).
  */
-export async function queryBuildingsInBBox(
+async function queryBuildingsTile(
   south: number,
   west: number,
   north: number,
@@ -143,6 +143,131 @@ export async function queryBuildingsInBBox(
         hasAddress,
       };
     });
+}
+
+/** Max tile size in degrees (~2.5km). Areas larger than this are split into tiles. */
+const MAX_TILE_DEG = 0.025;
+
+/**
+ * Query buildings within a bounding box.
+ * Automatically splits large areas into smaller tiles to avoid Overpass timeouts.
+ * Deduplicates buildings that appear in overlapping tile edges.
+ */
+export async function queryBuildingsInBBox(
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): Promise<OverpassBuilding[]> {
+  const latSpan = north - south;
+  const lngSpan = east - west;
+
+  // Small area — single query
+  if (latSpan <= MAX_TILE_DEG && lngSpan <= MAX_TILE_DEG) {
+    return queryBuildingsTile(south, west, north, east);
+  }
+
+  // Split into tiles
+  const latSteps = Math.ceil(latSpan / MAX_TILE_DEG);
+  const lngSteps = Math.ceil(lngSpan / MAX_TILE_DEG);
+  const latStep = latSpan / latSteps;
+  const lngStep = lngSpan / lngSteps;
+  const totalTiles = latSteps * lngSteps;
+
+  console.log(`[overpass] Splitting ${latSpan.toFixed(3)}° × ${lngSpan.toFixed(3)}° bbox into ${latSteps}×${lngSteps} = ${totalTiles} tiles`);
+
+  const seen = new Set<string>();
+  const results: OverpassBuilding[] = [];
+
+  for (let latIdx = 0; latIdx < latSteps; latIdx++) {
+    for (let lngIdx = 0; lngIdx < lngSteps; lngIdx++) {
+      const tileNum = latIdx * lngSteps + lngIdx + 1;
+      const tileSouth = south + latIdx * latStep;
+      const tileWest = west + lngIdx * lngStep;
+      const tileNorth = Math.min(south + (latIdx + 1) * latStep, north);
+      const tileEast = Math.min(west + (lngIdx + 1) * lngStep, east);
+
+      // Brief delay between tiles to avoid Overpass rate-limiting
+      if (tileNum > 1) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      try {
+        const tileBuildings = await queryBuildingsTile(tileSouth, tileWest, tileNorth, tileEast);
+        for (const b of tileBuildings) {
+          if (!seen.has(b.osmId)) {
+            seen.add(b.osmId);
+            results.push(b);
+          }
+        }
+        console.log(`[overpass] Tile ${tileNum}/${totalTiles}: +${tileBuildings.length} buildings (total: ${results.length})`);
+      } catch (err) {
+        console.error(`[overpass] Tile ${tileNum}/${totalTiles} failed:`, err instanceof Error ? err.message : err);
+        throw err;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Query buildings within a GeoJSON polygon using H3 hex tiling.
+ * Computes H3 hex coverage at the given resolution, fetches buildings per hex,
+ * and deduplicates by osmId. Preferred over queryBuildingsInBBox for large areas.
+ */
+export async function queryBuildingsInPolygon(
+  geojson: { type: string; coordinates: unknown },
+  resolution = 8,
+): Promise<OverpassBuilding[]> {
+  const { polygonToHexes, hexToBBox } = await import("./hex-grid.js");
+
+  const hexes = polygonToHexes(geojson, resolution);
+
+  if (hexes.length === 0) {
+    console.warn("[overpass] polygonToHexes returned 0 hexes — falling back to bbox");
+    // Fallback: compute bbox from coordinates
+    const coords = (geojson as any).coordinates?.[0] as [number, number][] | undefined;
+    if (!coords) return [];
+    let south = Infinity, north = -Infinity, west = Infinity, east = -Infinity;
+    for (const [lng, lat] of coords) {
+      if (lat < south) south = lat;
+      if (lat > north) north = lat;
+      if (lng < west) west = lng;
+      if (lng > east) east = lng;
+    }
+    return queryBuildingsInBBox(south, west, north, east);
+  }
+
+  console.log(`[overpass] H3 res-${resolution}: ${hexes.length} hexes covering polygon`);
+
+  const seen = new Set<string>();
+  const results: OverpassBuilding[] = [];
+
+  for (let i = 0; i < hexes.length; i++) {
+    // Brief delay between hex queries to avoid Overpass rate-limiting
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    const bbox = hexToBBox(hexes[i]!);
+
+    try {
+      const tileBuildings = await queryBuildingsTile(bbox.south, bbox.west, bbox.north, bbox.east);
+      for (const b of tileBuildings) {
+        if (!seen.has(b.osmId)) {
+          seen.add(b.osmId);
+          results.push(b);
+        }
+      }
+      console.log(`[overpass] Hex ${i + 1}/${hexes.length}: +${tileBuildings.length} buildings (total: ${results.length})`);
+    } catch (err) {
+      console.error(`[overpass] Hex ${i + 1}/${hexes.length} failed:`, err instanceof Error ? err.message : err);
+      throw err;
+    }
+  }
+
+  return results;
 }
 
 /**
