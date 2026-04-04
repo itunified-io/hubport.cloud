@@ -4,7 +4,7 @@
  * Click marker → ignore popup with reason.
  * Bulk select + ignore from list.
  */
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
   AlertTriangle, Play, Loader2, CheckCircle2, XCircle,
@@ -18,12 +18,18 @@ import {
   ignoreBuildings,
   listTerritories,
   populateAddressesFromOsm,
+  fetchBuildingOverrides,
+  batchOverrides,
   type GapDetectionRun,
   type GeoJsonFeature,
   type TerritoryListItem,
   type OsmPopulateResult,
+  type BuildingOverride,
+  type TriageStatus,
 } from "@/lib/territory-api";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
+import { GapResolutionSection } from "@/components/territories/GapResolutionSection";
+import { BuildingTriageList } from "@/components/territories/BuildingTriageList";
 
 const STATUS_META: Record<string, { icon: React.ElementType; color: string }> = {
   running: { icon: Loader2, color: "text-[var(--amber)]" },
@@ -42,6 +48,81 @@ const IGNORE_REASONS = [
   { value: "other", label: "Other" },
 ];
 
+// ─── Severity-based building type color mapping ─────────────────────
+const SEVERITY_HIGH_TYPES = new Set([
+  "house", "apartments", "residential", "detached", "semidetached_house", "terrace",
+  "cabin",
+]);
+const SEVERITY_MEDIUM_TYPES = new Set(["farm", "farm_auxiliary"]);
+const SEVERITY_IGNORABLE_TYPES = new Set([
+  "garage", "garages", "commercial", "industrial", "retail",
+  "shed", "barn", "church", "public",
+  "warehouse", "office", "school", "hospital", "hotel", "supermarket",
+  "service", "construction", "boathouse", "cowshed", "ruins",
+  "roof", "hut", "transformer_tower", "bridge", "bunker",
+  "carport", "kiosk", "toilets", "pavilion", "greenhouse",
+]);
+
+const SEVERITY_COLORS = {
+  high: { fill: "#ef4444", stroke: "#b91c1c", label: "Residential" },
+  medium: { fill: "#f97316", stroke: "#c2410c", label: "Mixed / Farm" },
+  low: { fill: "#eab308", stroke: "#a16207", label: "Uncertain" },
+  ignorable: { fill: "#9ca3af", stroke: "#6b7280", label: "Non-residential" },
+} as const;
+
+// All ignorable type strings for MapLibre expressions
+const IGNORABLE_LIST = [
+  "garage", "garages", "commercial", "industrial", "retail",
+  "shed", "barn", "church", "public",
+  "warehouse", "office", "school", "hospital", "hotel", "supermarket",
+  "service", "construction", "boathouse", "cowshed", "ruins",
+  "roof", "hut", "transformer_tower", "bridge", "bunker",
+  "carport", "kiosk", "toilets", "pavilion", "greenhouse",
+];
+
+/** Classify a building type string into severity level. */
+function getBuildingSeverity(buildingType: string | undefined, hasAddress: boolean): keyof typeof SEVERITY_COLORS {
+  if (!buildingType || buildingType === "unknown") return "low";
+  if (SEVERITY_HIGH_TYPES.has(buildingType)) return "high";
+  if (SEVERITY_MEDIUM_TYPES.has(buildingType)) return "medium";
+  if (buildingType === "yes") return hasAddress ? "medium" : "low";
+  if (SEVERITY_IGNORABLE_TYPES.has(buildingType)) return "ignorable";
+  return "low";
+}
+
+/** MapLibre data-driven expression for circle-color based on building type severity. */
+const SEVERITY_CIRCLE_COLOR: unknown = [
+  "case",
+  // High severity — residential
+  ["in", ["get", "buildingType"], ["literal", ["house", "apartments", "residential", "detached", "semidetached_house", "terrace", "cabin"]]],
+  "#ef4444",
+  // Medium severity — farm
+  ["in", ["get", "buildingType"], ["literal", ["farm", "farm_auxiliary"]]],
+  "#f97316",
+  // Medium — "yes" with address
+  ["all", ["==", ["get", "buildingType"], "yes"], ["!=", ["get", "streetAddress"], null]],
+  "#f97316",
+  // Ignorable — non-residential
+  ["in", ["get", "buildingType"], ["literal", IGNORABLE_LIST]],
+  "#9ca3af",
+  // Default — low severity (uncertain)
+  "#eab308",
+];
+
+/** MapLibre data-driven expression for circle-stroke-color. */
+const SEVERITY_STROKE_COLOR: unknown = [
+  "case",
+  ["in", ["get", "buildingType"], ["literal", ["house", "apartments", "residential", "detached", "semidetached_house", "terrace", "cabin"]]],
+  "#b91c1c",
+  ["in", ["get", "buildingType"], ["literal", ["farm", "farm_auxiliary"]]],
+  "#c2410c",
+  ["all", ["==", ["get", "buildingType"], "yes"], ["!=", ["get", "streetAddress"], null]],
+  "#c2410c",
+  ["in", ["get", "buildingType"], ["literal", IGNORABLE_LIST]],
+  "#6b7280",
+  "#a16207",
+];
+
 export function GapDetection() {
   const { user } = useAuth();
   const intl = useIntl();
@@ -55,6 +136,14 @@ export function GapDetection() {
   const [selectedGaps, setSelectedGaps] = useState<Set<string>>(new Set());
   const [showIgnoreDialog, setShowIgnoreDialog] = useState(false);
   const [ignoreReason, setIgnoreReason] = useState("not_a_residence");
+
+  // Building type filter — hiddenTypes tracks types the user has toggled off
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
+
+  // ─── Tab state + triage overrides ─────────────────────────────
+  const [activeTab, setActiveTab] = useState<"buildings" | "gaps">("buildings");
+  const [overrides, setOverrides] = useState<Map<string, BuildingOverride>>(new Map());
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Map
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +184,74 @@ export function GapDetection() {
     selectedFeaturesRef.current = selectedFeatures;
   }, [selectedFeatures]);
 
+  // ─── Gap resolution: polygon visualization ──────────────────
+  const [gapPolygons, setGapPolygons] = useState<object[]>([]);
+  const [highlightedGap, setHighlightedGap] = useState<object | null>(null);
+
+  // Show gap polygon fills on map
+  const updateGapPolygonLayers = useCallback((polygons: object[], highlighted: object | null) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove old layers
+    if (map.getLayer("gap-polygon-fill")) map.removeLayer("gap-polygon-fill");
+    if (map.getLayer("gap-polygon-outline")) map.removeLayer("gap-polygon-outline");
+    if (map.getLayer("gap-highlight-fill")) map.removeLayer("gap-highlight-fill");
+    if (map.getSource("gap-polygons")) map.removeSource("gap-polygons");
+    if (map.getSource("gap-highlight")) map.removeSource("gap-highlight");
+
+    if (polygons.length > 0) {
+      addSource("gap-polygons", {
+        type: "FeatureCollection",
+        features: polygons.map((p, i) => ({
+          type: "Feature",
+          properties: { index: i },
+          geometry: p,
+        })),
+      });
+      addLayer({
+        id: "gap-polygon-fill",
+        type: "fill",
+        source: "gap-polygons",
+        paint: { "fill-color": "#f97316", "fill-opacity": 0.12 },
+      });
+      addLayer({
+        id: "gap-polygon-outline",
+        type: "line",
+        source: "gap-polygons",
+        paint: { "line-color": "#f97316", "line-width": 1.5, "line-dasharray": [3, 2] },
+      });
+    }
+
+    if (highlighted) {
+      addSource("gap-highlight", {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", properties: {}, geometry: highlighted }],
+      });
+      addLayer({
+        id: "gap-highlight-fill",
+        type: "fill",
+        source: "gap-highlight",
+        paint: { "fill-color": "#f97316", "fill-opacity": 0.3 },
+      });
+    }
+  }, [mapRef, addSource, addLayer]);
+
+  // Update gap polygon layers when state changes
+  useEffect(() => {
+    if (isLoaded) {
+      updateGapPolygonLayers(gapPolygons, highlightedGap);
+    }
+  }, [isLoaded, gapPolygons, highlightedGap, updateGapPolygonLayers]);
+
+  const handleGapPolygonsChange = useCallback((polygons: object[]) => {
+    setGapPolygons(polygons);
+  }, []);
+
+  const handleHighlightGap = useCallback((polygon: object | null) => {
+    setHighlightedGap(polygon);
+  }, []);
+
   // ─── Fetch territories for map ───────────────────────────────
 
   useEffect(() => {
@@ -123,6 +280,37 @@ export function GapDetection() {
   useEffect(() => {
     void fetchRuns();
   }, [fetchRuns]);
+
+  const handleGapResolved = useCallback(() => {
+    // Refresh territories + gap markers after gap resolution
+    if (token) {
+      listTerritories(token, { type: "all" }).then(setTerritories).catch(() => {});
+      void fetchRuns();
+    }
+  }, [token, fetchRuns]);
+
+  // ─── Override loading + handlers ──────────────────────────────
+  const loadOverrides = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await fetchBuildingOverrides(token, { limit: 1000 });
+      setOverrides(new Map(data.overrides.map(o => [o.osmId, o])));
+    } catch { /* ignore */ }
+  }, [token]);
+
+  useEffect(() => { loadOverrides(); }, [loadOverrides]);
+
+  const handleOverrideChange = useCallback((_osmId: string, override: BuildingOverride) => {
+    setOverrides(prev => new Map(prev).set(override.osmId, override));
+  }, []);
+
+  const handleBatchOverride = useCallback(async (osmIds: string[], triageStatus: TriageStatus) => {
+    if (!token) return;
+    try {
+      await batchOverrides(token, osmIds.map(osmId => ({ osmId, triageStatus })));
+      await loadOverrides();
+    } catch { /* ignore */ }
+  }, [token, loadOverrides]);
 
   // ─── Map: add territory boundaries + congregation outline ────
 
@@ -205,16 +393,16 @@ export function GapDetection() {
 
     addSource("gaps", run.resultGeoJson);
 
-    // Orange/red circles for gap buildings
+    // Severity-colored circles for gap buildings
     addLayer({
       id: "gap-markers",
       type: "circle",
       source: "gaps",
       paint: {
         "circle-radius": 6,
-        "circle-color": "#f97316",
+        "circle-color": SEVERITY_CIRCLE_COLOR as any,
         "circle-opacity": 0.85,
-        "circle-stroke-color": "#b45309",
+        "circle-stroke-color": SEVERITY_STROKE_COLOR as any,
         "circle-stroke-width": 1.5,
       },
     });
@@ -229,22 +417,26 @@ export function GapDetection() {
       "match",
       ["get", "osmId"],
       ...osmIds.flatMap((id) => [id, "#facc15"]),
-      "#f97316", // default orange
+      // Fall back to severity colors for non-selected markers
+      ...(() => {
+        // MapLibre match requires a flat fallback — use the severity expression
+        return [SEVERITY_CIRCLE_COLOR];
+      })(),
     ]);
     map.setPaintProperty("gap-markers", "circle-radius", [
       "match",
       ["get", "osmId"],
       ...osmIds.flatMap((id) => [id, 8]),
-      5, // default
+      6, // default
     ]);
   }, [mapRef]);
 
-  /** Reset gap marker paint to default (remove selection highlight). */
+  /** Reset gap marker paint to default severity colors (remove selection highlight). */
   const clearSelectionHighlight = useCallback(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer("gap-markers")) return;
-    map.setPaintProperty("gap-markers", "circle-color", "#f97316");
-    map.setPaintProperty("gap-markers", "circle-radius", 5);
+    map.setPaintProperty("gap-markers", "circle-color", SEVERITY_CIRCLE_COLOR as any);
+    map.setPaintProperty("gap-markers", "circle-radius", 6);
   }, [mapRef]);
 
   // ─── Map: click handler for gap markers ──────────────────────
@@ -405,6 +597,12 @@ export function GapDetection() {
 
   // ─── Map: initialize layers on style ready ───────────────────
 
+  // Keep gap polygons ref in sync for style change re-render
+  const gapPolygonsRef = useRef<object[]>([]);
+  const highlightedGapRef = useRef<object | null>(null);
+  useEffect(() => { gapPolygonsRef.current = gapPolygons; }, [gapPolygons]);
+  useEffect(() => { highlightedGapRef.current = highlightedGap; }, [highlightedGap]);
+
   useEffect(() => {
     onStyleReady(() => {
       layersAdded.current = false;
@@ -422,8 +620,12 @@ export function GapDetection() {
           .filter(Boolean);
         applySelectionHighlight(osmIds);
       }
+      // Re-add gap resolution polygon layers
+      if (gapPolygonsRef.current.length > 0) {
+        updateGapPolygonLayers(gapPolygonsRef.current, highlightedGapRef.current);
+      }
     });
-  }, [onStyleReady, addMapLayers, showGapsOnMap, applySelectionHighlight, runs, selectedRunId]);
+  }, [onStyleReady, addMapLayers, showGapsOnMap, applySelectionHighlight, updateGapPolygonLayers, runs, selectedRunId]);
 
   useEffect(() => {
     if (!isLoaded || !territories.length) return;
@@ -433,12 +635,76 @@ export function GapDetection() {
 
   // When selectedRunId changes, update gap markers and clear selection
   const selectedRun = runs.find((r) => r.id === selectedRunId);
+
+  // Derive unique building types + counts from current run, filter by hiddenTypes
+  const { typeCountMap, visibleFeatures } = (() => {
+    const features: GeoJsonFeature[] = selectedRun?.resultGeoJson?.features ?? [];
+    const counts = new Map<string, number>();
+    for (const f of features) {
+      const t = (f.properties?.buildingType as string) || "unknown";
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    const visible = features.filter((f) => {
+      const t = (f.properties?.buildingType as string) || "unknown";
+      return !hiddenTypes.has(t);
+    });
+    return { typeCountMap: counts, visibleFeatures: visible };
+  })();
+
+  // Triage progress: count uncertain buildings (yellow) and how many are reviewed
+  const { triageUnreviewedCount, triageReviewedCount, triageTotalUncertain } = useMemo(() => {
+    const features: GeoJsonFeature[] = visibleFeatures;
+    if (!features.length) return { triageUnreviewedCount: 0, triageReviewedCount: 0, triageTotalUncertain: 0 };
+
+    let uncertain = 0;
+    let reviewed = 0;
+
+    for (const f of features) {
+      const osmId = f.properties?.osmId as string;
+      const override = overrides.get(osmId);
+      const effectiveType = override?.overriddenType ?? (f.properties?.buildingType as string) ?? "unknown";
+      const effectiveHasAddress = (override?.overriddenAddress != null) || !!(f.properties?.streetAddress);
+
+      const isYellow = !SEVERITY_HIGH_TYPES.has(effectiveType)
+        && !SEVERITY_MEDIUM_TYPES.has(effectiveType)
+        && !SEVERITY_IGNORABLE_TYPES.has(effectiveType)
+        && !(effectiveType === "yes" && effectiveHasAddress);
+
+      if (isYellow) {
+        uncertain++;
+        if (override && override.triageStatus !== "unreviewed") {
+          reviewed++;
+        }
+      }
+    }
+
+    return { triageUnreviewedCount: uncertain - reviewed, triageReviewedCount: reviewed, triageTotalUncertain: uncertain };
+  }, [visibleFeatures, overrides]);
+
+  // Reset filter when switching runs
+  useEffect(() => {
+    setHiddenTypes(new Set());
+  }, [selectedRunId]);
+
   useEffect(() => {
     setSelectedFeatures([]);
     if (isLoaded && layersAdded.current) {
       showGapsOnMap(selectedRun);
     }
   }, [isLoaded, selectedRun, showGapsOnMap]);
+
+  // Filter map markers when hiddenTypes changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedRun?.resultGeoJson) return;
+    const src = map.getSource("gaps") as { setData?: (d: unknown) => void } | undefined;
+    if (src?.setData) {
+      src.setData({
+        ...selectedRun.resultGeoJson,
+        features: visibleFeatures,
+      });
+    }
+  }, [hiddenTypes, visibleFeatures, selectedRun, mapRef]);
 
   // ─── Run detection ────────────────────────────────────────────
 
@@ -663,20 +929,26 @@ export function GapDetection() {
           </div>
         )}
 
-        {/* Map legend */}
+        {/* Map legend — severity-based colors */}
         {isLoaded && (
           <div className="absolute bottom-4 left-3 z-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-lg px-3 py-2 space-y-1.5">
-            <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
-              <span className="w-3 h-3 rounded-full bg-[#f97316] border border-[#b45309]" />
-              Uncovered building
+            <div className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+              <FormattedMessage id="gap.legend.title" defaultMessage="Building Severity" />
             </div>
+            {(Object.entries(SEVERITY_COLORS) as [string, typeof SEVERITY_COLORS[keyof typeof SEVERITY_COLORS]][]).map(([key, { fill, stroke, label }]) => (
+              <div key={key} className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: fill, border: `1.5px solid ${stroke}` }} />
+                {label}
+              </div>
+            ))}
+            <div className="border-t border-[var(--glass-border)] my-1" />
             <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
               <span className="w-3 h-0.5 bg-[#16a34a]" />
-              Territory boundary
+              <FormattedMessage id="gap.legend.territory" defaultMessage="Territory boundary" />
             </div>
             <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
               <span className="w-3 h-0.5 bg-[#dc2626]" style={{ borderTop: "2px dashed #dc2626" }} />
-              Congregation boundary
+              <FormattedMessage id="gap.legend.congregation" defaultMessage="Congregation boundary" />
             </div>
           </div>
         )}
@@ -870,7 +1142,7 @@ export function GapDetection() {
                 <div className="text-[10px] text-[var(--text-muted)]">In territories</div>
               </div>
               <div className="p-2 rounded-[var(--radius-sm)] bg-[#f9731614]">
-                <div className="text-lg font-bold text-[var(--amber)]">{selectedRun.gapCount ?? 0}</div>
+                <div className="text-lg font-bold text-[var(--amber)]">{visibleFeatures.length}</div>
                 <div className="text-[10px] text-[var(--text-muted)]">Uncovered</div>
               </div>
             </div>
@@ -895,54 +1167,107 @@ export function GapDetection() {
               </div>
             )}
 
-            {/* Bulk actions */}
-            {selectedGaps.size > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[var(--text-muted)]">{selectedGaps.size} selected</span>
-                <button
-                  onClick={() => setShowIgnoreDialog(true)}
-                  className="px-3 py-1 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <EyeOff size={12} />
-                  <FormattedMessage id="territories.gapIgnore" defaultMessage="Ignore" />
-                </button>
+            {/* Building type filter chips — colored by severity */}
+            {typeCountMap.size > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from(typeCountMap.entries())
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, count]) => {
+                    const active = !hiddenTypes.has(type);
+                    const severity = getBuildingSeverity(type, false);
+                    const color = SEVERITY_COLORS[severity].fill;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setHiddenTypes((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(type)) next.delete(type);
+                            else next.add(type);
+                            return next;
+                          });
+                        }}
+                        className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors cursor-pointer ${
+                          active
+                            ? "text-[var(--text)]"
+                            : "border-[var(--border)] text-[var(--text-muted)] opacity-50"
+                        }`}
+                        style={active ? { borderColor: color, backgroundColor: `${color}18` } : undefined}
+                      >
+                        <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: color }} />
+                        {type} ({count})
+                      </button>
+                    );
+                  })}
               </div>
             )}
+          </div>
+        )}
 
-            {/* Gap list */}
-            {selectedRun.resultGeoJson && selectedRun.resultGeoJson.features.length > 0 && (
-              <ul className="max-h-40 overflow-y-auto space-y-0.5">
-                {selectedRun.resultGeoJson.features.map((feature: GeoJsonFeature) => {
-                  const osmId = feature.properties?.osmId as string;
-                  const isSelected = selectedGaps.has(osmId);
-                  return (
-                    <li key={osmId}>
-                      <button
-                        onClick={() => toggleGapSelection(osmId)}
-                        className={`w-full text-left px-3 py-2 text-xs rounded-[var(--radius-sm)] flex items-center gap-2 transition-colors cursor-pointer ${
-                          isSelected
-                            ? "bg-[var(--glass-2)] text-[var(--text)]"
-                            : "text-[var(--text-muted)] hover:bg-[var(--glass)]"
-                        }`}
-                      >
-                        <input type="checkbox" checked={isSelected} readOnly className="accent-[var(--amber)]" />
-                        <MapPin size={12} className="text-[var(--amber)] flex-shrink-0" />
-                        <span className="truncate flex-1">
-                          {(feature.properties?.streetAddress as string) ?? osmId}
-                        </span>
-                        {(feature.properties?.buildingType as string | undefined) && (
-                          <span className="text-[10px] px-1.5 py-0 rounded-full bg-[var(--glass)] text-[var(--text-muted)] flex-shrink-0">
-                            {String(feature.properties?.buildingType)}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+        {/* ─── Tab bar ─────────────────────────────────────────── */}
+        {selectedRun?.status === "completed" && (
+          <div className="flex border-b border-[var(--border)] flex-shrink-0">
+            <button
+              onClick={() => setActiveTab("buildings")}
+              className={`flex-1 py-2 text-xs font-medium text-center transition-colors cursor-pointer ${
+                activeTab === "buildings"
+                  ? "text-[var(--text)] border-b-2 border-[var(--amber)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              <FormattedMessage id="gap.tab.buildings" defaultMessage="Buildings" />
+              {triageUnreviewedCount > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] rounded-full bg-[var(--amber)]/10 text-[var(--amber)]">
+                  {triageUnreviewedCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("gaps")}
+              className={`flex-1 py-2 text-xs font-medium text-center transition-colors cursor-pointer ${
+                activeTab === "gaps"
+                  ? "text-[var(--text)] border-b-2 border-[var(--amber)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              <FormattedMessage id="gap.tab.gaps" defaultMessage="Gaps" />
+              {visibleFeatures.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] rounded-full bg-[var(--amber)]/10 text-[var(--amber)]">
+                  {visibleFeatures.length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ─── Buildings Tab ───────────────────────────────────── */}
+        {selectedRun?.status === "completed" && activeTab === "buildings" && (
+          <div className="flex-1 overflow-y-auto">
+            {/* Triage progress bar */}
+            {triageTotalUncertain > 0 && (
+              <div className="px-4 py-2">
+                <div className="flex justify-between text-[9px] text-[var(--text-muted)] mb-1">
+                  <span>{triageReviewedCount}/{triageTotalUncertain} <FormattedMessage id="gap.triageProgress" defaultMessage="uncertain reviewed" /></span>
+                </div>
+                <div className="h-1 bg-[var(--glass)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[var(--amber)] rounded-full transition-all"
+                    style={{ width: `${triageTotalUncertain > 0 ? (triageReviewedCount / triageTotalUncertain) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
             )}
+            <BuildingTriageList
+              features={visibleFeatures}
+              overrides={overrides}
+              token={token}
+              onOverrideChange={handleOverrideChange}
+              onBatchOverride={handleBatchOverride}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+            />
 
-            {selectedRun.resultGeoJson && selectedRun.resultGeoJson.features.length === 0 && (
+            {selectedRun?.resultGeoJson && visibleFeatures.length === 0 && (
               <div className="flex flex-col items-center py-4 text-[var(--green)]">
                 <CheckCircle2 size={24} strokeWidth={1.2} className="mb-2" />
                 <p className="text-xs font-medium">All buildings are covered by territories!</p>
@@ -951,39 +1276,53 @@ export function GapDetection() {
           </div>
         )}
 
-        {/* Ignore dialog */}
-        {showIgnoreDialog && (
-          <div className="p-4 border-b border-[var(--border)] bg-[var(--bg-1)] space-y-3 flex-shrink-0">
-            <h3 className="text-xs font-semibold text-[var(--text)]">
-              Ignore {selectedGaps.size} buildings
-            </h3>
-            <div>
-              <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Reason</label>
-              <select
-                value={ignoreReason}
-                onChange={(e) => setIgnoreReason(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)] cursor-pointer"
-              >
-                {IGNORE_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowIgnoreDialog(false)}
-                className="flex-1 py-1.5 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkIgnore}
-                className="flex-1 py-1.5 text-xs font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] cursor-pointer flex items-center justify-center gap-1"
-              >
-                <EyeOff size={12} />
-                Ignore
-              </button>
-            </div>
+        {/* ─── Gaps Tab ────────────────────────────────────────── */}
+        {selectedRun?.status === "completed" && activeTab === "gaps" && (
+          <div className="flex-1 overflow-y-auto">
+            {/* Ignore dialog */}
+            {showIgnoreDialog && (
+              <div className="p-4 border-b border-[var(--border)] bg-[var(--bg-1)] space-y-3">
+                <h3 className="text-xs font-semibold text-[var(--text)]">
+                  Ignore {selectedGaps.size} buildings
+                </h3>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Reason</label>
+                  <select
+                    value={ignoreReason}
+                    onChange={(e) => setIgnoreReason(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)] cursor-pointer"
+                  >
+                    {IGNORE_REASONS.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowIgnoreDialog(false)}
+                    className="flex-1 py-1.5 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkIgnore}
+                    className="flex-1 py-1.5 text-xs font-semibold text-black bg-[var(--amber)] rounded-[var(--radius-sm)] hover:bg-[var(--amber-light)] cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <EyeOff size={12} />
+                    Ignore
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Smart Gap Resolution */}
+            <GapResolutionSection
+              token={token}
+              onGapPolygonsChange={handleGapPolygonsChange}
+              onResolved={handleGapResolved}
+              onHighlightGap={handleHighlightGap}
+              overrides={overrides}
+            />
           </div>
         )}
 
