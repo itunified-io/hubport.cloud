@@ -249,9 +249,7 @@ export function GapDetection() {
       try {
         const geo = highlighted as { coordinates?: number[][][][] | number[][][] };
         if (geo.coordinates) {
-          const coords = geo.coordinates.flat(3) as unknown as number[];
           let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-          // coords is flat array [lng, lat, lng, lat, ...]
           const allCoords: number[][] = (geo.coordinates as number[][][][]).flat(2);
           for (const c of allCoords) {
             if (c[0]! < minLng) minLng = c[0]!;
