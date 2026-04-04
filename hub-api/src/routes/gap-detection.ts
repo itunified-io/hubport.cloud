@@ -15,8 +15,8 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { queryBuildingsInBBox, type OverpassBuilding } from "../lib/osm-overpass.js";
-import { bboxFromGeoJSON, isInsideBoundaries } from "../lib/geo.js";
+import { queryBuildingsInPolygon, type OverpassBuilding } from "../lib/osm-overpass.js";
+import { isInsideBoundaries } from "../lib/geo.js";
 import {
   checkBuildingCoveragePostGIS,
   checkCongregationContainsPostGIS,
@@ -119,11 +119,6 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const bbox = bboxFromGeoJSON(congBoundary.boundaries);
-      if (!bbox) {
-        return reply.code(400).send({ error: "Could not compute bounding box from congregation boundary" });
-      }
-
       // Create run record (linked to congregation boundary territory)
       const run = await prisma.gapDetectionRun.create({
         data: {
@@ -135,8 +130,10 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
       });
 
       try {
-        // Single Overpass query for the entire congregation area
-        const allBuildings = await queryBuildingsInBBox(bbox.south, bbox.west, bbox.north, bbox.east);
+        // H3 hex-tiled Overpass query covering the congregation polygon
+        const allBuildings = await queryBuildingsInPolygon(
+          congBoundary.boundaries as { type: string; coordinates: unknown },
+        );
 
         // Filter to buildings inside the congregation boundary.
         // Use PostGIS ST_Contains for accuracy (handles holes, complex geometries).

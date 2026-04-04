@@ -1,6 +1,6 @@
 {
   "name": "@itunified-io/hub-api",
-  "version": "2026.03.24.1",
+  "version": "2026.04.04.23",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -23,6 +23,7 @@
     "bullmq": "^5.0.0",
     "fastify": "^5.0.0",
     "get-jwks": "^11.0.3",
+    "h3-js": "^4.4.0",
     "ioredis": "^5.0.0",
     "jszip": "^3.10.1",
     "pdfkit": "^0.18.0",
