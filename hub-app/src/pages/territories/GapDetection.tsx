@@ -1317,10 +1317,10 @@ export function GapDetection() {
           </div>
         )}
 
-        {/* Run history */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Run history — collapse to fixed height when tab content is showing */}
+        <div className={`${selectedRun?.status === "completed" ? "flex-shrink-0 max-h-[140px]" : "flex-1"} overflow-y-auto border-t border-[var(--border)]`}>
           <div className="px-4 py-2 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-            Run History
+            <FormattedMessage id="gap.runHistory" defaultMessage="Run History" />
           </div>
 
           {loading ? (
