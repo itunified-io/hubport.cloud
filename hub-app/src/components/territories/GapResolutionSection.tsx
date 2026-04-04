@@ -26,6 +26,8 @@ interface GapResolutionSectionProps {
   onResolved: () => void;
   onHighlightGap: (polygon: object | null) => void;
   overrides: Map<string, BuildingOverride>;
+  /** When true, hides the "Smart Resolve" header (floating window provides its own) */
+  hideHeader?: boolean;
 }
 
 export function GapResolutionSection({
@@ -33,6 +35,7 @@ export function GapResolutionSection({
   onGapPolygonsChange,
   onResolved,
   onHighlightGap,
+  hideHeader,
 }: GapResolutionSectionProps) {
   const intl = useIntl();
 
@@ -145,17 +148,26 @@ export function GapResolutionSection({
     <div className="flex flex-col h-full">
       {/* Header + controls */}
       <div className="px-4 pt-4 pb-3 space-y-3 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-[var(--amber)]" />
-          <span className="text-sm font-semibold text-[var(--text)]">
-            <FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />
-          </span>
-          {result && unresolvedCount > 0 && (
-            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
+        {!hideHeader && (
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-[var(--amber)]" />
+            <span className="text-sm font-semibold text-[var(--text)]">
+              <FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />
+            </span>
+            {result && unresolvedCount > 0 && (
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
+                {unresolvedCount} <FormattedMessage id="gap.remaining" defaultMessage="remaining" />
+              </span>
+            )}
+          </div>
+        )}
+        {hideHeader && result && unresolvedCount > 0 && (
+          <div className="flex justify-end">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
               {unresolvedCount} <FormattedMessage id="gap.remaining" defaultMessage="remaining" />
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Threshold controls */}
         <div className="grid grid-cols-2 gap-3">

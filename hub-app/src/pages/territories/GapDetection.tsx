@@ -30,6 +30,7 @@ import {
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
 import { GapResolutionSection } from "@/components/territories/GapResolutionSection";
 import { BuildingTriageList } from "@/components/territories/BuildingTriageList";
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
 
 const STATUS_META: Record<string, { icon: React.ElementType; color: string }> = {
   running: { icon: Loader2, color: "text-[var(--amber)]" },
@@ -1079,36 +1080,7 @@ export function GapDetection() {
           </div>
         )}
 
-        {/* ─── Undocked Smart Resolve floating panel ──────────── */}
-        {smartResolveUndocked && selectedRun?.status === "completed" && activeTab === "gaps" && (
-          <div className="absolute bottom-4 left-4 right-4 z-20 max-h-[50vh] bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius)] shadow-xl overflow-hidden flex flex-col">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] flex-shrink-0 bg-[var(--glass)]">
-              <span className="text-xs font-semibold text-[var(--text)] flex items-center gap-2">
-                <Sparkles size={14} className="text-[var(--amber)]" />
-                <FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />
-              </span>
-              <button
-                onClick={() => setSmartResolveUndocked(false)}
-                className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer"
-                title="Dock back to sidebar"
-              >
-                <PanelRightOpen size={12} />
-                <FormattedMessage id="gap.dock" defaultMessage="Dock" />
-              </button>
-            </div>
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto">
-              <GapResolutionSection
-                token={token}
-                onGapPolygonsChange={handleGapPolygonsChange}
-                onResolved={handleGapResolved}
-                onHighlightGap={handleHighlightGap}
-                overrides={overrides}
-              />
-            </div>
-          </div>
-        )}
+        {/* ─── Undocked Smart Resolve floating window ─────────── */}
       </div>
 
       {/* ─── Sidebar (right) ──────────────────────────────────── */}
@@ -1491,6 +1463,28 @@ export function GapDetection() {
           )}
         </div>
       </div>
+
+      {/* ─── Undocked Smart Resolve floating window ─────────── */}
+      {smartResolveUndocked && selectedRun?.status === "completed" && (
+        <FloatingWindow
+          title={<FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />}
+          icon={<Sparkles size={14} className="text-[var(--amber)]" />}
+          onClose={() => setSmartResolveUndocked(false)}
+          initialWidth={520}
+          initialHeight={480}
+          minWidth={400}
+          minHeight={300}
+        >
+          <GapResolutionSection
+            token={token}
+            onGapPolygonsChange={handleGapPolygonsChange}
+            onResolved={handleGapResolved}
+            onHighlightGap={handleHighlightGap}
+            overrides={overrides}
+            hideHeader
+          />
+        </FloatingWindow>
+      )}
     </div>
   );
 }

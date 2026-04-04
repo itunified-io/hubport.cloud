@@ -136,7 +136,9 @@ export async function gapResolutionRoutes(app: FastifyInstance): Promise<void> {
             });
           }
 
+          app.log.info({ assignments: body.neighborAssignments.map(a => ({ id: a.territoryId, coords: a.buildingCoords.length })) }, "[gap-resolve] expand_neighbors request");
           const result = await resolveGapExpandNeighbors(prisma, body.neighborAssignments);
+          app.log.info({ expanded: result.expanded }, "[gap-resolve] expand_neighbors result");
 
           return {
             success: true,

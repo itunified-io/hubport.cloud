@@ -10,7 +10,7 @@
 
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { computeGapPolygons, runAutoFixPipeline } from "./postgis-helpers.js";
+import { computeGapPolygons, runAutoFixPipeline, clipToCongregation as clipToCongregationOnly } from "./postgis-helpers.js";
 import { queryBuildingsInBBox, type OverpassBuilding } from "./osm-overpass.js";
 import { bboxFromGeoJSON, isInsideBoundaries } from "./geo.js";
 
@@ -405,12 +405,15 @@ export async function resolveGapExpandNeighbors(
         continue;
       }
 
-      // Run auto-fix pipeline
+      // Only clip to congregation boundary (skip neighbor clip — gap expansion
+      // deliberately pushes into uncovered space between territories)
       const autoFixApplied: string[] = [];
       try {
-        const autoFix = await runAutoFixPipeline(tx, expandedBoundaries, territory.id);
-        expandedBoundaries = autoFix.clipped;
-        autoFixApplied.push(...autoFix.applied);
+        const congClip = await clipToCongregationOnly(tx, expandedBoundaries);
+        if (congClip) {
+          expandedBoundaries = congClip.clipped;
+          if (congClip.wasModified) autoFixApplied.push("Clipped to congregation boundary");
+        }
       } catch {
         // Use expanded polygon as-is
       }
@@ -441,6 +444,8 @@ export async function resolveGapExpandNeighbors(
           updatedAt: new Date(),
         },
       });
+
+      console.log(`[gap-expand] Territory ${territory.number} (${territory.id}) updated with +${assignment.buildingCoords.length} buildings, autoFix: [${autoFixApplied.join(", ")}]`);
 
       expanded.push({
         territoryId: territory.id,
