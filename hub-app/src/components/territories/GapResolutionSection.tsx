@@ -1,202 +1,123 @@
 /**
- * Smart Gap Resolution section — analyzes uncovered areas between
- * territory polygons and proposes resolution actions.
+ * Smart Resolve section — building-centric resolution.
  *
- * Renders directly inside the Gaps tab (no collapsible wrapper).
- * Gap cards highlight on the map when hovered/selected.
- * Expand action shows preview and requires confirmation.
+ * Finds uncovered residential buildings, clusters them by nearest territory,
+ * and offers one-click "Include in #X" expansion per cluster.
+ *
+ * Manages its own dock/undock state internally via portal so the
+ * component never unmounts and analysis results are preserved.
  */
 import { useState, useCallback } from "react";
-import { FormattedMessage, useIntl } from "react-intl";
+import { FormattedMessage } from "react-intl";
 import {
-  Sparkles, Loader2, Map as MapIcon,
-  Plus, ArrowUpRight, CheckCircle2, AlertCircle, Eye,
+  Sparkles, Loader2, MapPin,
+  ArrowUpRight, CheckCircle2, AlertCircle,
+  PanelRightClose, PanelRightOpen,
 } from "lucide-react";
 import {
-  fetchGapAnalysis,
-  resolveGap,
-  type GapAnalysisItem,
-  type GapAnalysisResponse,
-  type BuildingOverride,
+  fetchSmartResolveAnalysis,
+  resolveCluster,
+  type BuildingCluster,
+  type SmartResolveAnalysis,
 } from "@/lib/territory-api";
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
+
+export interface ClusterHighlightData {
+  cluster: BuildingCluster | null;
+}
 
 interface GapResolutionSectionProps {
   token: string;
-  onGapPolygonsChange: (polygons: object[]) => void;
+  onHighlightCluster: (data: ClusterHighlightData) => void;
   onResolved: () => void;
-  onHighlightGap: (polygon: object | null) => void;
-  overrides: Map<string, BuildingOverride>;
-  /** When true, hides the "Smart Resolve" header (floating window provides its own) */
-  hideHeader?: boolean;
 }
 
 export function GapResolutionSection({
   token,
-  onGapPolygonsChange,
+  onHighlightCluster,
   onResolved,
-  onHighlightGap,
-  hideHeader,
 }: GapResolutionSectionProps) {
-  const intl = useIntl();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<GapAnalysisResponse | null>(null);
+  const [result, setResult] = useState<SmartResolveAnalysis | null>(null);
+  const [undocked, setUndocked] = useState(false);
 
-  // Threshold controls
-  const [minBuildings, setMinBuildings] = useState(8);
-  const [minArea, setMinArea] = useState(5000);
+  // Threshold
+  const [maxDistance, setMaxDistance] = useState(200);
 
-  // Per-gap resolution state
-  const [resolvingGapId, setResolvingGapId] = useState<string | null>(null);
-  const [resolvedGapIds, setResolvedGapIds] = useState<Set<string>>(new Set());
-
-  // Selected gap for preview
-  const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
-
-  // Expand confirmation state
-  const [confirmingExpand, setConfirmingExpand] = useState<string | null>(null);
-
-  // New territory form state (per gap)
-  const [newTerritoryForm, setNewTerritoryForm] = useState<{
-    gapId: string;
-    name: string;
-    number: string;
-  } | null>(null);
+  // Per-cluster state
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const handleAnalyze = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setSelectedGapId(null);
-    setConfirmingExpand(null);
+    setSelectedId(null);
+    setConfirmingId(null);
     try {
-      const data = await fetchGapAnalysis(token, minBuildings, minArea);
+      const data = await fetchSmartResolveAnalysis(token, maxDistance);
       setResult(data);
-      setResolvedGapIds(new Set());
-      onGapPolygonsChange(data.gaps.map((g) => g.gapPolygon));
-      // Auto-select first gap
-      if (data.gaps.length > 0) {
-        setSelectedGapId(data.gaps[0]!.gapId);
-        onHighlightGap(data.gaps[0]!.gapPolygon);
+      setResolvedIds(new Set());
+      if (data.clusters.length > 0) {
+        setSelectedId(data.clusters[0]!.territoryId);
+        onHighlightCluster({ cluster: data.clusters[0]! });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setLoading(false);
     }
-  }, [token, minBuildings, minArea, onGapPolygonsChange, onHighlightGap]);
+  }, [token, maxDistance, onHighlightCluster]);
 
-  const handleSelectGap = useCallback((gap: GapAnalysisItem) => {
-    setSelectedGapId(gap.gapId);
-    onHighlightGap(gap.gapPolygon);
-    setConfirmingExpand(null);
-    setNewTerritoryForm(null);
-  }, [onHighlightGap]);
+  const handleSelectCluster = useCallback((cluster: BuildingCluster) => {
+    setSelectedId(cluster.territoryId);
+    onHighlightCluster({ cluster });
+    setConfirmingId(null);
+  }, [onHighlightCluster]);
 
-  const handleCreateTerritory = useCallback(async (gap: GapAnalysisItem) => {
-    if (!newTerritoryForm || newTerritoryForm.gapId !== gap.gapId) return;
-    setResolvingGapId(gap.gapId);
+  const handleExpand = useCallback(async (cluster: BuildingCluster) => {
+    setResolvingId(cluster.territoryId);
+    setConfirmingId(null);
     setError(null);
     try {
-      await resolveGap(token, {
-        gapPolygon: gap.gapPolygon,
-        action: "new_territory",
-        newTerritoryName: newTerritoryForm.name,
-        newTerritoryNumber: newTerritoryForm.number,
+      await resolveCluster(token, {
+        action: "expand_cluster",
+        territoryId: cluster.territoryId,
+        buildingCoords: cluster.buildings.map((b) => [b.lng, b.lat]),
       });
-      setResolvedGapIds((prev) => new Set([...prev, gap.gapId]));
-      setNewTerritoryForm(null);
+      setResolvedIds((prev) => new Set([...prev, cluster.territoryId]));
       onResolved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create territory");
+      setError(err instanceof Error ? err.message : "Failed to expand territory");
     } finally {
-      setResolvingGapId(null);
-    }
-  }, [token, newTerritoryForm, onResolved]);
-
-  const handleExpandNeighbors = useCallback(async (gap: GapAnalysisItem) => {
-    if (gap.neighborAssignments.length === 0) return;
-    setResolvingGapId(gap.gapId);
-    setConfirmingExpand(null);
-    setError(null);
-    try {
-      await resolveGap(token, {
-        gapPolygon: gap.gapPolygon,
-        action: "expand_neighbors",
-        neighborAssignments: gap.neighborAssignments.map((a) => ({
-          territoryId: a.territoryId,
-          buildingCoords: a.buildingCoords,
-        })),
-      });
-      setResolvedGapIds((prev) => new Set([...prev, gap.gapId]));
-      onResolved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to expand neighbors");
-    } finally {
-      setResolvingGapId(null);
+      setResolvingId(null);
     }
   }, [token, onResolved]);
 
-  const formatArea = (m2: number): string => {
-    if (m2 >= 10_000) return `${(m2 / 10_000).toFixed(1)} ha`;
-    return `${Math.round(m2).toLocaleString()} m\u00B2`;
-  };
+  const unresolvedCount = result
+    ? result.clusters.filter((c) => !resolvedIds.has(c.territoryId)).length
+    : 0;
 
-  const unresolvedCount = result ? result.gaps.filter(g => !resolvedGapIds.has(g.gapId)).length : 0;
-
-  return (
+  // ─── Content (shared between docked and undocked) ────────────────
+  const content = (
     <div className="flex flex-col h-full">
-      {/* Header + controls */}
-      <div className="px-4 pt-4 pb-3 space-y-3 flex-shrink-0">
-        {!hideHeader && (
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-[var(--amber)]" />
-            <span className="text-sm font-semibold text-[var(--text)]">
-              <FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />
-            </span>
-            {result && unresolvedCount > 0 && (
-              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
-                {unresolvedCount} <FormattedMessage id="gap.remaining" defaultMessage="remaining" />
-              </span>
-            )}
-          </div>
-        )}
-        {hideHeader && result && unresolvedCount > 0 && (
-          <div className="flex justify-end">
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
-              {unresolvedCount} <FormattedMessage id="gap.remaining" defaultMessage="remaining" />
-            </span>
-          </div>
-        )}
-
-        {/* Threshold controls */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">
-              <FormattedMessage id="gap.minBuildings" defaultMessage="Min. residential" />
-            </label>
-            <input
-              type="number"
-              value={minBuildings}
-              onChange={(e) => setMinBuildings(Math.max(1, parseInt(e.target.value) || 1))}
-              min={1}
-              max={100}
-              className="w-full px-2.5 py-2 text-sm bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">
-              <FormattedMessage id="gap.minArea" defaultMessage="Min. area (m²)" />
-            </label>
-            <input
-              type="number"
-              value={minArea}
-              onChange={(e) => setMinArea(Math.max(100, parseInt(e.target.value) || 100))}
-              min={100}
-              step={500}
-              className="w-full px-2.5 py-2 text-sm bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-            />
-          </div>
+      {/* Controls */}
+      <div className="px-4 pt-3 pb-3 space-y-3 flex-shrink-0">
+        <div>
+          <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">
+            <FormattedMessage id="resolve.maxDistance" defaultMessage="Max. distance (m)" />
+          </label>
+          <input
+            type="number"
+            value={maxDistance}
+            onChange={(e) => setMaxDistance(Math.max(10, parseInt(e.target.value) || 10))}
+            min={10}
+            max={1000}
+            step={50}
+            className="w-full px-2.5 py-2 text-sm bg-[var(--bg)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
+          />
         </div>
 
         <button
@@ -207,12 +128,12 @@ export function GapResolutionSection({
           {loading ? (
             <>
               <Loader2 size={16} className="animate-spin" />
-              <FormattedMessage id="gap.analyzing" defaultMessage="Analyzing gaps..." />
+              <FormattedMessage id="resolve.analyzing" defaultMessage="Finding uncovered..." />
             </>
           ) : (
             <>
               <Sparkles size={16} />
-              <FormattedMessage id="gap.analyzeGaps" defaultMessage="Analyze Gaps" />
+              <FormattedMessage id="resolve.findUncovered" defaultMessage="Find Uncovered" />
             </>
           )}
         </button>
@@ -225,276 +146,239 @@ export function GapResolutionSection({
         )}
       </div>
 
-      {/* Gap cards */}
-      {result && result.gaps.length === 0 && (
+      {/* Empty state */}
+      {result && result.clusters.length === 0 && result.unassigned.length === 0 && (
         <div className="flex flex-col items-center py-8 text-[var(--green)]">
           <CheckCircle2 size={28} strokeWidth={1.2} className="mb-2" />
           <p className="text-sm font-medium">
-            <FormattedMessage id="gap.noGaps" defaultMessage="No significant gaps found!" />
+            <FormattedMessage id="resolve.allCovered" defaultMessage="All residential buildings are covered!" />
           </p>
         </div>
       )}
 
-      {result && result.gaps.length > 0 && (
+      {/* Cluster cards */}
+      {result && result.clusters.length > 0 && (
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
-          {result.gaps.map((gap, index) => {
-            const isResolved = resolvedGapIds.has(gap.gapId);
-            const isResolving = resolvingGapId === gap.gapId;
-            const isSelected = selectedGapId === gap.gapId;
-            const showForm = newTerritoryForm?.gapId === gap.gapId;
-            const isConfirmingExpand = confirmingExpand === gap.gapId;
+          {result.clusters.map((cluster) => {
+            const isResolved = resolvedIds.has(cluster.territoryId);
+            const isResolving = resolvingId === cluster.territoryId;
+            const isSelected = selectedId === cluster.territoryId;
+            const isConfirming = confirmingId === cluster.territoryId;
 
             return (
               <div
-                key={gap.gapId}
+                key={cluster.territoryId}
                 className={`rounded-[var(--radius)] border p-4 space-y-3 transition-all cursor-pointer ${
                   isResolved
                     ? "border-[var(--green)]/30 bg-[#22c55e08]"
                     : isSelected
-                      ? "border-[var(--amber)] bg-[var(--amber)]/5 shadow-sm ring-1 ring-[var(--amber)]/20"
-                      : "border-[var(--border)] bg-[var(--bg)] hover:border-[var(--amber)]/40"
+                      ? "border-[#3b82f6] bg-[#3b82f6]/5 shadow-sm ring-1 ring-[#3b82f6]/20"
+                      : "border-[var(--border)] bg-[var(--bg)] hover:border-[#3b82f6]/40"
                 }`}
-                onClick={() => handleSelectGap(gap)}
-                onMouseEnter={() => !isSelected && onHighlightGap(gap.gapPolygon)}
-                onMouseLeave={() => !isSelected && onHighlightGap(selectedGapId ? (result.gaps.find(g => g.gapId === selectedGapId)?.gapPolygon ?? null) : null)}
+                onClick={() => handleSelectCluster(cluster)}
+                onMouseEnter={() => !isSelected && onHighlightCluster({ cluster })}
+                onMouseLeave={() => {
+                  if (isSelected) return;
+                  const sel = selectedId ? result.clusters.find((c) => c.territoryId === selectedId) : null;
+                  onHighlightCluster({ cluster: sel ?? null });
+                }}
               >
-                {/* Gap header */}
+                {/* Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <MapIcon size={14} className={isSelected ? "text-[var(--amber)]" : "text-[var(--text-muted)]"} />
-                    <span className="text-xs font-semibold text-[var(--text)]">
-                      <FormattedMessage id="gap.gapLabel" defaultMessage="Gap {index}" values={{ index: index + 1 }} />
+                    <MapPin size={14} className={isSelected ? "text-[#3b82f6]" : "text-[var(--text-muted)]"} />
+                    <span className="text-sm font-semibold text-[var(--text)]">
+                      #{cluster.territoryNumber} {cluster.territoryName}
                     </span>
                   </div>
                   {isResolved && (
                     <span className="text-xs text-[var(--green)] font-medium flex items-center gap-1">
                       <CheckCircle2 size={12} />
-                      <FormattedMessage id="gap.resolved" defaultMessage="Resolved" />
-                    </span>
-                  )}
-                  {isSelected && !isResolved && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
-                      <Eye size={10} className="inline mr-1" />
-                      <FormattedMessage id="gap.preview" defaultMessage="Preview on map" />
+                      <FormattedMessage id="resolve.resolved" defaultMessage="Resolved" />
                     </span>
                   )}
                 </div>
 
-                {/* Stats row */}
+                {/* Stats */}
                 <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-                  <span>
-                    <span className="font-semibold text-[var(--text)]">{gap.residentialCount}</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#ef4444] inline-block" />
+                    <span className="font-semibold text-[var(--text)]">{cluster.buildings.length}</span>
                     {" "}
-                    <FormattedMessage id="gap.residential" defaultMessage="residential" />
+                    <FormattedMessage id="resolve.buildings" defaultMessage="buildings" />
                   </span>
                   <span className="text-[var(--border)]">|</span>
-                  <span>
-                    {gap.totalBuildingCount}{" "}
-                    <FormattedMessage id="gap.total" defaultMessage="total" />
-                  </span>
-                  <span className="text-[var(--border)]">|</span>
-                  <span>{formatArea(gap.areaMeter2)}</span>
+                  <span>{cluster.maxDistanceM}m <FormattedMessage id="resolve.away" defaultMessage="away" /></span>
                 </div>
 
-                {/* Recommendation badge */}
-                {!isResolved && (
-                  <div>
-                    <span
-                      className={`inline-block text-[10px] px-2 py-1 rounded-full font-semibold ${
-                        gap.recommendation === "new_territory"
-                          ? "bg-[#3b82f614] text-[#3b82f6]"
-                          : "bg-[#22c55e14] text-[var(--green)]"
-                      }`}
-                    >
-                      {gap.recommendation === "new_territory" ? (
-                        <FormattedMessage id="gap.recommendNew" defaultMessage="Recommended: New Territory" />
-                      ) : (
-                        <FormattedMessage id="gap.recommendExpand" defaultMessage="Recommended: Expand Neighbors" />
-                      )}
-                    </span>
-                  </div>
-                )}
-
-                {/* Triage gate warning */}
-                {gap.unreviewedCount > 0 && !isResolved && (
-                  <div className="text-[11px] text-[var(--amber)] flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-[var(--amber)]/5">
-                    <AlertCircle size={12} />
-                    <FormattedMessage
-                      id="gap.unreviewedRemaining"
-                      defaultMessage="{count} uncertain buildings remaining"
-                      values={{ count: gap.unreviewedCount }}
-                    />
-                  </div>
-                )}
-
-                {/* Neighbor assignments preview — show when selected */}
-                {!isResolved && gap.neighborAssignments.length > 0 && isSelected && !showForm && (
-                  <div className="text-xs text-[var(--text-muted)] space-y-1 bg-[var(--glass)] rounded-[var(--radius-sm)] p-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                      <FormattedMessage id="gap.neighborPreview" defaultMessage="Neighbor expansion preview" />
-                    </div>
-                    {gap.neighborAssignments.map((a) => (
-                      <div key={a.territoryId} className="flex items-center justify-between py-0.5">
-                        <span>#{a.territoryNumber} {a.territoryName}</span>
-                        <span className="font-mono font-semibold text-[var(--text)]">+{a.buildingCount}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Action buttons — show when selected and no unreviewed */}
-                {!isResolved && !isResolving && isSelected && (
-                  <>
-                    {/* Primary actions */}
-                    {gap.unreviewedCount === 0 && !isConfirmingExpand && (
-                      <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            if (showForm) {
-                              setNewTerritoryForm(null);
-                            } else {
-                              setNewTerritoryForm({ gapId: gap.gapId, name: "", number: "" });
-                              setConfirmingExpand(null);
-                            }
-                          }}
-                          className={`flex-1 py-2 text-xs font-medium rounded-[var(--radius-sm)] flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-                            gap.recommendation === "new_territory"
-                              ? "bg-[#3b82f6] text-white hover:bg-[#2563eb]"
-                              : "border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--glass)]"
-                          }`}
-                        >
-                          <Plus size={12} />
-                          <FormattedMessage id="gap.createTerritory" defaultMessage="Create Territory" />
-                        </button>
-                        <button
-                          onClick={() => setConfirmingExpand(gap.gapId)}
-                          disabled={gap.neighborAssignments.length === 0}
-                          className={`flex-1 py-2 text-xs font-medium rounded-[var(--radius-sm)] flex items-center justify-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                            gap.recommendation === "expand_neighbors"
-                              ? "bg-[var(--green)] text-white hover:opacity-90"
-                              : "border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--glass)]"
-                          }`}
-                        >
-                          <ArrowUpRight size={12} />
-                          <FormattedMessage id="gap.expandNeighbors" defaultMessage="Expand Neighbors" />
-                        </button>
+                {/* Building addresses — show when selected */}
+                {isSelected && !isResolved && cluster.buildings.some((b) => b.streetAddress) && (
+                  <div className="text-xs text-[var(--text-muted)] space-y-0.5 bg-[var(--glass)] rounded-[var(--radius-sm)] p-2.5">
+                    {cluster.buildings
+                      .filter((b) => b.streetAddress)
+                      .map((b) => (
+                        <div key={b.osmId} className="flex items-center justify-between">
+                          <span>{b.streetAddress}</span>
+                          <span className="text-[10px] font-mono">{b.distanceM}m</span>
+                        </div>
+                      ))}
+                    {cluster.buildings.filter((b) => !b.streetAddress).length > 0 && (
+                      <div className="text-[10px] text-[var(--text-muted)] pt-0.5">
+                        +{cluster.buildings.filter((b) => !b.streetAddress).length}{" "}
+                        <FormattedMessage id="resolve.withoutAddress" defaultMessage="without address" />
                       </div>
                     )}
+                  </div>
+                )}
 
-                    {/* Expand confirmation */}
-                    {isConfirmingExpand && (
-                      <div className="pt-2 space-y-2 border-t border-[var(--glass-border)]" onClick={(e) => e.stopPropagation()}>
+                {/* Action button */}
+                {!isResolved && !isResolving && isSelected && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    {!isConfirming ? (
+                      <button
+                        onClick={() => setConfirmingId(cluster.territoryId)}
+                        className="w-full py-2.5 text-xs font-semibold text-white bg-[#3b82f6] rounded-[var(--radius-sm)] hover:bg-[#2563eb] cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <ArrowUpRight size={12} />
+                        <FormattedMessage
+                          id="resolve.includeIn"
+                          defaultMessage="Include in #{number}"
+                          values={{ number: cluster.territoryNumber }}
+                        />
+                      </button>
+                    ) : (
+                      <div className="space-y-2 pt-1">
                         <div className="text-xs text-[var(--amber)] font-medium">
                           <FormattedMessage
-                            id="gap.expandConfirm"
-                            defaultMessage="Expand {count} territories? This will modify territory boundaries."
-                            values={{ count: gap.neighborAssignments.length }}
+                            id="resolve.confirmExpand"
+                            defaultMessage="Expand #{number} to include {count} buildings?"
+                            values={{ number: cluster.territoryNumber, count: cluster.buildings.length }}
                           />
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setConfirmingExpand(null)}
+                            onClick={() => setConfirmingId(null)}
                             className="flex-1 py-2 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
                           >
                             <FormattedMessage id="common.cancel" defaultMessage="Cancel" />
                           </button>
                           <button
-                            onClick={() => handleExpandNeighbors(gap)}
-                            className="flex-1 py-2 text-xs font-semibold text-white bg-[var(--green)] rounded-[var(--radius-sm)] hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5"
+                            onClick={() => handleExpand(cluster)}
+                            className="flex-1 py-2 text-xs font-semibold text-white bg-[#3b82f6] rounded-[var(--radius-sm)] hover:bg-[#2563eb] cursor-pointer flex items-center justify-center gap-1.5"
                           >
                             <ArrowUpRight size={12} />
-                            <FormattedMessage id="gap.applyExpand" defaultMessage="Apply Expand" />
+                            <FormattedMessage id="resolve.apply" defaultMessage="Apply" />
                           </button>
                         </div>
                       </div>
                     )}
-
-                    {/* Force resolve — when unreviewed */}
-                    {gap.unreviewedCount > 0 && !showForm && !isConfirmingExpand && (
-                      <div className="text-center pt-2" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-[11px] text-[var(--text-muted)]">
-                          <FormattedMessage
-                            id="gap.forceResolve"
-                            defaultMessage="Force resolve ({count} unreviewed):"
-                            values={{ count: gap.unreviewedCount }}
-                          />
-                        </span>
-                        <div className="flex gap-2 mt-1.5">
-                          <button
-                            onClick={() => { setNewTerritoryForm({ gapId: gap.gapId, name: "", number: "" }); setConfirmingExpand(null); }}
-                            className="flex-1 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] cursor-pointer"
-                          >
-                            <Plus size={10} className="inline mr-1" />
-                            <FormattedMessage id="gap.forceNew" defaultMessage="New" />
-                          </button>
-                          <button
-                            onClick={() => setConfirmingExpand(gap.gapId)}
-                            disabled={gap.neighborAssignments.length === 0}
-                            className="flex-1 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] cursor-pointer disabled:opacity-40"
-                          >
-                            <ArrowUpRight size={10} className="inline mr-1" />
-                            <FormattedMessage id="gap.forceExpand" defaultMessage="Expand" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Resolving spinner */}
-                {isResolving && (
-                  <div className="flex items-center justify-center py-3 text-[var(--amber)]">
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                    <span className="text-sm">
-                      <FormattedMessage id="gap.resolving" defaultMessage="Resolving..." />
-                    </span>
                   </div>
                 )}
 
-                {/* New territory inline form */}
-                {showForm && !isResolving && (
-                  <div className="space-y-2 pt-2 border-t border-[var(--glass-border)]" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      value={newTerritoryForm.number}
-                      onChange={(e) =>
-                        setNewTerritoryForm({ ...newTerritoryForm, number: e.target.value })
-                      }
-                      placeholder={intl.formatMessage({ id: "gap.territoryNumber", defaultMessage: "Number (e.g. 301)" })}
-                      className="w-full px-2.5 py-2 text-sm bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-                    />
-                    <input
-                      type="text"
-                      value={newTerritoryForm.name}
-                      onChange={(e) =>
-                        setNewTerritoryForm({ ...newTerritoryForm, name: e.target.value })
-                      }
-                      placeholder={intl.formatMessage({ id: "gap.territoryName", defaultMessage: "Name (e.g. Gap Area 1)" })}
-                      className="w-full px-2.5 py-2 text-sm bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text)]"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setNewTerritoryForm(null)}
-                        className="flex-1 py-2 text-xs text-[var(--text-muted)] border border-[var(--border)] rounded-[var(--radius-sm)] hover:bg-[var(--glass)] cursor-pointer"
-                      >
-                        <FormattedMessage id="common.cancel" defaultMessage="Cancel" />
-                      </button>
-                      <button
-                        onClick={() => handleCreateTerritory(gap)}
-                        disabled={!newTerritoryForm.name || !newTerritoryForm.number}
-                        className="flex-1 py-2 text-xs font-semibold text-white bg-[#3b82f6] rounded-[var(--radius-sm)] hover:bg-[#2563eb] disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <Plus size={12} />
-                        <FormattedMessage id="gap.applyCreate" defaultMessage="Create" />
-                      </button>
-                    </div>
+                {isResolving && (
+                  <div className="flex items-center justify-center py-3 text-[#3b82f6]">
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    <span className="text-sm">
+                      <FormattedMessage id="resolve.expanding" defaultMessage="Expanding..." />
+                    </span>
                   </div>
                 )}
               </div>
             );
           })}
+
+          {/* Unassigned buildings */}
+          {result.unassigned.length > 0 && (
+            <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] p-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                <AlertCircle size={14} />
+                <span className="font-semibold">
+                  <FormattedMessage
+                    id="resolve.unassigned"
+                    defaultMessage="{count} buildings too far from any territory"
+                    values={{ count: result.unassigned.length }}
+                  />
+                </span>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                <FormattedMessage
+                  id="resolve.unassignedHint"
+                  defaultMessage="These buildings are over {maxDist}m from any territory. Manual territory creation needed."
+                  values={{ maxDist: maxDistance }}
+                />
+              </p>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+
+  // ─── Undocked: FloatingWindow portal ─────────────────────────────
+  if (undocked) {
+    return (
+      <>
+        <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)] space-y-3">
+          <PanelRightClose size={24} strokeWidth={1.2} />
+          <p className="text-xs">
+            <FormattedMessage id="resolve.undockedHint" defaultMessage="Smart Resolve is undocked" />
+          </p>
+          <button
+            onClick={() => setUndocked(false)}
+            className="text-xs text-[var(--amber)] hover:text-[var(--amber-light)] flex items-center gap-1 cursor-pointer"
+          >
+            <PanelRightOpen size={12} />
+            <FormattedMessage id="resolve.dock" defaultMessage="Dock back" />
+          </button>
+        </div>
+
+        <FloatingWindow
+          title={
+            <span className="flex items-center gap-2">
+              <FormattedMessage id="resolve.smartResolve" defaultMessage="Smart Resolve" />
+              {result && unresolvedCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
+                  {unresolvedCount}
+                </span>
+              )}
+            </span>
+          }
+          icon={<Sparkles size={14} className="text-[var(--amber)]" />}
+          onClose={() => setUndocked(false)}
+          initialWidth={460}
+          initialHeight={480}
+          minWidth={360}
+          minHeight={300}
+        >
+          {content}
+        </FloatingWindow>
+      </>
+    );
+  }
+
+  // ─── Docked: inline in sidebar ───────────────────────────────────
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 pt-3 pb-1 flex items-center gap-2 flex-shrink-0">
+        <Sparkles size={16} className="text-[var(--amber)]" />
+        <span className="text-sm font-semibold text-[var(--text)]">
+          <FormattedMessage id="resolve.smartResolve" defaultMessage="Smart Resolve" />
+        </span>
+        {result && unresolvedCount > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--amber)]/10 text-[var(--amber)] font-medium">
+            {unresolvedCount}
+          </span>
+        )}
+        <button
+          onClick={() => setUndocked(true)}
+          className="ml-auto text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer"
+          title="Undock to floating window"
+        >
+          <PanelRightClose size={12} />
+          <FormattedMessage id="resolve.undock" defaultMessage="Undock" />
+        </button>
+      </div>
+      {content}
     </div>
   );
 }

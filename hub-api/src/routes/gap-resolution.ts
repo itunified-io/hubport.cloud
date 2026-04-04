@@ -1,9 +1,9 @@
 /**
- * Gap resolution routes — smart analysis and resolution of uncovered
- * areas between territory polygons.
+ * Smart Resolve routes — building-centric analysis and resolution
+ * of uncovered residential buildings.
  *
- * GET  /territories/gap-analysis  — analyze gaps with building counts
- * POST /territories/gap-resolve   — create territory or expand neighbors
+ * GET  /territories/gap-analysis  — find uncovered residential buildings, cluster by nearest territory
+ * POST /territories/gap-resolve   — expand territory to include buildings
  */
 
 import type { FastifyInstance } from "fastify";
@@ -12,83 +12,52 @@ import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
 import prisma from "../lib/prisma.js";
 import {
-  runGapAnalysis,
-  resolveGapNewTerritory,
-  resolveGapExpandNeighbors,
+  runSmartResolveAnalysis,
+  resolveClusterExpand,
 } from "../lib/gap-analysis.js";
 
 // ─── Schemas ────────────────────────────────────────────────────────
 
-const GapAnalysisQuery = Type.Object({
-  minResidentialBuildings: Type.Optional(Type.Number({ minimum: 1, maximum: 100, default: 8 })),
-  minAreaM2: Type.Optional(Type.Number({ minimum: 100, maximum: 1_000_000, default: 5000 })),
+const AnalysisQuery = Type.Object({
+  maxDistanceM: Type.Optional(Type.Number({ minimum: 10, maximum: 1000, default: 200 })),
 });
-type GapAnalysisQueryType = Static<typeof GapAnalysisQuery>;
+type AnalysisQueryType = Static<typeof AnalysisQuery>;
 
-const GapResolveBody = Type.Object({
-  gapPolygon: Type.Object({
-    type: Type.String(),
-    coordinates: Type.Array(Type.Unknown()),
-  }),
-  action: Type.Union([Type.Literal("new_territory"), Type.Literal("expand_neighbors")]),
-  newTerritoryName: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
-  newTerritoryNumber: Type.Optional(Type.String({ minLength: 1, maxLength: 10 })),
-  neighborAssignments: Type.Optional(
-    Type.Array(
-      Type.Object({
-        territoryId: Type.String({ format: "uuid" }),
-        buildingCoords: Type.Array(
-          Type.Tuple([Type.Number(), Type.Number()]),
-          { minItems: 1, maxItems: 500 },
-        ),
-      }),
-      { minItems: 1, maxItems: 6 },
-    ),
+const ResolveBody = Type.Object({
+  action: Type.Literal("expand_cluster"),
+  territoryId: Type.String({ format: "uuid" }),
+  buildingCoords: Type.Array(
+    Type.Tuple([Type.Number(), Type.Number()]),
+    { minItems: 1, maxItems: 500 },
   ),
 });
-type GapResolveBodyType = Static<typeof GapResolveBody>;
+type ResolveBodyType = Static<typeof ResolveBody>;
 
 // ─── Routes ──────────────────────────────────────────────────────────
 
 export async function gapResolutionRoutes(app: FastifyInstance): Promise<void> {
-  // ─── Analyze gaps ─────────────────────────────────────────────────
+  // ─── Analyze uncovered buildings ─────────────────────────────────
   app.get(
     "/territories/gap-analysis",
     {
       preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_RUN),
-      schema: { querystring: GapAnalysisQuery },
+      schema: { querystring: AnalysisQuery },
     },
     async (request, reply) => {
-      const query = request.query as GapAnalysisQueryType;
+      const query = request.query as AnalysisQueryType;
 
       try {
-        const result = await runGapAnalysis(prisma, {
-          minResidentialBuildings: query.minResidentialBuildings,
-          minAreaM2: query.minAreaM2,
+        const result = await runSmartResolveAnalysis(prisma, {
+          maxDistanceM: query.maxDistanceM,
         });
 
         return result;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
 
-        // No congregation boundary
-        if (msg.includes("congregation")) {
-          return reply.code(400).send({
-            error: "No congregation boundary found. Import a branch territory assignment (KML) first.",
-          });
-        }
-
-        // PostGIS missing
         if (msg.includes("does not exist") && (msg.includes("st_") || msg.includes("postgis"))) {
           return reply.code(501).send({
-            error: "PostGIS extension is not available. Gap analysis requires PostGIS.",
-          });
-        }
-
-        // Overpass failure
-        if (msg.includes("Overpass")) {
-          return reply.code(502).send({
-            error: `Overpass API failed: ${msg}`,
+            error: "PostGIS extension is not available. Smart Resolve requires PostGIS.",
           });
         }
 
@@ -97,57 +66,38 @@ export async function gapResolutionRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // ─── Resolve a gap ────────────────────────────────────────────────
+  // ─── Resolve: expand territory to include buildings ──────────────
   app.post(
     "/territories/gap-resolve",
     {
       preHandler: requirePermission(PERMISSIONS.TERRITORIES_EDIT),
-      schema: { body: GapResolveBody },
+      schema: { body: ResolveBody },
     },
     async (request, reply) => {
-      const body = request.body as GapResolveBodyType;
+      const body = request.body as ResolveBodyType;
 
       try {
-        if (body.action === "new_territory") {
-          if (!body.newTerritoryName || !body.newTerritoryNumber) {
-            return reply.code(400).send({
-              error: "newTerritoryName and newTerritoryNumber are required for new_territory action.",
-            });
-          }
+        app.log.info(
+          { territoryId: body.territoryId, buildingCount: body.buildingCoords.length },
+          "[smart-resolve] expand_cluster request",
+        );
 
-          const result = await resolveGapNewTerritory(
-            prisma,
-            body.gapPolygon,
-            body.newTerritoryName,
-            body.newTerritoryNumber,
-          );
+        const result = await resolveClusterExpand(
+          prisma,
+          body.territoryId,
+          body.buildingCoords,
+        );
 
-          return {
-            success: true,
-            action: "new_territory",
-            ...result,
-          };
-        }
+        app.log.info(
+          { territoryId: result.territoryId, number: result.number, autoFix: result.autoFixApplied },
+          "[smart-resolve] expand_cluster result",
+        );
 
-        if (body.action === "expand_neighbors") {
-          if (!body.neighborAssignments || body.neighborAssignments.length === 0) {
-            return reply.code(400).send({
-              error: "neighborAssignments are required for expand_neighbors action.",
-            });
-          }
-
-          app.log.info({ assignments: body.neighborAssignments.map(a => ({ id: a.territoryId, coords: a.buildingCoords.length })) }, "[gap-resolve] expand_neighbors request");
-          const result = await resolveGapExpandNeighbors(prisma, body.neighborAssignments);
-          app.log.info({ expanded: result.expanded }, "[gap-resolve] expand_neighbors result");
-
-          return {
-            success: true,
-            action: "expand_neighbors",
-            ...result,
-          };
-        }
-
-        return reply.code(400).send({ error: "Invalid action" });
+        return {
+          success: true,
+          action: "expand_cluster",
+          ...result,
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
 
@@ -155,8 +105,8 @@ export async function gapResolutionRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(501).send({ error: "PostGIS extension is not available." });
         }
 
-        app.log.error(err, "Gap resolution failed");
-        return reply.code(500).send({ error: "Gap resolution failed. Please try again." });
+        app.log.error(err, "Smart resolve failed");
+        return reply.code(500).send({ error: "Smart resolve failed. Please try again." });
       }
     },
   );

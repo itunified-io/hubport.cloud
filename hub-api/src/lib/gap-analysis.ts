@@ -1,43 +1,20 @@
 /**
- * Gap Analysis Engine — analyzes uncovered areas between territory polygons
- * and recommends resolution actions (new territory or neighbor expansion).
+ * Building-Centric Smart Resolve Engine
  *
- * Reuses existing gap detection patterns:
- * - Single Overpass query for congregation bbox (avoids rate limiting)
- * - PostGIS gap polygon computation via ST_Difference
- * - Point-in-polygon distribution via isInsideBoundaries
+ * Replaces the gap-polygon-based approach with building-centric resolution:
+ * 1. Find uncovered residential buildings (from latest gap detection run)
+ * 2. Assign each to nearest territory by boundary edge distance (PostGIS ST_Distance)
+ * 3. Group into clusters per territory
+ * 4. Expand via convex hull stretch (buildings + nearest edge points, buffered 15m)
  */
 
-import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { computeGapPolygons, runAutoFixPipeline, clipToCongregation as clipToCongregationOnly } from "./postgis-helpers.js";
-import { queryBuildingsInBBox, type OverpassBuilding } from "./osm-overpass.js";
-import { bboxFromGeoJSON, isInsideBoundaries } from "./geo.js";
+import { clipToCongregation as clipToCongregationOnly } from "./postgis-helpers.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PrismaLike = any;
 
 // ─── Building severity classification ────────────────────────────────
-
-const RESIDENTIAL_TYPES = new Set([
-  "house", "apartments", "residential", "detached", "semidetached_house", "terrace",
-]);
-const MEDIUM_TYPES = new Set(["farm"]);
-const IGNORABLE_TYPES = new Set([
-  "garage", "commercial", "industrial", "retail", "shed", "barn",
-  "church", "public", "warehouse", "office", "school", "hospital",
-  "hotel", "supermarket",
-]);
-
-function isResidential(building: OverpassBuilding): boolean {
-  const type = building.buildingType ?? "unknown";
-  if (RESIDENTIAL_TYPES.has(type)) return true;
-  if (MEDIUM_TYPES.has(type)) return true;
-  if (type === "yes" && building.hasAddress) return true;
-  return false;
-}
-
-// ─── Shared severity classification (used by overrides + analysis) ───
 
 export const ALLOWED_BUILDING_TYPES = new Set([
   // Residential (red)
@@ -84,378 +61,364 @@ export function classifySeverity(
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export interface NeighborAssignment {
+export interface ClusterBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
+  distanceM: number;
+}
+
+export interface BuildingCluster {
   territoryId: string;
   territoryNumber: string;
   territoryName: string;
-  buildingCount: number;
-  /** Building [lng, lat] coordinates assigned to this neighbor */
-  buildingCoords: [number, number][];
+  maxDistanceM: number;
+  buildings: ClusterBuilding[];
 }
 
-export interface GapAnalysis {
-  gapId: string;
-  gapPolygon: object;
-  areaMeter2: number;
-  residentialCount: number;
-  totalBuildingCount: number;
-  unreviewedCount: number;
-  recommendation: "new_territory" | "expand_neighbors";
-  neighborAssignments: NeighborAssignment[];
+export interface UnassignedBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
 }
 
-export interface GapAnalysisResult {
-  gaps: GapAnalysis[];
-  thresholds: { minResidentialBuildings: number; minAreaM2: number };
+export interface SmartResolveAnalysis {
+  clusters: BuildingCluster[];
+  unassigned: UnassignedBuilding[];
+  thresholds: { maxDistanceM: number };
 }
 
-export interface GapResolveNewTerritoryResult {
+export interface ClusterExpandResult {
   territoryId: string;
   number: string;
-  name: string;
+  buildingCount: number;
   autoFixApplied: string[];
-}
-
-export interface GapResolveExpandResult {
-  expanded: Array<{
-    territoryId: string;
-    number: string;
-    autoFixApplied: string[];
-  }>;
 }
 
 // ─── Analysis ────────────────────────────────────────────────────────
 
-export async function runGapAnalysis(
+export async function runSmartResolveAnalysis(
   prisma: PrismaLike,
-  options: { minResidentialBuildings?: number; minAreaM2?: number } = {},
-): Promise<GapAnalysisResult> {
-  const minRes = options.minResidentialBuildings ?? 8;
-  const minArea = options.minAreaM2 ?? 5000;
+  options: { maxDistanceM?: number } = {},
+): Promise<SmartResolveAnalysis> {
+  const maxDist = options.maxDistanceM ?? 200;
 
-  // Step 1: Compute gap polygons
-  const gaps = await computeGapPolygons(prisma);
-  if (!gaps || gaps.length === 0) {
-    return { gaps: [], thresholds: { minResidentialBuildings: minRes, minAreaM2: minArea } };
-  }
-
-  // Step 2: Get congregation bbox for single Overpass query
-  const congregation = await prisma.territory.findFirst({
-    where: { type: "congregation_boundary", boundaries: { not: Prisma.DbNull } },
-    select: { boundaries: true },
+  // Step 1: Load latest completed gap detection run
+  const latestRun = await prisma.gapDetectionRun.findFirst({
+    where: { status: "completed" },
+    orderBy: { completedAt: "desc" },
+    select: { id: true, resultGeoJson: true },
   });
-  if (!congregation?.boundaries) {
-    return { gaps: [], thresholds: { minResidentialBuildings: minRes, minAreaM2: minArea } };
+
+  if (!latestRun?.resultGeoJson) {
+    return { clusters: [], unassigned: [], thresholds: { maxDistanceM: maxDist } };
   }
 
-  const congBbox = bboxFromGeoJSON(congregation.boundaries);
-  if (!congBbox) {
-    return { gaps: [], thresholds: { minResidentialBuildings: minRes, minAreaM2: minArea } };
+  // Step 2: Extract uncovered buildings from run result
+  const geojson = latestRun.resultGeoJson as {
+    features?: Array<{
+      properties?: { osmId?: string; buildingType?: string; streetAddress?: string };
+      geometry?: { coordinates?: [number, number] };
+    }>;
+  };
+
+  if (!geojson.features || geojson.features.length === 0) {
+    return { clusters: [], unassigned: [], thresholds: { maxDistanceM: maxDist } };
   }
 
-  // Step 3: Single Overpass query + filter inside congregation
-  const allBuildings = await queryBuildingsInBBox(congBbox.south, congBbox.west, congBbox.north, congBbox.east);
-  const congBuildings = allBuildings.filter((b) =>
-    isInsideBoundaries(b.lat, b.lng, congregation.boundaries),
-  );
-
-  // Step 4: Load ignored buildings
-  const ignoredRows = await prisma.ignoredOsmBuilding.findMany({
-    select: { osmId: true },
-  });
-  const ignoredIds = new Set(ignoredRows.map((r: { osmId: string }) => r.osmId));
-
-  // Step 4b: Load building overrides
+  // Step 3: Load building overrides for severity classification
   type OverrideRow = { osmId: string; overriddenType: string | null; overriddenAddress: string | null; triageStatus: string };
   const overrideRows: OverrideRow[] = await prisma.buildingOverride.findMany();
   const overrideMap = new Map<string, OverrideRow>(overrideRows.map((r) => [r.osmId, r]));
 
-  // Step 5: Get all territory boundaries for neighbor assignment
-  const territories: Array<{ id: string; number: string; name: string; boundaries: unknown }> =
-    await prisma.territory.findMany({
-      where: {
-        type: "territory",
-        boundaries: { not: Prisma.DbNull },
-      },
-      select: { id: true, number: true, name: true, boundaries: true },
-    });
+  // Step 4: Filter to residential buildings only (high + medium severity)
+  const residentialBuildings: Array<{
+    osmId: string; lat: number; lng: number;
+    buildingType: string; streetAddress?: string;
+  }> = [];
 
-  // Step 6: Distribute buildings into gaps
-  const gapResults: GapAnalysis[] = [];
+  for (const feature of geojson.features) {
+    const props = feature.properties;
+    const coords = feature.geometry?.coordinates;
+    if (!props?.osmId || !coords) continue;
 
-  for (const gap of gaps) {
-    const gapBuildings = congBuildings.filter(
-      (b) => !ignoredIds.has(b.osmId) && isInsideBoundaries(b.lat, b.lng, gap.geojson),
-    );
+    const override = overrideMap.get(props.osmId);
 
-    const totalBuildingCount = gapBuildings.length;
-
-    // Classify buildings using overrides
-    let residentialCount = 0;
-    let unreviewedCount = 0;
-
-    for (const b of gapBuildings) {
-      const override = overrideMap.get(b.osmId);
-      const effectiveType = override?.overriddenType ?? b.buildingType ?? "unknown";
-      const effectiveHasAddress = (override?.overriddenAddress != null) || b.hasAddress;
-      const severity = classifySeverity(effectiveType, effectiveHasAddress);
-
-      // Triage-based counting
-      if (override?.triageStatus === "ignored" || override?.triageStatus === "needs_visit") {
-        // Excluded from residential count
-      } else if (override?.triageStatus === "confirmed_residential") {
-        residentialCount++;
-      } else if (severity === "high" || severity === "medium") {
-        residentialCount++;
-      } else if (severity === "low") {
-        // Unreviewed uncertain — excluded from count, tracked for gate
-        unreviewedCount++;
-      }
-      // severity === "ignorable" → excluded
+    // Skip triaged-out buildings
+    if (override?.triageStatus === "ignored" || override?.triageStatus === "needs_visit") {
+      continue;
     }
 
-    // Decision engine
-    const recommendation: "new_territory" | "expand_neighbors" =
-      residentialCount >= minRes && gap.areaMeter2 >= minArea
-        ? "new_territory"
-        : "expand_neighbors";
+    const effectiveType = override?.overriddenType ?? props.buildingType ?? "unknown";
+    const effectiveHasAddress = (override?.overriddenAddress != null) || !!props.streetAddress;
+    const severity = classifySeverity(effectiveType, effectiveHasAddress);
 
-    // Find adjacent territories (within 50m)
-    let adjacentTerritories: typeof territories = [];
+    // Include: confirmed_residential override OR high/medium severity
+    const isResidential =
+      override?.triageStatus === "confirmed_residential" ||
+      severity === "high" ||
+      severity === "medium";
+
+    if (isResidential) {
+      residentialBuildings.push({
+        osmId: props.osmId,
+        lng: coords[0],
+        lat: coords[1],
+        buildingType: effectiveType,
+        streetAddress: props.streetAddress ?? undefined,
+      });
+    }
+  }
+
+  if (residentialBuildings.length === 0) {
+    return { clusters: [], unassigned: [], thresholds: { maxDistanceM: maxDist } };
+  }
+
+  // Step 5: Spatially cluster nearby buildings (within 150m of each other)
+  // so that a group of buildings in the same area all go to the same territory
+  const CLUSTER_RADIUS_M = 150;
+  const spatialGroups: typeof residentialBuildings[] = [];
+  const assigned = new Set<number>();
+
+  for (let i = 0; i < residentialBuildings.length; i++) {
+    if (assigned.has(i)) continue;
+    const group = [residentialBuildings[i]!];
+    assigned.add(i);
+
+    // Find all buildings within CLUSTER_RADIUS_M of any building in this group
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let j = 0; j < residentialBuildings.length; j++) {
+        if (assigned.has(j)) continue;
+        const b = residentialBuildings[j]!;
+        const isNear = group.some((g) => {
+          const dlat = (b.lat - g.lat) * 111_000;
+          const dlng = (b.lng - g.lng) * 111_000 * Math.cos(b.lat * Math.PI / 180);
+          return Math.sqrt(dlat * dlat + dlng * dlng) < CLUSTER_RADIUS_M;
+        });
+        if (isNear) {
+          group.push(b);
+          assigned.add(j);
+          changed = true;
+        }
+      }
+    }
+    spatialGroups.push(group);
+  }
+
+  // Step 6: For each spatial group, find nearest territory using centroid
+  const clusterMap = new Map<string, {
+    territoryId: string; territoryNumber: string; territoryName: string;
+    buildings: ClusterBuilding[];
+  }>();
+  const unassigned: UnassignedBuilding[] = [];
+
+  for (const group of spatialGroups) {
+    // Compute group centroid
+    const centLat = group.reduce((s, b) => s + b.lat, 0) / group.length;
+    const centLng = group.reduce((s, b) => s + b.lng, 0) / group.length;
+
     try {
-      const adjacentIds = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT t.id
+      const nearest = await prisma.$queryRaw<Array<{
+        id: string; number: string; name: string; distance_m: number;
+      }>>`
+        SELECT t.id, t.number, t.name,
+          ST_Distance(
+            ST_SetSRID(ST_MakePoint(${centLng}, ${centLat}), 4326)::geography,
+            ST_MakeValid(ST_GeomFromGeoJSON(t.boundaries::text))::geography
+          ) AS distance_m
         FROM "Territory" t
-        WHERE t.boundaries IS NOT NULL
-          AND t.type = 'territory'
+        WHERE t.type = 'territory'
+          AND t.boundaries IS NOT NULL
           AND t.boundaries->>'coordinates' IS NOT NULL
           AND jsonb_typeof(t.boundaries->'coordinates') = 'array'
           AND ST_DWithin(
-            ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(gap.geojson)}))::geography,
+            ST_SetSRID(ST_MakePoint(${centLng}, ${centLat}), 4326)::geography,
             ST_MakeValid(ST_GeomFromGeoJSON(t.boundaries::text))::geography,
-            50
+            ${maxDist}
           )
-        LIMIT 6
+        ORDER BY distance_m ASC, t.number ASC
+        LIMIT 1
       `;
-      const idSet = new Set(adjacentIds.map((r: { id: string }) => r.id));
-      adjacentTerritories = territories.filter((t: { id: string }) => idSet.has(t.id));
-    } catch {
-      // PostGIS unavailable — fall back to empty
-    }
 
-    // Assign buildings to nearest neighbor (simple centroid distance)
-    const assignments = new Map<string, { territory: typeof territories[0]; coords: [number, number][] }>();
-
-    for (const building of gapBuildings) {
-      let nearestId: string | null = null;
-      let nearestDist = Infinity;
-
-      for (const territory of adjacentTerritories) {
-        const tBbox = bboxFromGeoJSON(territory.boundaries);
-        if (!tBbox) continue;
-        // Approximate distance using centroid
-        const tCenterLat = (tBbox.south + tBbox.north) / 2;
-        const tCenterLng = (tBbox.west + tBbox.east) / 2;
-        const dist = Math.sqrt(
-          Math.pow((building.lat - tCenterLat) * 111_000, 2) +
-          Math.pow((building.lng - tCenterLng) * 111_000 * Math.cos(building.lat * Math.PI / 180), 2),
-        );
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestId = territory.id;
+      if (nearest.length === 0) {
+        // All buildings in this group are unassigned
+        for (const b of group) {
+          unassigned.push({
+            osmId: b.osmId, lat: b.lat, lng: b.lng,
+            buildingType: b.buildingType, streetAddress: b.streetAddress,
+          });
         }
-      }
-
-      if (nearestId) {
-        const existing = assignments.get(nearestId);
-        if (existing) {
-          existing.coords.push([building.lng, building.lat]);
-        } else {
-          const territory = adjacentTerritories.find((t: { id: string }) => t.id === nearestId)!;
-          assignments.set(nearestId, { territory, coords: [[building.lng, building.lat]] });
-        }
-      }
-    }
-
-    const neighborAssignments: NeighborAssignment[] = Array.from(assignments.entries()).map(
-      ([id, { territory, coords }]) => ({
-        territoryId: id,
-        territoryNumber: territory.number,
-        territoryName: territory.name,
-        buildingCount: coords.length,
-        buildingCoords: coords,
-      }),
-    );
-
-    gapResults.push({
-      gapId: randomUUID(),
-      gapPolygon: gap.geojson,
-      areaMeter2: gap.areaMeter2,
-      residentialCount,
-      totalBuildingCount,
-      unreviewedCount,
-      recommendation,
-      neighborAssignments,
-    });
-  }
-
-  return {
-    gaps: gapResults,
-    thresholds: { minResidentialBuildings: minRes, minAreaM2: minArea },
-  };
-}
-
-// ─── Resolution: Create new territory ────────────────────────────────
-
-export async function resolveGapNewTerritory(
-  prisma: PrismaLike,
-  gapPolygon: object,
-  name: string,
-  number: string,
-): Promise<GapResolveNewTerritoryResult> {
-  // Run auto-fix pipeline on the gap polygon
-  let finalBoundaries = gapPolygon;
-  const autoFixApplied: string[] = [];
-
-  try {
-    const autoFix = await runAutoFixPipeline(prisma, gapPolygon, null);
-    finalBoundaries = autoFix.clipped;
-    autoFixApplied.push(...autoFix.applied);
-  } catch (err: unknown) {
-    // If PostGIS unavailable, use gap polygon as-is
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes("does not exist") || (!msg.includes("st_") && !msg.includes("postgis"))) {
-      throw err;
-    }
-  }
-
-  const result = await prisma.$transaction(async (tx: PrismaLike) => {
-    // Create territory
-    const territory = await tx.territory.create({
-      data: {
-        number,
-        name,
-        type: "territory",
-        boundaries: finalBoundaries,
-      },
-    });
-
-    // Create boundary version v1
-    await tx.territoryBoundaryVersion.create({
-      data: {
-        territoryId: territory.id,
-        version: 1,
-        boundaries: finalBoundaries as any,
-        changeType: "gap_resolution",
-        changeSummary: `Created from gap resolution${autoFixApplied.length > 0 ? ` (${autoFixApplied.join("; ")})` : ""}`,
-      },
-    });
-
-    return territory;
-  });
-
-  return {
-    territoryId: result.id,
-    number: result.number,
-    name: result.name,
-    autoFixApplied,
-  };
-}
-
-// ─── Resolution: Expand neighbors ────────────────────────────────────
-
-export async function resolveGapExpandNeighbors(
-  prisma: PrismaLike,
-  assignments: Array<{ territoryId: string; buildingCoords: [number, number][] }>,
-): Promise<GapResolveExpandResult> {
-  const results = await prisma.$transaction(async (tx: PrismaLike) => {
-    const expanded: GapResolveExpandResult["expanded"] = [];
-
-    for (const assignment of assignments) {
-      const territory = await tx.territory.findUnique({
-        where: { id: assignment.territoryId },
-        select: { id: true, number: true, name: true, boundaries: true },
-      });
-      if (!territory?.boundaries) continue;
-
-      // Build point collection string for PostGIS
-      const pointsWkt = assignment.buildingCoords
-        .map(([lng, lat]) => `ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)`)
-        .join(", ");
-
-      // Expand territory polygon to include building points with 15m buffer
-      let expandedBoundaries: object;
-      try {
-        const result = await tx.$queryRaw<Array<{ geojson: string }>>`
-          SELECT ST_AsGeoJSON(
-            ST_Union(
-              ST_MakeValid(ST_GeomFromGeoJSON(${JSON.stringify(territory.boundaries)})),
-              ST_Buffer(
-                ST_Collect(ARRAY[${Prisma.raw(pointsWkt)}])::geography,
-                15
-              )::geometry
-            )
-          ) AS geojson
-        `;
-        if (!result[0]?.geojson) continue;
-        expandedBoundaries = JSON.parse(result[0].geojson);
-      } catch (err) {
-        // PostGIS issue — log and skip this territory
-        console.error(`[gap-expand] PostGIS failed for territory ${territory.number}:`, err instanceof Error ? err.message : err);
         continue;
       }
 
-      // Only clip to congregation boundary (skip neighbor clip — gap expansion
-      // deliberately pushes into uncovered space between territories)
-      const autoFixApplied: string[] = [];
-      try {
-        const congClip = await clipToCongregationOnly(tx, expandedBoundaries);
-        if (congClip) {
-          expandedBoundaries = congClip.clipped;
-          if (congClip.wasModified) autoFixApplied.push("Clipped to congregation boundary");
+      const match = nearest[0]!;
+
+      // Now get per-building distance to this territory
+      for (const b of group) {
+        let distanceM = Math.round(match.distance_m); // fallback: centroid distance
+        try {
+          const bDist = await prisma.$queryRaw<Array<{ d: number }>>`
+            SELECT ST_Distance(
+              ST_SetSRID(ST_MakePoint(${b.lng}, ${b.lat}), 4326)::geography,
+              ST_MakeValid(ST_GeomFromGeoJSON(
+                (SELECT boundaries::text FROM "Territory" WHERE id = ${match.id})
+              ))::geography
+            ) AS d
+          `;
+          if (bDist[0]) distanceM = Math.round(bDist[0].d);
+        } catch { /* use centroid distance */ }
+
+        const clusterBuilding: ClusterBuilding = {
+          osmId: b.osmId, lat: b.lat, lng: b.lng,
+          buildingType: b.buildingType, streetAddress: b.streetAddress,
+          distanceM,
+        };
+
+        const existing = clusterMap.get(match.id);
+        if (existing) {
+          existing.buildings.push(clusterBuilding);
+        } else {
+          clusterMap.set(match.id, {
+            territoryId: match.id,
+            territoryNumber: match.number,
+            territoryName: match.name,
+            buildings: [clusterBuilding],
+          });
         }
-      } catch {
-        // Use expanded polygon as-is
       }
+    } catch {
+      for (const b of group) {
+        unassigned.push({
+          osmId: b.osmId, lat: b.lat, lng: b.lng,
+          buildingType: b.buildingType, streetAddress: b.streetAddress,
+        });
+      }
+    }
+  }
 
-      // Save previous boundary version
-      const lastVersion = await tx.territoryBoundaryVersion.findFirst({
-        where: { territoryId: territory.id },
-        orderBy: { version: "desc" },
-        select: { version: true },
-      });
-      const nextVersion = (lastVersion?.version ?? 0) + 1;
+  // Step 7: Build cluster list sorted by max distance
+  const clusters: BuildingCluster[] = Array.from(clusterMap.values())
+    .map((c) => ({
+      territoryId: c.territoryId,
+      territoryNumber: c.territoryNumber,
+      territoryName: c.territoryName,
+      maxDistanceM: Math.max(...c.buildings.map((b) => b.distanceM)),
+      buildings: c.buildings,
+    }))
+    .sort((a, b) => a.maxDistanceM - b.maxDistanceM);
 
-      await tx.territoryBoundaryVersion.create({
-        data: {
-          territoryId: territory.id,
-          version: nextVersion,
-          boundaries: territory.boundaries as any,
-          changeType: "gap_expansion",
-          changeSummary: `Previous boundary before gap resolution expansion (+${assignment.buildingCoords.length} buildings)`,
-        },
-      });
+  return { clusters, unassigned, thresholds: { maxDistanceM: maxDist } };
+}
 
-      // Update territory boundaries
-      await tx.territory.update({
-        where: { id: territory.id },
-        data: {
-          boundaries: expandedBoundaries,
-          updatedAt: new Date(),
-        },
-      });
+// ─── Resolution: Expand territory to include buildings ──────────────
 
-      console.log(`[gap-expand] Territory ${territory.number} (${territory.id}) updated with +${assignment.buildingCoords.length} buildings, autoFix: [${autoFixApplied.join(", ")}]`);
-
-      expanded.push({
-        territoryId: territory.id,
-        number: territory.number,
-        autoFixApplied,
-      });
+export async function resolveClusterExpand(
+  prisma: PrismaLike,
+  territoryId: string,
+  buildingCoords: [number, number][],
+): Promise<ClusterExpandResult> {
+  const result = await prisma.$transaction(async (tx: PrismaLike) => {
+    // Load current territory boundary
+    const territory = await tx.territory.findUnique({
+      where: { id: territoryId },
+      select: { id: true, number: true, name: true, boundaries: true },
+    });
+    if (!territory?.boundaries) {
+      throw new Error(`Territory ${territoryId} not found or has no boundary`);
     }
 
-    return expanded;
+    const boundariesJson = JSON.stringify(territory.boundaries);
+
+    // Build the ST_Collect array: building points + their nearest boundary edge points
+    const collectItems: string[] = [];
+    for (const [lng, lat] of buildingCoords) {
+      // Building point
+      collectItems.push(`ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)`);
+      // Nearest point on territory boundary edge
+      collectItems.push(
+        `ST_ClosestPoint(ST_MakeValid(ST_GeomFromGeoJSON('${boundariesJson.replace(/'/g, "''")}')), ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326))`,
+      );
+    }
+
+    // Convex hull stretch: hull of (buildings + edge points), buffered 15m, unioned with territory
+    let expandedBoundaries: object;
+    try {
+      const expandResult = await tx.$queryRaw<Array<{ geojson: string }>>`
+        SELECT ST_AsGeoJSON(
+          ST_Union(
+            ST_MakeValid(ST_GeomFromGeoJSON(${boundariesJson})),
+            ST_Buffer(
+              ST_ConvexHull(
+                ST_Collect(ARRAY[${Prisma.raw(collectItems.join(", "))}])
+              )::geography,
+              15
+            )::geometry
+          )
+        ) AS geojson
+      `;
+      if (!expandResult[0]?.geojson) {
+        throw new Error("PostGIS expansion returned no result");
+      }
+      expandedBoundaries = JSON.parse(expandResult[0].geojson);
+    } catch (err) {
+      console.error(`[smart-resolve] PostGIS expansion failed for territory ${territory.number}:`, err instanceof Error ? err.message : err);
+      throw err;
+    }
+
+    // Clip to congregation boundary only (no neighbor clip)
+    const autoFixApplied: string[] = [];
+    try {
+      const congClip = await clipToCongregationOnly(tx, expandedBoundaries);
+      if (congClip) {
+        expandedBoundaries = congClip.clipped;
+        if (congClip.wasModified) autoFixApplied.push("Clipped to congregation boundary");
+      }
+    } catch {
+      // Use expanded polygon as-is
+    }
+
+    // Save previous boundary as version history
+    const lastVersion = await tx.territoryBoundaryVersion.findFirst({
+      where: { territoryId: territory.id },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
+    const nextVersion = (lastVersion?.version ?? 0) + 1;
+
+    await tx.territoryBoundaryVersion.create({
+      data: {
+        territoryId: territory.id,
+        version: nextVersion,
+        boundaries: territory.boundaries as any,
+        changeType: "gap_expansion",
+        changeSummary: `Previous boundary before smart resolve expansion (+${buildingCoords.length} buildings)`,
+      },
+    });
+
+    // Update territory boundaries
+    await tx.territory.update({
+      where: { id: territory.id },
+      data: {
+        boundaries: expandedBoundaries,
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log(`[smart-resolve] Territory ${territory.number} expanded with +${buildingCoords.length} buildings, autoFix: [${autoFixApplied.join(", ")}]`);
+
+    return {
+      territoryId: territory.id,
+      number: territory.number,
+      buildingCount: buildingCoords.length,
+      autoFixApplied,
+    };
   });
 
-  return { expanded: results };
+  return result;
 }

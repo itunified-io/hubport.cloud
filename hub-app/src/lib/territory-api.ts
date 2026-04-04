@@ -734,80 +734,68 @@ export function joinFieldGroupByCode(
   });
 }
 
-// ─── Gap Resolution ──────────────────────────────────────────────────
+// ─── Smart Resolve (Building-Centric) ────────────────────────────────
 
-export interface GapNeighborAssignment {
+export interface ClusterBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
+  distanceM: number;
+}
+
+export interface BuildingCluster {
   territoryId: string;
   territoryNumber: string;
   territoryName: string;
-  buildingCount: number;
-  buildingCoords: [number, number][];
+  maxDistanceM: number;
+  buildings: ClusterBuilding[];
 }
 
-export interface GapAnalysisItem {
-  gapId: string;
-  gapPolygon: GeoJsonGeometry;
-  areaMeter2: number;
-  residentialCount: number;
-  totalBuildingCount: number;
-  unreviewedCount: number;
-  recommendation: "new_territory" | "expand_neighbors";
-  neighborAssignments: GapNeighborAssignment[];
+export interface UnassignedBuilding {
+  osmId: string;
+  lat: number;
+  lng: number;
+  buildingType: string;
+  streetAddress?: string;
 }
 
-export interface GapAnalysisResponse {
-  gaps: GapAnalysisItem[];
-  thresholds: { minResidentialBuildings: number; minAreaM2: number };
+export interface SmartResolveAnalysis {
+  clusters: BuildingCluster[];
+  unassigned: UnassignedBuilding[];
+  thresholds: { maxDistanceM: number };
 }
 
-export async function fetchGapAnalysis(
+export async function fetchSmartResolveAnalysis(
   token: string,
-  minResidentialBuildings = 8,
-  minAreaM2 = 5000,
-): Promise<GapAnalysisResponse> {
+  maxDistanceM = 200,
+): Promise<SmartResolveAnalysis> {
   const params = new URLSearchParams({
-    minResidentialBuildings: String(minResidentialBuildings),
-    minAreaM2: String(minAreaM2),
+    maxDistanceM: String(maxDistanceM),
   });
   return apiFetch(`/territories/gap-analysis?${params}`, token);
 }
 
-export interface GapResolveNewTerritoryRequest {
-  gapPolygon: GeoJsonGeometry;
-  action: "new_territory";
-  newTerritoryName: string;
-  newTerritoryNumber: string;
+export interface ClusterExpandRequest {
+  action: "expand_cluster";
+  territoryId: string;
+  buildingCoords: [number, number][];
 }
 
-export interface GapResolveExpandRequest {
-  gapPolygon: GeoJsonGeometry;
-  action: "expand_neighbors";
-  neighborAssignments: Array<{
-    territoryId: string;
-    buildingCoords: [number, number][];
-  }>;
-}
-
-export type GapResolveRequest = GapResolveNewTerritoryRequest | GapResolveExpandRequest;
-
-export interface GapResolveResponse {
+export interface ClusterExpandResponse {
   success: boolean;
   action: string;
-  territoryId?: string;
-  number?: string;
-  name?: string;
-  autoFixApplied?: string[];
-  expanded?: Array<{
-    territoryId: string;
-    number: string;
-    autoFixApplied: string[];
-  }>;
+  territoryId: string;
+  number: string;
+  buildingCount: number;
+  autoFixApplied: string[];
 }
 
-export async function resolveGap(
+export async function resolveCluster(
   token: string,
-  body: GapResolveRequest,
-): Promise<GapResolveResponse> {
+  body: ClusterExpandRequest,
+): Promise<ClusterExpandResponse> {
   return apiFetch("/territories/gap-resolve", token, {
     method: "POST",
     body: JSON.stringify(body),

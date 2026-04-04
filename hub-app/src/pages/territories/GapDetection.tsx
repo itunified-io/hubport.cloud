@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
   AlertTriangle, Play, Loader2, CheckCircle2, XCircle,
-  MapPin, EyeOff, ChevronRight, Trash2, PanelRightClose, PanelRightOpen, Sparkles,
+  MapPin, EyeOff, ChevronRight, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import {
@@ -28,9 +28,9 @@ import {
   type TriageStatus,
 } from "@/lib/territory-api";
 import { useMapLibre, MAP_STYLES, type MapStyleKey } from "@/hooks/useMapLibre";
-import { GapResolutionSection } from "@/components/territories/GapResolutionSection";
+import { GapResolutionSection, type ClusterHighlightData } from "@/components/territories/GapResolutionSection";
 import { BuildingTriageList } from "@/components/territories/BuildingTriageList";
-import { FloatingWindow } from "@/components/ui/FloatingWindow";
+
 
 const STATUS_META: Record<string, { icon: React.ElementType; color: string }> = {
   running: { icon: Loader2, color: "text-[var(--amber)]" },
@@ -145,7 +145,7 @@ export function GapDetection() {
   const [activeTab, setActiveTab] = useState<"buildings" | "gaps">("buildings");
   const [overrides, setOverrides] = useState<Map<string, BuildingOverride>>(new Map());
   const [statusFilter, setStatusFilter] = useState("all");
-  const [smartResolveUndocked, setSmartResolveUndocked] = useState(false);
+
 
   // Map
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -186,106 +186,116 @@ export function GapDetection() {
     selectedFeaturesRef.current = selectedFeatures;
   }, [selectedFeatures]);
 
-  // ─── Gap resolution: polygon visualization ──────────────────
-  const [gapPolygons, setGapPolygons] = useState<object[]>([]);
-  const [highlightedGap, setHighlightedGap] = useState<object | null>(null);
+  // ─── Smart Resolve: cluster preview on map ──────────────────
+  const [clusterHighlight, setClusterHighlight] = useState<ClusterHighlightData | null>(null);
 
-  // Show gap polygon fills on map
-  const updateGapPolygonLayers = useCallback((polygons: object[], highlighted: object | null) => {
+  // Show cluster building markers + territory highlight on map
+  const updateClusterPreview = useCallback((data: ClusterHighlightData | null) => {
     const map = mapRef.current;
     if (!map) return;
 
+    const cluster = data?.cluster ?? null;
+
     // Remove old layers
-    if (map.getLayer("gap-highlight-outline")) map.removeLayer("gap-highlight-outline");
-    if (map.getLayer("gap-highlight-fill")) map.removeLayer("gap-highlight-fill");
-    if (map.getLayer("gap-polygon-outline")) map.removeLayer("gap-polygon-outline");
-    if (map.getLayer("gap-polygon-fill")) map.removeLayer("gap-polygon-fill");
-    if (map.getSource("gap-polygons")) map.removeSource("gap-polygons");
-    if (map.getSource("gap-highlight")) map.removeSource("gap-highlight");
-
-    // Insert gap polygons BELOW building markers so dots remain clickable
-    const beforeLayer = map.getLayer("gap-markers") ? "gap-markers" : undefined;
-
-    if (polygons.length > 0) {
-      addSource("gap-polygons", {
-        type: "FeatureCollection",
-        features: polygons.map((p, i) => ({
-          type: "Feature",
-          properties: { index: i },
-          geometry: p,
-        })),
-      });
-      addLayer({
-        id: "gap-polygon-fill",
-        type: "fill",
-        source: "gap-polygons",
-        paint: { "fill-color": "#f97316", "fill-opacity": 0.1 },
-      }, beforeLayer);
-      addLayer({
-        id: "gap-polygon-outline",
-        type: "line",
-        source: "gap-polygons",
-        paint: { "line-color": "#f97316", "line-width": 1.5, "line-dasharray": [3, 2] },
-      }, beforeLayer);
+    for (const layerId of ["cluster-building-labels", "cluster-building-markers", "cluster-territory-outline"]) {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+    }
+    for (const srcId of ["cluster-buildings", "cluster-territory"]) {
+      if (map.getSource(srcId)) map.removeSource(srcId);
     }
 
-    if (highlighted) {
-      addSource("gap-highlight", {
+    if (!cluster) return;
+
+    // Highlight target territory boundary (blue pulsing outline)
+    const territory = territories.find((t) => t.id === cluster.territoryId);
+    if (territory?.boundaries) {
+      addSource("cluster-territory", {
         type: "FeatureCollection",
-        features: [{ type: "Feature", properties: {}, geometry: highlighted }],
+        features: [{ type: "Feature", properties: {}, geometry: territory.boundaries }],
       });
       addLayer({
-        id: "gap-highlight-fill",
-        type: "fill",
-        source: "gap-highlight",
-        paint: { "fill-color": "#f97316", "fill-opacity": 0.25 },
-      }, beforeLayer);
-      addLayer({
-        id: "gap-highlight-outline",
+        id: "cluster-territory-outline",
         type: "line",
-        source: "gap-highlight",
-        paint: { "line-color": "#f97316", "line-width": 2.5 },
-      }, beforeLayer);
+        source: "cluster-territory",
+        paint: { "line-color": "#3b82f6", "line-width": 3, "line-dasharray": [2, 1] },
+      });
+    }
 
-      // Fly to highlighted gap polygon bounds
-      try {
-        const geo = highlighted as { coordinates?: number[][][][] | number[][][] };
-        if (geo.coordinates) {
-          let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-          const allCoords: number[][] = (geo.coordinates as number[][][][]).flat(2);
-          for (const c of allCoords) {
-            if (c[0]! < minLng) minLng = c[0]!;
-            if (c[1]! < minLat) minLat = c[1]!;
-            if (c[0]! > maxLng) maxLng = c[0]!;
-            if (c[1]! > maxLat) maxLat = c[1]!;
-          }
-          if (isFinite(minLng)) {
-            map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
-              padding: 80,
-              maxZoom: 16,
-              duration: 800,
-            });
-          }
-        }
-      } catch {
-        // Ignore bounds calculation errors
+    // Show cluster buildings as blue dots
+    const features = cluster.buildings.map((b) => ({
+      type: "Feature" as const,
+      properties: {
+        label: `#${cluster.territoryNumber}`,
+        address: b.streetAddress ?? "",
+        distance: `${b.distanceM}m`,
+      },
+      geometry: { type: "Point" as const, coordinates: [b.lng, b.lat] },
+    }));
+
+    addSource("cluster-buildings", {
+      type: "FeatureCollection",
+      features,
+    });
+
+    addLayer({
+      id: "cluster-building-markers",
+      type: "circle",
+      source: "cluster-buildings",
+      paint: {
+        "circle-radius": 9,
+        "circle-color": "#3b82f6",
+        "circle-opacity": 0.8,
+        "circle-stroke-width": 2.5,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+
+    addLayer({
+      id: "cluster-building-labels",
+      type: "symbol",
+      source: "cluster-buildings",
+      layout: {
+        "text-field": ["get", "label"],
+        "text-size": 10,
+        "text-font": ["Open Sans Bold"],
+        "text-offset": [0, -1.5],
+        "text-allow-overlap": true,
+      },
+      paint: {
+        "text-color": "#ffffff",
+        "text-halo-color": "#3b82f6",
+        "text-halo-width": 1.5,
+      },
+    });
+
+    // Fly to cluster buildings
+    if (cluster.buildings.length > 0) {
+      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+      for (const b of cluster.buildings) {
+        if (b.lng < minLng) minLng = b.lng;
+        if (b.lat < minLat) minLat = b.lat;
+        if (b.lng > maxLng) maxLng = b.lng;
+        if (b.lat > maxLat) maxLat = b.lat;
+      }
+      if (isFinite(minLng)) {
+        map.fitBounds([[minLng - 0.002, minLat - 0.002], [maxLng + 0.002, maxLat + 0.002]], {
+          padding: 80,
+          maxZoom: 17,
+          duration: 800,
+        });
       }
     }
-  }, [mapRef, addSource, addLayer]);
+  }, [mapRef, addSource, addLayer, territories]);
 
-  // Update gap polygon layers when state changes
+  // Update cluster preview when state changes
   useEffect(() => {
     if (isLoaded) {
-      updateGapPolygonLayers(gapPolygons, highlightedGap);
+      updateClusterPreview(clusterHighlight);
     }
-  }, [isLoaded, gapPolygons, highlightedGap, updateGapPolygonLayers]);
+  }, [isLoaded, clusterHighlight, updateClusterPreview]);
 
-  const handleGapPolygonsChange = useCallback((polygons: object[]) => {
-    setGapPolygons(polygons);
-  }, []);
-
-  const handleHighlightGap = useCallback((polygon: object | null) => {
-    setHighlightedGap(polygon);
+  const handleHighlightCluster = useCallback((data: ClusterHighlightData) => {
+    setClusterHighlight(data);
   }, []);
 
   // ─── Fetch territories for map ───────────────────────────────
@@ -640,10 +650,8 @@ export function GapDetection() {
   // ─── Map: initialize layers on style ready ───────────────────
 
   // Keep gap polygons ref in sync for style change re-render
-  const gapPolygonsRef = useRef<object[]>([]);
-  const highlightedGapRef = useRef<object | null>(null);
-  useEffect(() => { gapPolygonsRef.current = gapPolygons; }, [gapPolygons]);
-  useEffect(() => { highlightedGapRef.current = highlightedGap; }, [highlightedGap]);
+  const clusterHighlightRef = useRef<ClusterHighlightData | null>(null);
+  useEffect(() => { clusterHighlightRef.current = clusterHighlight; }, [clusterHighlight]);
 
   useEffect(() => {
     onStyleReady(() => {
@@ -662,12 +670,12 @@ export function GapDetection() {
           .filter(Boolean);
         applySelectionHighlight(osmIds);
       }
-      // Re-add gap resolution polygon layers
-      if (gapPolygonsRef.current.length > 0) {
-        updateGapPolygonLayers(gapPolygonsRef.current, highlightedGapRef.current);
+      // Re-add cluster preview layers
+      if (clusterHighlightRef.current) {
+        updateClusterPreview(clusterHighlightRef.current);
       }
     });
-  }, [onStyleReady, addMapLayers, showGapsOnMap, applySelectionHighlight, updateGapPolygonLayers, runs, selectedRunId]);
+  }, [onStyleReady, addMapLayers, showGapsOnMap, applySelectionHighlight, updateClusterPreview, runs, selectedRunId]);
 
   useEffect(() => {
     if (!isLoaded || !territories.length) return;
@@ -1350,46 +1358,12 @@ export function GapDetection() {
               </div>
             )}
 
-            {/* Smart Gap Resolution — docked in sidebar */}
-            {!smartResolveUndocked && (
-              <>
-                {/* Undock button */}
-                <div className="px-4 pt-2 flex justify-end">
-                  <button
-                    onClick={() => setSmartResolveUndocked(true)}
-                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer"
-                    title="Undock to floating panel"
-                  >
-                    <PanelRightClose size={12} />
-                    <FormattedMessage id="gap.undock" defaultMessage="Undock" />
-                  </button>
-                </div>
-                <GapResolutionSection
-                  token={token}
-                  onGapPolygonsChange={handleGapPolygonsChange}
-                  onResolved={handleGapResolved}
-                  onHighlightGap={handleHighlightGap}
-                  overrides={overrides}
-                />
-              </>
-            )}
-
-            {/* Placeholder when undocked */}
-            {smartResolveUndocked && (
-              <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)] space-y-3">
-                <PanelRightClose size={24} strokeWidth={1.2} />
-                <p className="text-xs">
-                  <FormattedMessage id="gap.undockedHint" defaultMessage="Smart Resolve is undocked" />
-                </p>
-                <button
-                  onClick={() => setSmartResolveUndocked(false)}
-                  className="text-xs text-[var(--amber)] hover:text-[var(--amber-light)] flex items-center gap-1 cursor-pointer"
-                >
-                  <PanelRightOpen size={12} />
-                  <FormattedMessage id="gap.dock" defaultMessage="Dock back" />
-                </button>
-              </div>
-            )}
+            {/* Smart Resolve — building-centric, self-manages dock/undock */}
+            <GapResolutionSection
+              token={token}
+              onResolved={handleGapResolved}
+              onHighlightCluster={handleHighlightCluster}
+            />
           </div>
         )}
 
@@ -1464,27 +1438,6 @@ export function GapDetection() {
         </div>
       </div>
 
-      {/* ─── Undocked Smart Resolve floating window ─────────── */}
-      {smartResolveUndocked && selectedRun?.status === "completed" && (
-        <FloatingWindow
-          title={<FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />}
-          icon={<Sparkles size={14} className="text-[var(--amber)]" />}
-          onClose={() => setSmartResolveUndocked(false)}
-          initialWidth={520}
-          initialHeight={480}
-          minWidth={400}
-          minHeight={300}
-        >
-          <GapResolutionSection
-            token={token}
-            onGapPolygonsChange={handleGapPolygonsChange}
-            onResolved={handleGapResolved}
-            onHighlightGap={handleHighlightGap}
-            overrides={overrides}
-            hideHeader
-          />
-        </FloatingWindow>
-      )}
     </div>
   );
 }
