@@ -399,8 +399,9 @@ export async function resolveGapExpandNeighbors(
         `;
         if (!result[0]?.geojson) continue;
         expandedBoundaries = JSON.parse(result[0].geojson);
-      } catch {
-        // PostGIS issue — skip this territory
+      } catch (err) {
+        // PostGIS issue — log and skip this territory
+        console.error(`[gap-expand] PostGIS failed for territory ${territory.number}:`, err instanceof Error ? err.message : err);
         continue;
       }
 

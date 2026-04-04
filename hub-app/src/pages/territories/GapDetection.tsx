@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
   AlertTriangle, Play, Loader2, CheckCircle2, XCircle,
-  MapPin, EyeOff, ChevronRight, Trash2,
+  MapPin, EyeOff, ChevronRight, Trash2, PanelRightClose, PanelRightOpen, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import {
@@ -144,6 +144,7 @@ export function GapDetection() {
   const [activeTab, setActiveTab] = useState<"buildings" | "gaps">("buildings");
   const [overrides, setOverrides] = useState<Map<string, BuildingOverride>>(new Map());
   const [statusFilter, setStatusFilter] = useState("all");
+  const [smartResolveUndocked, setSmartResolveUndocked] = useState(false);
 
   // Map
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -354,16 +355,22 @@ export function GapDetection() {
     const congBoundary = territories.find((t) => t.type === "congregation_boundary" && t.boundaries);
     const regularTerritories = territories.filter((t) => t.type === "territory" && t.boundaries);
 
-    // Territory fills
-    if (!mapRef.current?.getSource("territories")) {
-      addSource("territories", {
-        type: "FeatureCollection",
-        features: regularTerritories.map((t) => ({
-          type: "Feature",
-          properties: { number: t.number, name: t.name },
-          geometry: t.boundaries,
-        })),
-      });
+    // Territory fills — update source data if already exists, otherwise create
+    const territoryFeatures = {
+      type: "FeatureCollection" as const,
+      features: regularTerritories.map((t) => ({
+        type: "Feature" as const,
+        properties: { number: t.number, name: t.name },
+        geometry: t.boundaries,
+      })),
+    };
+
+    const existingSource = mapRef.current?.getSource("territories") as { setData?: (data: object) => void } | undefined;
+    if (existingSource?.setData) {
+      // Update existing source data (e.g., after gap expansion changes boundaries)
+      existingSource.setData(territoryFeatures);
+    } else {
+      addSource("territories", territoryFeatures);
 
       addLayer({
         id: "territory-fill", type: "fill", source: "territories",
@@ -1071,6 +1078,37 @@ export function GapDetection() {
             </button>
           </div>
         )}
+
+        {/* ─── Undocked Smart Resolve floating panel ──────────── */}
+        {smartResolveUndocked && selectedRun?.status === "completed" && activeTab === "gaps" && (
+          <div className="absolute bottom-4 left-4 right-4 z-20 max-h-[50vh] bg-[var(--bg-1)] border border-[var(--border)] rounded-[var(--radius)] shadow-xl overflow-hidden flex flex-col">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] flex-shrink-0 bg-[var(--glass)]">
+              <span className="text-xs font-semibold text-[var(--text)] flex items-center gap-2">
+                <Sparkles size={14} className="text-[var(--amber)]" />
+                <FormattedMessage id="gap.smartResolve" defaultMessage="Smart Resolve" />
+              </span>
+              <button
+                onClick={() => setSmartResolveUndocked(false)}
+                className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer"
+                title="Dock back to sidebar"
+              >
+                <PanelRightOpen size={12} />
+                <FormattedMessage id="gap.dock" defaultMessage="Dock" />
+              </button>
+            </div>
+            {/* Panel content */}
+            <div className="flex-1 overflow-y-auto">
+              <GapResolutionSection
+                token={token}
+                onGapPolygonsChange={handleGapPolygonsChange}
+                onResolved={handleGapResolved}
+                onHighlightGap={handleHighlightGap}
+                overrides={overrides}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Sidebar (right) ──────────────────────────────────── */}
@@ -1340,14 +1378,46 @@ export function GapDetection() {
               </div>
             )}
 
-            {/* Smart Gap Resolution */}
-            <GapResolutionSection
-              token={token}
-              onGapPolygonsChange={handleGapPolygonsChange}
-              onResolved={handleGapResolved}
-              onHighlightGap={handleHighlightGap}
-              overrides={overrides}
-            />
+            {/* Smart Gap Resolution — docked in sidebar */}
+            {!smartResolveUndocked && (
+              <>
+                {/* Undock button */}
+                <div className="px-4 pt-2 flex justify-end">
+                  <button
+                    onClick={() => setSmartResolveUndocked(true)}
+                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer"
+                    title="Undock to floating panel"
+                  >
+                    <PanelRightClose size={12} />
+                    <FormattedMessage id="gap.undock" defaultMessage="Undock" />
+                  </button>
+                </div>
+                <GapResolutionSection
+                  token={token}
+                  onGapPolygonsChange={handleGapPolygonsChange}
+                  onResolved={handleGapResolved}
+                  onHighlightGap={handleHighlightGap}
+                  overrides={overrides}
+                />
+              </>
+            )}
+
+            {/* Placeholder when undocked */}
+            {smartResolveUndocked && (
+              <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)] space-y-3">
+                <PanelRightClose size={24} strokeWidth={1.2} />
+                <p className="text-xs">
+                  <FormattedMessage id="gap.undockedHint" defaultMessage="Smart Resolve is undocked" />
+                </p>
+                <button
+                  onClick={() => setSmartResolveUndocked(false)}
+                  className="text-xs text-[var(--amber)] hover:text-[var(--amber-light)] flex items-center gap-1 cursor-pointer"
+                >
+                  <PanelRightOpen size={12} />
+                  <FormattedMessage id="gap.dock" defaultMessage="Dock back" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
