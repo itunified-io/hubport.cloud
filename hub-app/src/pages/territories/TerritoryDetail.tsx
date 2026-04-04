@@ -293,8 +293,20 @@ export function TerritoryDetail() {
 
   /** Extract ring coordinates from territory boundaries */
   const extractRing = useCallback((boundaries: unknown): [number, number][] => {
-    const b = boundaries as { type?: string; coordinates?: number[][][] };
-    const ring = b?.coordinates?.[0];
+    const b = boundaries as { type?: string; coordinates?: unknown };
+    let ring: number[][] | undefined;
+    if (b?.type === "MultiPolygon") {
+      const polys = b.coordinates as number[][][][];
+      if (polys.length > 0) {
+        // Take the largest polygon's outer ring
+        const largest = polys.reduce((a, c) =>
+          (a[0]?.length ?? 0) >= (c[0]?.length ?? 0) ? a : c
+        );
+        ring = largest[0];
+      }
+    } else {
+      ring = (b?.coordinates as number[][][])?.[0];
+    }
     if (!ring || ring.length < 3) return [];
     return ring.map((c) => [c[0]!, c[1]!] as [number, number]);
   }, []);
@@ -369,7 +381,7 @@ export function TerritoryDetail() {
         });
       }
 
-      // Fetch snap context (roads, local streets, water) — cached after first fetch
+      // Fetch snap context (roads, local streets, water) — cached after successful fetch
       try {
         let ctx = snapContextCacheRef.current;
         if (!ctx) {
@@ -378,11 +390,11 @@ export function TerritoryDetail() {
           const pad = 0.005; // ~500m padding
           const bbox = `${Math.min(...lngs) - pad},${Math.min(...lats) - pad},${Math.max(...lngs) + pad},${Math.max(...lats) + pad}`;
           ctx = await getSnapContext(bbox, token);
-          snapContextCacheRef.current = ctx;
         }
 
         // Convert road + local_street features to SnapTargets
         const features = (ctx as any)?.features ?? (ctx as any)?.roads?.features ?? [];
+        let hasRoads = false;
         for (const f of features) {
           const snapType = f.properties?.snapType;
           if (snapType === "road" || snapType === "local_street") {
@@ -391,7 +403,12 @@ export function TerritoryDetail() {
               label: f.properties?.name ?? "Road",
               geometry: f.geometry as SnapTarget["geometry"],
             });
+            hasRoads = true;
           }
+        }
+        // Only cache if we actually got road data (avoid caching Overpass timeouts)
+        if (hasRoads) {
+          snapContextCacheRef.current = ctx;
         }
       } catch (roadErr) {
         console.warn("Road data unavailable (Overpass timeout/rate-limit), continuing with neighbors only:", roadErr);
@@ -1177,12 +1194,18 @@ export function TerritoryDetail() {
                               setTerritory(refreshed);
                               territoryRef.current = refreshed;
                               layerAdded.current = false;
+                              // Clean up clip mode AFTER save completes
+                              setClipPreviewCoords(null);
+                              setClipMode(false);
+                              setClipSnapTargets([]);
+                              setEditCoords([]);
+                              setMapExpanded(false);
+                              clipMarkersRef.current.forEach((m) => m.remove());
+                              clipMarkersRef.current = [];
                             })
                             .catch((err) => console.error("Clip save failed:", err))
                             .finally(() => setSaving(false));
                         }
-                        setClipPreviewCoords(null);
-                        cancelClipMode();
                       }}
                       disabled={saving}
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--green)] text-black rounded-[var(--radius-sm)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"

@@ -893,15 +893,6 @@ export function GapDetection() {
     if (activeStyle === "satellite") changeStyle("street");
   };
 
-  const toggleGapSelection = (osmId: string) => {
-    setSelectedGaps((prev) => {
-      const next = new Set(prev);
-      if (next.has(osmId)) next.delete(osmId);
-      else next.add(osmId);
-      return next;
-    });
-  };
-
   // ─── Render ───────────────────────────────────────────────────
 
   return (

@@ -166,8 +166,9 @@ export async function runGapAnalysis(
   const ignoredIds = new Set(ignoredRows.map((r: { osmId: string }) => r.osmId));
 
   // Step 4b: Load building overrides
-  const overrideRows = await prisma.buildingOverride.findMany();
-  const overrideMap = new Map(overrideRows.map((r: { osmId: string; overriddenType: string | null; overriddenAddress: string | null; triageStatus: string }) => [r.osmId, r]));
+  type OverrideRow = { osmId: string; overriddenType: string | null; overriddenAddress: string | null; triageStatus: string };
+  const overrideRows: OverrideRow[] = await prisma.buildingOverride.findMany();
+  const overrideMap = new Map<string, OverrideRow>(overrideRows.map((r) => [r.osmId, r]));
 
   // Step 5: Get all territory boundaries for neighbor assignment
   const territories: Array<{ id: string; number: string; name: string; boundaries: unknown }> =

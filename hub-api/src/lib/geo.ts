@@ -42,22 +42,33 @@ export function bboxFromGeoJSON(boundaries: unknown): BBox | null {
 }
 
 /**
- * Simple point-in-polygon test using ray casting algorithm.
+ * Ray-casting test for a single ring.
+ */
+function rayInRing(lat: number, lng: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i]![0]!, yi = ring[i]![1]!;
+    const xj = ring[j]![0]!, yj = ring[j]![1]!;
+    const intersect = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Point-in-polygon test using ray casting algorithm.
  * Polygon is an array of rings (first = outer boundary, rest = holes).
- * Each ring is an array of [lng, lat] coordinate pairs.
+ * A point is inside if it's in the outer ring AND NOT in any hole ring.
  */
 export function pointInPolygon(lat: number, lng: number, polygon: number[][][]): boolean {
-  for (const ring of polygon) {
-    let inside = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const xi = ring[i]![0]!, yi = ring[i]![1]!;
-      const xj = ring[j]![0]!, yj = ring[j]![1]!;
-      const intersect = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
-      if (intersect) inside = !inside;
-    }
-    if (inside) return true;
+  if (!polygon || polygon.length === 0) return false;
+  // Must be inside outer ring
+  if (!rayInRing(lat, lng, polygon[0]!)) return false;
+  // Must NOT be inside any hole ring
+  for (let i = 1; i < polygon.length; i++) {
+    if (rayInRing(lat, lng, polygon[i]!)) return false;
   }
-  return false;
+  return true;
 }
 
 /**
@@ -65,12 +76,16 @@ export function pointInPolygon(lat: number, lng: number, polygon: number[][][]):
  */
 export function isInsideBoundaries(lat: number, lng: number, boundaries: unknown): boolean {
   if (!boundaries || typeof boundaries !== "object") return false;
-  const geo = boundaries as { type?: string; coordinates?: number[][][] | number[][][][] };
+  const geo = boundaries as { type?: string; coordinates?: number[][][] | number[][][][]; geometries?: Array<{ type?: string; coordinates?: unknown }> };
   if (geo.type === "Polygon") {
     return pointInPolygon(lat, lng, geo.coordinates as number[][][]);
   }
   if (geo.type === "MultiPolygon") {
     return (geo.coordinates as number[][][][]).some((poly) => pointInPolygon(lat, lng, poly));
+  }
+  // GeometryCollection — check each sub-geometry (PostGIS sometimes produces these)
+  if (geo.type === "GeometryCollection" && Array.isArray(geo.geometries)) {
+    return geo.geometries.some((g) => isInsideBoundaries(lat, lng, g));
   }
   return false;
 }

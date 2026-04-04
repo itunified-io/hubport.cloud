@@ -1,6 +1,14 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.03.11
+
+### Gap Detection Filter & Auto-Fix Bugs
+- feat: add building type filter chips to gap detection sidebar (toggle shed, barn, commercial, etc.)
+- fix: handle MultiPolygon geometry in territory edit mode (Edit button stops working after first save)
+- fix: bulk fix uses `runAutoFixPipeline`, matching single-fix behavior (was failing with inline PostGIS)
+- fix: Branch-KML-Import file picker accept attribute (macOS text/plain MIME type)
+
 ## v2026.04.03.9
 
 ### Territory Management Features

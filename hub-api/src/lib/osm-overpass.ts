@@ -44,8 +44,8 @@ export interface OverpassWaterBody {
   name?: string;
 }
 
-async function overpassFetch(query: string, timeoutMs = 120_000): Promise<any> {
-  const MAX_RETRIES = 3;
+async function overpassFetch(query: string, timeoutMs = 100_000): Promise<any> {
+  const MAX_RETRIES = 2;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -107,7 +107,7 @@ export async function queryBuildingsInBBox(
   east: number,
 ): Promise<OverpassBuilding[]> {
   const query = `
-    [out:json][timeout:180];
+    [out:json][timeout:90];
     (
       way["building"](${south},${west},${north},${east});
       relation["building"](${south},${west},${north},${east});
@@ -115,7 +115,7 @@ export async function queryBuildingsInBBox(
     out center tags;
   `;
 
-  const data = await overpassFetch(query, 200_000);
+  const data = await overpassFetch(query, 100_000);
 
   return (data.elements ?? [])
     .filter((el: any) => el.lat || el.center?.lat)
@@ -150,9 +150,9 @@ export async function queryRoadsInBBox(
   north: number,
   east: number,
 ): Promise<OverpassRoad[]> {
-  const query = `[out:json][timeout:120];
+  const query = `[out:json][timeout:25];
 (
-  way["highway"~"^(primary|secondary|tertiary|residential|service|track|path|unclassified|living_street)$"](${south},${west},${north},${east});
+  way["highway"~"^(primary|secondary|tertiary|residential|unclassified|living_street)$"](${south},${west},${north},${east});
 );
 out geom tags;`;
 
@@ -180,7 +180,7 @@ export async function queryWaterBodiesInBBox(
   north: number,
   east: number,
 ): Promise<OverpassWaterBody[]> {
-  const query = `[out:json][timeout:180];
+  const query = `[out:json][timeout:90];
 (
   way["natural"="water"](${south},${west},${north},${east});
   relation["natural"="water"](${south},${west},${north},${east});
