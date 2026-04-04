@@ -194,11 +194,15 @@ export function GapDetection() {
     if (!map) return;
 
     // Remove old layers
-    if (map.getLayer("gap-polygon-fill")) map.removeLayer("gap-polygon-fill");
-    if (map.getLayer("gap-polygon-outline")) map.removeLayer("gap-polygon-outline");
+    if (map.getLayer("gap-highlight-outline")) map.removeLayer("gap-highlight-outline");
     if (map.getLayer("gap-highlight-fill")) map.removeLayer("gap-highlight-fill");
+    if (map.getLayer("gap-polygon-outline")) map.removeLayer("gap-polygon-outline");
+    if (map.getLayer("gap-polygon-fill")) map.removeLayer("gap-polygon-fill");
     if (map.getSource("gap-polygons")) map.removeSource("gap-polygons");
     if (map.getSource("gap-highlight")) map.removeSource("gap-highlight");
+
+    // Insert gap polygons BELOW building markers so dots remain clickable
+    const beforeLayer = map.getLayer("gap-markers") ? "gap-markers" : undefined;
 
     if (polygons.length > 0) {
       addSource("gap-polygons", {
@@ -213,14 +217,14 @@ export function GapDetection() {
         id: "gap-polygon-fill",
         type: "fill",
         source: "gap-polygons",
-        paint: { "fill-color": "#f97316", "fill-opacity": 0.12 },
-      });
+        paint: { "fill-color": "#f97316", "fill-opacity": 0.1 },
+      }, beforeLayer);
       addLayer({
         id: "gap-polygon-outline",
         type: "line",
         source: "gap-polygons",
         paint: { "line-color": "#f97316", "line-width": 1.5, "line-dasharray": [3, 2] },
-      });
+      }, beforeLayer);
     }
 
     if (highlighted) {
@@ -232,8 +236,40 @@ export function GapDetection() {
         id: "gap-highlight-fill",
         type: "fill",
         source: "gap-highlight",
-        paint: { "fill-color": "#f97316", "fill-opacity": 0.3 },
-      });
+        paint: { "fill-color": "#f97316", "fill-opacity": 0.25 },
+      }, beforeLayer);
+      addLayer({
+        id: "gap-highlight-outline",
+        type: "line",
+        source: "gap-highlight",
+        paint: { "line-color": "#f97316", "line-width": 2.5 },
+      }, beforeLayer);
+
+      // Fly to highlighted gap polygon bounds
+      try {
+        const geo = highlighted as { coordinates?: number[][][][] | number[][][] };
+        if (geo.coordinates) {
+          const coords = geo.coordinates.flat(3) as unknown as number[];
+          let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+          // coords is flat array [lng, lat, lng, lat, ...]
+          const allCoords: number[][] = (geo.coordinates as number[][][][]).flat(2);
+          for (const c of allCoords) {
+            if (c[0]! < minLng) minLng = c[0]!;
+            if (c[1]! < minLat) minLat = c[1]!;
+            if (c[0]! > maxLng) maxLng = c[0]!;
+            if (c[1]! > maxLat) maxLat = c[1]!;
+          }
+          if (isFinite(minLng)) {
+            map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+              padding: 80,
+              maxZoom: 16,
+              duration: 800,
+            });
+          }
+        }
+      } catch {
+        // Ignore bounds calculation errors
+      }
     }
   }, [mapRef, addSource, addLayer]);
 
@@ -1317,9 +1353,9 @@ export function GapDetection() {
           </div>
         )}
 
-        {/* Run history — collapse to fixed height when tab content is showing */}
-        <div className={`${selectedRun?.status === "completed" ? "flex-shrink-0 max-h-[140px]" : "flex-1"} overflow-y-auto border-t border-[var(--border)]`}>
-          <div className="px-4 py-2 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+        {/* Run history — collapse to compact size when tab content is showing */}
+        <div className={`${selectedRun?.status === "completed" ? "flex-shrink-0 max-h-[100px]" : "flex-1"} overflow-y-auto border-t border-[var(--border)]`}>
+          <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
             <FormattedMessage id="gap.runHistory" defaultMessage="Run History" />
           </div>
 

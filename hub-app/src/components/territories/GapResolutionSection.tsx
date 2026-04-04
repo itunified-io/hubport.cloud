@@ -174,7 +174,7 @@ export function GapResolutionSection({
           </div>
           <div>
             <label className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">
-              <FormattedMessage id="gap.minArea" defaultMessage="Min. area (m\u00B2)" />
+              <FormattedMessage id="gap.minArea" defaultMessage="Min. area (m²)" />
             </label>
             <input
               type="number"
