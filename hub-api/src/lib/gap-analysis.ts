@@ -99,6 +99,7 @@ export interface GapAnalysis {
   areaMeter2: number;
   residentialCount: number;
   totalBuildingCount: number;
+  unreviewedCount: number;
   recommendation: "new_territory" | "expand_neighbors";
   neighborAssignments: NeighborAssignment[];
 }
@@ -164,6 +165,10 @@ export async function runGapAnalysis(
   });
   const ignoredIds = new Set(ignoredRows.map((r: { osmId: string }) => r.osmId));
 
+  // Step 4b: Load building overrides
+  const overrideRows = await prisma.buildingOverride.findMany();
+  const overrideMap = new Map(overrideRows.map((r: { osmId: string; overriddenType: string | null; overriddenAddress: string | null; triageStatus: string }) => [r.osmId, r]));
+
   // Step 5: Get all territory boundaries for neighbor assignment
   const territories: Array<{ id: string; number: string; name: string; boundaries: unknown }> =
     await prisma.territory.findMany({
@@ -182,8 +187,31 @@ export async function runGapAnalysis(
       (b) => !ignoredIds.has(b.osmId) && isInsideBoundaries(b.lat, b.lng, gap.geojson),
     );
 
-    const residentialCount = gapBuildings.filter(isResidential).length;
     const totalBuildingCount = gapBuildings.length;
+
+    // Classify buildings using overrides
+    let residentialCount = 0;
+    let unreviewedCount = 0;
+
+    for (const b of gapBuildings) {
+      const override = overrideMap.get(b.osmId);
+      const effectiveType = override?.overriddenType ?? b.buildingType ?? "unknown";
+      const effectiveHasAddress = (override?.overriddenAddress != null) || b.hasAddress;
+      const severity = classifySeverity(effectiveType, effectiveHasAddress);
+
+      // Triage-based counting
+      if (override?.triageStatus === "ignored" || override?.triageStatus === "needs_visit") {
+        // Excluded from residential count
+      } else if (override?.triageStatus === "confirmed_residential") {
+        residentialCount++;
+      } else if (severity === "high" || severity === "medium") {
+        residentialCount++;
+      } else if (severity === "low") {
+        // Unreviewed uncertain — excluded from count, tracked for gate
+        unreviewedCount++;
+      }
+      // severity === "ignorable" → excluded
+    }
 
     // Decision engine
     const recommendation: "new_territory" | "expand_neighbors" =
@@ -264,6 +292,7 @@ export async function runGapAnalysis(
       areaMeter2: gap.areaMeter2,
       residentialCount,
       totalBuildingCount,
+      unreviewedCount,
       recommendation,
       neighborAssignments,
     });
