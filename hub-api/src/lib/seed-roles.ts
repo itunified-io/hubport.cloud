@@ -302,11 +302,36 @@ const SYSTEM_ROLES: SeedRole[] = [
     permissions: [P.MEETINGS_VIEW, P.PUBLISHERS_VIEW_MINIMAL],
   },
   {
-    name: "Cleaning Responsible",
-    description: "Kingdom Hall cleaning schedule manager",
+    name: "Cleaning Coordinator",
+    description: "Manages Kingdom Hall cleaning rotations and grounds assignments",
     scope: "all",
     permissions: [
-      P.MANAGE_CLEANING, P.PUBLISHERS_VIEW_MINIMAL, P.MEETINGS_VIEW,
+      P.MANAGE_FACILITIES_CLEANING,
+      P.MANAGE_FACILITIES_GROUNDS,
+      P.FACILITIES_VIEW,
+      P.PUBLISHERS_VIEW_MINIMAL,
+      P.MEETINGS_VIEW,
+    ],
+  },
+  {
+    name: "LDC Representative",
+    description: "Manages maintenance issues, preventive tasks, and LDC committee forwarding",
+    scope: "all",
+    permissions: [
+      P.MANAGE_FACILITIES_MAINTENANCE,
+      P.MANAGE_FACILITIES_PREVENTIVE,
+      P.FACILITIES_VIEW,
+      P.FACILITIES_REPORT,
+      P.PUBLISHERS_VIEW_MINIMAL,
+    ],
+  },
+  {
+    name: "Maintenance Reporter",
+    description: "Can submit maintenance issues with photos",
+    scope: "all",
+    permissions: [
+      P.FACILITIES_REPORT,
+      P.FACILITIES_VIEW,
     ],
   },
   {
@@ -375,25 +400,25 @@ const SYSTEM_ROLES: SeedRole[] = [
     name: "Grundreinigung",
     description: "Deep cleaning team member",
     scope: "all",
-    permissions: [P.PRIVILEGE_CLEANING_DEEP, P.CLEANING_VIEW],
+    permissions: [P.PRIVILEGE_CLEANING_DEEP, P.FACILITIES_VIEW],
   },
   {
     name: "Sichtreinigung",
     description: "Visual / spot cleaning team member",
     scope: "all",
-    permissions: [P.PRIVILEGE_CLEANING_VISUAL, P.CLEANING_VIEW],
+    permissions: [P.PRIVILEGE_CLEANING_VISUAL, P.FACILITIES_VIEW],
   },
   {
     name: "Rasen",
     description: "Lawn care team member",
     scope: "all",
-    permissions: [P.PRIVILEGE_GARDEN_LAWN, P.CLEANING_VIEW],
+    permissions: [P.PRIVILEGE_GARDEN_LAWN, P.FACILITIES_VIEW],
   },
   {
     name: "Winterdienst",
     description: "Snow clearing / winter service team member",
     scope: "all",
-    permissions: [P.PRIVILEGE_GARDEN_WINTER, P.CLEANING_VIEW],
+    permissions: [P.PRIVILEGE_GARDEN_WINTER, P.FACILITIES_VIEW],
   },
 ];
 

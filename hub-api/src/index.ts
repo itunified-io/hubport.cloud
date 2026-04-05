@@ -14,7 +14,10 @@ import { onboardingRoutes } from "./routes/onboarding.js";
 import { auditRoutes } from "./routes/audit.js";
 import { securityRoutes } from "./routes/security.js";
 import { serviceGroupRoutes } from "./routes/service-groups.js";
-import { cleaningRoutes } from "./routes/cleaning.js";
+import { facilitiesCleaningRoutes } from "./routes/facilities-cleaning.js";
+import { facilitiesGroundsRoutes } from "./routes/facilities-grounds.js";
+import { facilitiesMaintenanceRoutes } from "./routes/facilities-maintenance.js";
+import { facilitiesPreventiveRoutes } from "./routes/facilities-preventive.js";
 import { jitsiRoutes } from "./routes/jitsi.js";
 import { sharingRoutes } from "./routes/sharing.js";
 import { internalRoutes } from "./routes/internal.js";
@@ -52,6 +55,7 @@ import { startAssignmentOverdueCheck } from './jobs/assignment-overdue-check.js'
 import { startCampaignAutoClose } from './jobs/campaign-auto-close.js';
 import { seedSystemRoles, bootstrapBoundaryVersions } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
+import { migrateFacilitiesPermissions } from "./lib/migration-facilities.js";
 
 
 const app = Fastify({
@@ -101,7 +105,10 @@ async function start(): Promise<void> {
   await app.register(auditRoutes);
   await app.register(securityRoutes);
   await app.register(serviceGroupRoutes);
-  await app.register(cleaningRoutes);
+  await app.register(facilitiesCleaningRoutes);
+  await app.register(facilitiesGroundsRoutes);
+  await app.register(facilitiesMaintenanceRoutes);
+  await app.register(facilitiesPreventiveRoutes);
   await app.register(jitsiRoutes);
   await app.register(sharingRoutes);
   await app.register(internalRoutes);
@@ -165,6 +172,10 @@ async function start(): Promise<void> {
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
     app.log.info("System roles up to date");
+
+    app.log.info("Migrating facilities permissions...");
+    await migrateFacilitiesPermissions();
+    app.log.info("Facilities permissions migrated");
 
     app.log.info("Bootstrapping boundary version snapshots...");
     await bootstrapBoundaryVersions();

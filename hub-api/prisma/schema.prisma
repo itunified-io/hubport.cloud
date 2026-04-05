@@ -172,17 +172,23 @@ model Publisher {
   inviteCode      InviteCode?
   serviceGroup    ServiceGroup?         @relation(fields: [serviceGroupId], references: [id])
   serviceGroupId  String?
-  overseerOf      ServiceGroup[]        @relation("ServiceGroupOverseer")
-  assistantOf     ServiceGroup[]        @relation("ServiceGroupAssistant")
-  gardenDuties    GardenDutyMember[]
-  campaignInvites CampaignInvite[]
-  assignedParts   MeetingAssignment[]   @relation("AssignedParts")
-  assistedParts   MeetingAssignment[]   @relation("AssistedParts")
-  awayPeriods     AwayPeriod[]
-  speaker         Speaker?              @relation("PublisherSpeaker")
-  notifications   Notification[]
-  addressVisits   AddressVisit[]
-  locationShares  LocationShare[]
+  overseerOf         ServiceGroup[]      @relation("ServiceGroupOverseer")
+  assistantOf        ServiceGroup[]      @relation("ServiceGroupAssistant")
+  gardenDuties       GardenDutyMember[]
+  campaignInvites    CampaignInvite[]
+  assignedParts      MeetingAssignment[] @relation("AssignedParts")
+  assistedParts      MeetingAssignment[] @relation("AssistedParts")
+  awayPeriods        AwayPeriod[]
+  speaker            Speaker?            @relation("PublisherSpeaker")
+  notifications      Notification[]
+  addressVisits      AddressVisit[]
+  locationShares     LocationShare[]
+  reportedIssues     MaintenanceIssue[]  @relation("reported_issues")
+  assignedIssues     MaintenanceIssue[]  @relation("assigned_issues")
+  uploadedPhotos     MaintenancePhoto[]  @relation("uploaded_photos")
+  maintenanceComments MaintenanceComment[] @relation("maintenance_comments")
+  preventiveTasks    PreventiveTask[]    @relation("preventive_tasks")
+  preventiveEntries  PreventiveEntry[]   @relation("preventive_entries")
 }
 
 // ─── App Roles (Permission Bundles) ──────────────────────────────────
@@ -732,6 +738,36 @@ enum GardenDutyType {
   custom
 }
 
+enum MaintenanceCategory {
+  electrical
+  plumbing
+  hvac
+  structural
+  safety
+  grounds
+  interior
+  audio_video
+  other
+}
+
+enum MaintenancePriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum MaintenanceStatus {
+  reported
+  under_review
+  approved
+  forwarded_to_ldc
+  in_progress
+  resolved
+  closed
+  rejected
+}
+
 /// Garden duties — assigned to INDIVIDUAL PUBLISHERS (not service groups).
 model GardenDuty {
   id        String         @id @default(uuid())
@@ -756,6 +792,90 @@ model GardenDutyMember {
 
   @@unique([dutyId, publisherId])
   @@index([publisherId])
+}
+
+// ─── Maintenance & Preventive Tasks ─────────────────────────────────
+
+model MaintenanceIssue {
+  id            String              @id @default(uuid())
+  title         String
+  description   String
+  category      MaintenanceCategory
+  priority      MaintenancePriority
+  status        MaintenanceStatus   @default(reported)
+  location      String?
+  reporterId    String
+  reporter      Publisher           @relation("reported_issues", fields: [reporterId], references: [id])
+  assigneeId    String?
+  assignee      Publisher?          @relation("assigned_issues", fields: [assigneeId], references: [id])
+  rejectionNote String?
+  ldcForwarded  DateTime?
+  ldcContact    String?             /// @encrypted
+  resolvedAt    DateTime?
+  closedAt      DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  photos   MaintenancePhoto[]
+  comments MaintenanceComment[]
+
+  @@index([status])
+  @@index([category])
+  @@index([reporterId])
+  @@index([assigneeId])
+}
+
+model MaintenancePhoto {
+  id           String           @id @default(uuid())
+  issueId      String
+  issue        MaintenanceIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   Publisher        @relation("uploaded_photos", fields: [uploadedById], references: [id])
+  data         String           /// @encrypted
+  mimeType     String
+  caption      String?
+  createdAt    DateTime         @default(now())
+}
+
+model MaintenanceComment {
+  id        String           @id @default(uuid())
+  issueId   String
+  issue     MaintenanceIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    Publisher        @relation("maintenance_comments", fields: [authorId], references: [id])
+  text      String
+  createdAt DateTime         @default(now())
+}
+
+model PreventiveTask {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  category    MaintenanceCategory
+  frequency   String              // "1w", "2w", "1m", "3m", "6m", "1y"
+  isDefault   Boolean             @default(false)
+  assigneeId  String?
+  assignee    Publisher?          @relation("preventive_tasks", fields: [assigneeId], references: [id])
+  lastDone    DateTime?
+  nextDue     DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  entries PreventiveEntry[]
+
+  @@index([nextDue])
+}
+
+model PreventiveEntry {
+  id        String         @id @default(uuid())
+  taskId    String
+  task      PreventiveTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  doneById  String
+  doneBy    Publisher      @relation("preventive_entries", fields: [doneById], references: [id])
+  doneAt    DateTime
+  notes     String?
+  createdAt DateTime       @default(now())
 }
 
 // ─── Chat ────────────────────────────────────────────────────────────

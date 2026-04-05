@@ -14,38 +14,28 @@ const DEFAULT_CLEANING_DUTIES = [
   { name: "Monatsreinigung", category: "monatsreinigung" as const, isDefault: true, sortOrder: 3 },
 ];
 
-const DEFAULT_GARDEN_DUTIES = [
-  { name: "Rasen mähen", type: "rasen" as const, isDefault: true, sortOrder: 1 },
-  { name: "Winterdienst", type: "winterdienst" as const, isDefault: true, sortOrder: 2 },
-];
-
-export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
+export async function facilitiesCleaningRoutes(app: FastifyInstance): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════
   // SEED DEFAULTS
   // ═══════════════════════════════════════════════════════════════════
 
-  app.get("/cleaning/seed", async () => {
-    let cleaningSeeded = 0;
-    let gardenSeeded = 0;
+  app.post(
+    "/facilities/cleaning/seed",
+    { preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING) },
+    async () => {
+      let cleaningSeeded = 0;
 
-    for (const d of DEFAULT_CLEANING_DUTIES) {
-      const exists = await prisma.cleaningDuty.findFirst({ where: { name: d.name, isDefault: true } });
-      if (!exists) {
-        await prisma.cleaningDuty.create({ data: d });
-        cleaningSeeded++;
+      for (const d of DEFAULT_CLEANING_DUTIES) {
+        const exists = await prisma.cleaningDuty.findFirst({ where: { name: d.name, isDefault: true } });
+        if (!exists) {
+          await prisma.cleaningDuty.create({ data: d });
+          cleaningSeeded++;
+        }
       }
-    }
 
-    for (const d of DEFAULT_GARDEN_DUTIES) {
-      const exists = await prisma.gardenDuty.findFirst({ where: { name: d.name, isDefault: true } });
-      if (!exists) {
-        await prisma.gardenDuty.create({ data: d });
-        gardenSeeded++;
-      }
-    }
-
-    return { cleaningSeeded, gardenSeeded };
-  });
+      return { cleaningSeeded };
+    },
+  );
 
   // ═══════════════════════════════════════════════════════════════════
   // CLEANING DUTIES (assigned to service groups)
@@ -53,8 +43,8 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // List all cleaning duties
   app.get(
-    "/cleaning/duties",
-    { preHandler: requirePermission(PERMISSIONS.CLEANING_VIEW) },
+    "/facilities/cleaning/duties",
+    { preHandler: requirePermission(PERMISSIONS.FACILITIES_VIEW) },
     async () => {
       return prisma.cleaningDuty.findMany({
         orderBy: { sortOrder: "asc" },
@@ -65,7 +55,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // Create cleaning duty
   app.post<{ Body: { name: string; category?: "grundreinigung" | "sichtreinigung" | "monatsreinigung" | "custom" } }>(
-    "/cleaning/duties",
+    "/facilities/cleaning/duties",
     {
       schema: {
         body: Type.Object({
@@ -76,7 +66,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
           ])),
         }),
       },
-      preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
+      preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING),
     },
     async (request) => {
       const { name, category } = request.body;
@@ -90,8 +80,8 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // Delete cleaning duty
   app.delete<{ Params: IdParamsType }>(
-    "/cleaning/duties/:id",
-    { preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING) },
+    "/facilities/cleaning/duties/:id",
+    { preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING) },
     async (request, reply) => {
       const duty = await prisma.cleaningDuty.findUnique({ where: { id: request.params.id } });
       if (!duty) return reply.code(404).send({ error: "Cleaning duty not found" });
@@ -107,8 +97,8 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // List schedules in date range
   app.get(
-    "/cleaning/schedules",
-    { preHandler: requirePermission(PERMISSIONS.CLEANING_VIEW) },
+    "/facilities/cleaning/schedules",
+    { preHandler: requirePermission(PERMISSIONS.FACILITIES_VIEW) },
     async (request) => {
       const { from, to } = request.query as { from?: string; to?: string };
       const where: Record<string, unknown> = {};
@@ -128,7 +118,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // Generate rotation schedule
   app.post<{ Body: { dutyId: string; startDate: string; endDate: string; frequency: "weekly" | "biweekly" | "monthly" } }>(
-    "/cleaning/schedules/generate",
+    "/facilities/cleaning/schedules/generate",
     {
       schema: {
         body: Type.Object({
@@ -140,7 +130,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
           ]),
         }),
       },
-      preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
+      preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING),
     },
     async (request) => {
       const { dutyId, startDate, endDate, frequency } = request.body;
@@ -182,7 +172,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // Update schedule entry (status, reassign)
   app.put<{ Params: IdParamsType; Body: { status?: "scheduled" | "completed" | "skipped"; serviceGroupId?: string; notes?: string } }>(
-    "/cleaning/schedules/:id",
+    "/facilities/cleaning/schedules/:id",
     {
       schema: {
         body: Type.Object({
@@ -193,7 +183,7 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
           notes: Type.Optional(Type.String()),
         }),
       },
-      preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
+      preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING),
     },
     async (request, reply) => {
       const before = await prisma.cleaningSchedule.findUnique({ where: { id: request.params.id } });
@@ -209,82 +199,10 @@ export async function cleaningRoutes(app: FastifyInstance): Promise<void> {
 
   // Delete schedule entry
   app.delete<{ Params: IdParamsType }>(
-    "/cleaning/schedules/:id",
-    { preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING) },
+    "/facilities/cleaning/schedules/:id",
+    { preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_CLEANING) },
     async (request, reply) => {
       await prisma.cleaningSchedule.delete({ where: { id: request.params.id } });
-      return reply.code(204).send();
-    },
-  );
-
-  // ═══════════════════════════════════════════════════════════════════
-  // GARDEN DUTIES (assigned to individual publishers)
-  // ═══════════════════════════════════════════════════════════════════
-
-  // List garden duties with members
-  app.get(
-    "/cleaning/garden",
-    { preHandler: requirePermission(PERMISSIONS.CLEANING_VIEW) },
-    async () => {
-      return prisma.gardenDuty.findMany({
-        orderBy: { sortOrder: "asc" },
-        include: {
-          members: {
-            include: { publisher: { select: { id: true, firstName: true, lastName: true, displayName: true } } },
-          },
-        },
-      });
-    },
-  );
-
-  // Create garden duty
-  app.post<{ Body: { name: string; type?: "rasen" | "winterdienst" | "custom" } }>(
-    "/cleaning/garden",
-    {
-      schema: {
-        body: Type.Object({
-          name: Type.String({ minLength: 1 }),
-          type: Type.Optional(Type.Union([
-            Type.Literal("rasen"), Type.Literal("winterdienst"), Type.Literal("custom"),
-          ])),
-        }),
-      },
-      preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
-    },
-    async (request) => {
-      const { name, type } = request.body;
-      const duty = await prisma.gardenDuty.create({
-        data: { name, type: type ?? "custom" },
-      });
-      return duty;
-    },
-  );
-
-  // Assign publisher to garden duty
-  app.post<{ Params: IdParamsType; Body: { publisherId: string } }>(
-    "/cleaning/garden/:id/members",
-    {
-      schema: { body: Type.Object({ publisherId: Type.String({ format: "uuid" }) }) },
-      preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING),
-    },
-    async (request, reply) => {
-      const duty = await prisma.gardenDuty.findUnique({ where: { id: request.params.id } });
-      if (!duty) return reply.code(404).send({ error: "Garden duty not found" });
-      await prisma.gardenDutyMember.create({
-        data: { dutyId: request.params.id, publisherId: request.body.publisherId },
-      });
-      return { ok: true };
-    },
-  );
-
-  // Remove publisher from garden duty
-  app.delete<{ Params: { id: string; publisherId: string } }>(
-    "/cleaning/garden/:id/members/:publisherId",
-    { preHandler: requirePermission(PERMISSIONS.MANAGE_CLEANING) },
-    async (request, reply) => {
-      await prisma.gardenDutyMember.deleteMany({
-        where: { dutyId: request.params.id, publisherId: request.params.publisherId },
-      });
       return reply.code(204).send();
     },
   );

@@ -208,6 +208,14 @@ export const PERMISSIONS = {
   MANAGE_ORDNUNGSDIENST: "manage:ordnungsdienst",
   MANAGE_PROGRAM: "manage:program",
   MANAGE_CLEANING: "manage:cleaning",
+
+  // Facilities (replaces CLEANING_VIEW and MANAGE_CLEANING)
+  FACILITIES_VIEW: "app:facilities.view",
+  MANAGE_FACILITIES_CLEANING: "manage:facilities.cleaning",
+  MANAGE_FACILITIES_GROUNDS: "manage:facilities.grounds",
+  MANAGE_FACILITIES_MAINTENANCE: "manage:facilities.maintenance",
+  MANAGE_FACILITIES_PREVENTIVE: "manage:facilities.preventive",
+  FACILITIES_REPORT: "facilities:report",
   MANAGE_MIDWEEK_PROGRAM: "manage:midweek_program",
   MANAGE_WEEKEND_PROGRAM: "manage:weekend_program",
   MANAGE_MEETING_DUTIES: "manage:meeting_duties",
@@ -237,7 +245,7 @@ export const BASE_ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.MEETINGS_VIEW,
     PERMISSIONS.TERRITORIES_VIEW,
     PERMISSIONS.TERRITORIES_EXPORT,
-    PERMISSIONS.CLEANING_VIEW,
+    PERMISSIONS.FACILITIES_VIEW,
     PERMISSIONS.CHAT_VIEW,
     PERMISSIONS.CHAT_SEND,
     PERMISSIONS.SHARING_VIEW,
@@ -380,7 +388,7 @@ export const PAGE_PERMISSIONS: Record<string, string[]> = {
   "/field-service/campaigns": [PERMISSIONS.CAMPAIGNS_VIEW],
   "/field-service/meeting-points": [PERMISSIONS.MEETING_POINTS_VIEW],
   "/field-service/groups": [PERMISSIONS.SERVICE_MEETINGS_VIEW],
-  "/cleaning": [PERMISSIONS.CLEANING_VIEW],
+  "/facilities": [PERMISSIONS.FACILITIES_VIEW],
   "/settings": [PERMISSIONS.SETTINGS_VIEW],
   "/audit": [PERMISSIONS.AUDIT_VIEW],
 };

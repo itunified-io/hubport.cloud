@@ -1,6 +1,26 @@
 # Changelog
 Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 
+## v2026.04.05.1
+
+### Cleaning & Maintenance Module
+- feat: **Full module rewrite** — "Reinigung & Garten" renamed to "Reinigung & Instandhaltung" under `/facilities` route
+- feat: **Four tabs** — Reinigung, Außenanlagen, Instandhaltung, Wartungsplan
+- feat: **Maintenance issue tracker** — priority levels, photo upload (max 10, JPEG/PNG, 2MB), comments, 8-state status workflow
+- feat: **LDC committee forwarding** — escalate issues with PDF report, email, status tracking
+- feat: **Preventive maintenance registry** — recurring tasks, completion tracking, iCal export, 12 default templates
+- feat: **PDF report generation** — downloadable maintenance issue reports via PDFKit
+- feat: **Three new RBAC roles** — Cleaning Coordinator, LDC Representative, Maintenance Reporter
+- feat: **Six new permissions** — facilities.view, manage:facilities.{cleaning,grounds,maintenance,preventive}, facilities:report
+- feat: **Status transition state machine** — reported → under_review → approved → in_progress → resolved → closed (+ forwarded_to_ldc, rejected)
+- feat: **Cursor-based pagination** on maintenance and preventive list endpoints
+- feat: **Soft delete** for maintenance issues
+- feat: **Data migration** — automatic permission key + role rename from old cleaning module
+- feat: `/cleaning` redirect to `/facilities` for backwards compatibility
+- feat: i18n keys for all four tabs (EN + DE)
+- test: route handler tests for maintenance (19 tests) and preventive (10 tests) endpoints
+- chore: bump version to 2026.04.05.1
+
 ## v2026.04.04.25
 
 ### Fix: Smart Resolve includes uncertain buildings
