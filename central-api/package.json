@@ -16,17 +16,17 @@
     "@fastify/cors": "^10.0.0",
     "@fastify/formbody": "^8.0.0",
     "@fastify/rate-limit": "^10.3.0",
-    "@prisma/client": "^6.19.2",
-    "@sinclair/typebox": "^0.34.0",
-    "fastify": "^5.0.0",
+    "@prisma/client": "^6.19.3",
+    "@sinclair/typebox": "^0.34.49",
+    "fastify": "^5.8.4",
     "jose": "^5.0.0",
     "openid-client": "^6.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "prisma": "^6.19.2",
+    "@types/node": "^25.5.2",
+    "prisma": "^6.19.3",
     "tsx": "^4.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.2"
   }
 }
