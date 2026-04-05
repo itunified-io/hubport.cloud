@@ -250,6 +250,7 @@ describe("Facilities preventive routes", () => {
 
   describe("DELETE /facilities/preventive/:id — delete task", () => {
     it("deletes task and returns ok", async () => {
+      mockPrisma.preventiveTask.findUnique.mockResolvedValue({ id: "task-1" });
       mockPrisma.preventiveTask.delete.mockResolvedValue({ id: "task-1" });
 
       const res = await app.inject({
@@ -269,6 +270,19 @@ describe("Facilities preventive routes", () => {
         "PreventiveTask",
         "task-1",
       );
+    });
+
+    it("returns 404 for nonexistent task", async () => {
+      mockPrisma.preventiveTask.findUnique.mockResolvedValue(null);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/facilities/preventive/nonexistent",
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.payload).error).toContain("Task not found");
+      expect(mockPrisma.preventiveTask.delete).not.toHaveBeenCalled();
     });
   });
 });

@@ -80,6 +80,20 @@ export async function facilitiesGroundsRoutes(app: FastifyInstance): Promise<voi
     },
   );
 
+  // Delete grounds duty
+  app.delete(
+    "/facilities/grounds/:id",
+    { preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_GROUNDS) },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const existing = await prisma.gardenDuty.findUnique({ where: { id } });
+      if (!existing) return reply.code(404).send({ error: "Duty not found" });
+      await prisma.gardenDuty.delete({ where: { id } });
+      await audit("grounds_duty.delete", request.user.sub, "GardenDuty", id);
+      return { ok: true };
+    },
+  );
+
   // Assign publisher to grounds duty
   app.post<{ Params: IdParamsType; Body: { publisherId: string } }>(
     "/facilities/grounds/:id/members",

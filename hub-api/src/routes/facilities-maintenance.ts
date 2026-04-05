@@ -9,6 +9,10 @@ import { isValidTransition } from "../lib/status-machine.js";
 const MAX_PHOTOS_PER_ISSUE = 10;
 const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB base64
 
+const VALID_CATEGORIES = ["plumbing", "electrical", "hvac", "structural", "safety", "grounds", "furniture", "cleaning", "other"] as const;
+const VALID_PRIORITIES = ["low", "medium", "high", "critical"] as const;
+const VALID_STATUSES = ["reported", "under_review", "approved", "in_progress", "forwarded_to_ldc", "resolved", "rejected", "closed"] as const;
+
 export async function facilitiesMaintenanceRoutes(app: FastifyInstance): Promise<void> {
 
   // ═══════════════════════════════════════════════════════════════════
@@ -58,9 +62,23 @@ export async function facilitiesMaintenanceRoutes(app: FastifyInstance): Promise
   app.post(
     "/facilities/maintenance",
     { preHandler: requirePermission(PERMISSIONS.FACILITIES_REPORT) },
-    async (request) => {
+    async (request, reply) => {
       const { title, description, category, priority, location } =
         request.body as Record<string, string>;
+
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return reply.code(400).send({ error: "title is required and must be a non-empty string" });
+      }
+      if (!description || typeof description !== "string" || !description.trim()) {
+        return reply.code(400).send({ error: "description is required and must be a non-empty string" });
+      }
+      if (!VALID_CATEGORIES.includes(category as any)) {
+        return reply.code(400).send({ error: `Invalid category: ${category}. Valid values: ${VALID_CATEGORIES.join(", ")}` });
+      }
+      if (!VALID_PRIORITIES.includes(priority as any)) {
+        return reply.code(400).send({ error: `Invalid priority: ${priority}. Valid values: ${VALID_PRIORITIES.join(", ")}` });
+      }
+
       const issue = await prisma.maintenanceIssue.create({
         data: {
           title,
@@ -117,6 +135,18 @@ export async function facilitiesMaintenanceRoutes(app: FastifyInstance): Promise
         where: { id, deletedAt: null },
       });
       if (!existing) return reply.code(404).send({ error: "Issue not found" });
+
+      // Validate enum values
+      if (body.status && !VALID_STATUSES.includes(body.status as any)) {
+        return reply.code(400).send({
+          error: `Invalid status: ${body.status}. Valid values: ${VALID_STATUSES.join(", ")}`,
+        });
+      }
+      if (body.priority && !VALID_PRIORITIES.includes(body.priority as any)) {
+        return reply.code(400).send({
+          error: `Invalid priority: ${body.priority}. Valid values: ${VALID_PRIORITIES.join(", ")}`,
+        });
+      }
 
       // Validate status transition
       if (body.status && body.status !== existing.status) {
@@ -201,7 +231,7 @@ export async function facilitiesMaintenanceRoutes(app: FastifyInstance): Promise
 
   app.delete(
     "/facilities/maintenance/:id/photos/:photoId",
-    { preHandler: requirePermission(PERMISSIONS.FACILITIES_VIEW) },
+    { preHandler: requirePermission(PERMISSIONS.FACILITIES_REPORT) },
     async (request, reply) => {
       const { photoId } = request.params as { id: string; photoId: string };
 

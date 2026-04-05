@@ -417,17 +417,45 @@ describe("facilities-maintenance routes", () => {
     });
   });
 
-  // ─── Report Stub ──────────────────────────────────────────────────
+  // ─── Report PDF ──────────────────────────────────────────────────
 
-  describe("report stub", () => {
-    it("returns 501 Not Implemented", async () => {
+  describe("report PDF", () => {
+    it("returns 404 when issue not found", async () => {
+      mockPrisma.maintenanceIssue.findFirst.mockResolvedValue(null);
+
       const res = await app.inject({
         method: "GET",
         url: "/facilities/maintenance/issue-1/report",
       });
 
-      // Fastify 5 may convert non-standard codes; accept 500 or 501
-      expect([500, 501]).toContain(res.statusCode);
+      expect(res.statusCode).toBe(404);
+      expect(res.json().error).toContain("Issue not found");
+    });
+
+    it("returns PDF when issue exists", async () => {
+      mockPrisma.maintenanceIssue.findFirst.mockResolvedValue({
+        id: "issue-1",
+        title: "Broken pipe",
+        description: "Leaking pipe in basement",
+        category: "plumbing",
+        priority: "high",
+        status: "reported",
+        location: "Basement",
+        createdAt: new Date("2026-01-15"),
+        deletedAt: null,
+        reporter: { firstName: "Max", lastName: "Mustermann" },
+        assignee: null,
+        photos: [],
+        comments: [],
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/facilities/maintenance/issue-1/report",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toContain("application/pdf");
     });
   });
 });

@@ -20,6 +20,15 @@ const DEFAULT_PREVENTIVE_TASKS = [
   { name: "Außenbeleuchtung prüfen", category: "electrical" as const, frequency: "3m" },
 ];
 
+/** Escape text for iCal RFC 5545 compliance */
+function escapeIcalText(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
 export async function facilitiesPreventiveRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /facilities/preventive/seed
@@ -134,8 +143,10 @@ export async function facilitiesPreventiveRoutes(app: FastifyInstance): Promise<
   app.delete(
     "/facilities/preventive/:id",
     { preHandler: requirePermission(PERMISSIONS.MANAGE_FACILITIES_PREVENTIVE) },
-    async (request) => {
+    async (request, reply) => {
       const { id } = request.params as { id: string };
+      const existing = await prisma.preventiveTask.findUnique({ where: { id } });
+      if (!existing) return reply.status(404).send({ error: "Task not found" });
       await prisma.preventiveTask.delete({ where: { id } });
       await audit("preventive_task.delete", request.user.sub, "PreventiveTask", id);
       return { ok: true };
@@ -207,9 +218,9 @@ export async function facilitiesPreventiveRoutes(app: FastifyInstance): Promise<
           "BEGIN:VEVENT",
           `UID:preventive-${task.id}@hubport.cloud`,
           `DTSTART;VALUE=DATE:${dateStr.substring(0, 8)}`,
-          `SUMMARY:${task.name}`,
-          `DESCRIPTION:Zuständig: ${assignee}\\nKategorie: ${task.category}\\nIntervall: ${task.frequency}`,
-          `CATEGORIES:${task.category}`,
+          `SUMMARY:${escapeIcalText(task.name)}`,
+          `DESCRIPTION:Zuständig: ${escapeIcalText(assignee)}\\nKategorie: ${escapeIcalText(task.category)}\\nIntervall: ${escapeIcalText(task.frequency)}`,
+          `CATEGORIES:${escapeIcalText(task.category)}`,
           "END:VEVENT",
         );
       }
