@@ -16,6 +16,8 @@ import { securityRoutes } from "./routes/security.js";
 import { serviceGroupRoutes } from "./routes/service-groups.js";
 import { facilitiesCleaningRoutes } from "./routes/facilities-cleaning.js";
 import { facilitiesGroundsRoutes } from "./routes/facilities-grounds.js";
+import { facilitiesMaintenanceRoutes } from "./routes/facilities-maintenance.js";
+import { facilitiesPreventiveRoutes } from "./routes/facilities-preventive.js";
 import { jitsiRoutes } from "./routes/jitsi.js";
 import { sharingRoutes } from "./routes/sharing.js";
 import { internalRoutes } from "./routes/internal.js";
@@ -103,6 +105,8 @@ async function start(): Promise<void> {
   await app.register(serviceGroupRoutes);
   await app.register(facilitiesCleaningRoutes);
   await app.register(facilitiesGroundsRoutes);
+  await app.register(facilitiesMaintenanceRoutes);
+  await app.register(facilitiesPreventiveRoutes);
   await app.register(jitsiRoutes);
   await app.register(sharingRoutes);
   await app.register(internalRoutes);
