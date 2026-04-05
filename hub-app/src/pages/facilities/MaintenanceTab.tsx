@@ -54,7 +54,6 @@ export function MaintenanceTab() {
   const intl = useIntl();
   const apiUrl = getApiUrl();
   const headers = { Authorization: `Bearer ${user?.access_token}`, "Content-Type": "application/json" };
-  const canManage = can("manage:facilities.maintenance");
   const canReport = can("facilities:report");
 
   const [issues, setIssues] = useState<Issue[]>([]);

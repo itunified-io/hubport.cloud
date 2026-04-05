@@ -46,7 +46,7 @@ export function MaintenanceForm({ onClose, onCreated }: Props) {
             canvas.width = width;
             canvas.height = height;
             canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-            const base64 = canvas.toDataURL(file.type).split(",")[1];
+            const base64 = canvas.toDataURL(file.type).split(",")[1]!;
             setPhotos((prev) => [...prev, { data: base64, mimeType: file.type }]);
             resolve();
           };

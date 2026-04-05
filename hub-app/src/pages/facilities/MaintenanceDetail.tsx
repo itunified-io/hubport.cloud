@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FormattedMessage, useIntl } from "react-intl";
+import { useIntl } from "react-intl";
 import { ArrowLeft, Send } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { usePermissions } from "@/auth/PermissionProvider";
