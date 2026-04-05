@@ -39,7 +39,11 @@ import { SharingPartners } from "./pages/sharing/SharingPartners";
 import { RoleList } from "./pages/users/RoleList";
 import { RoleDetail } from "./pages/users/RoleDetail";
 import { AuditLog } from "./pages/audit/AuditLog";
-import { CleaningDashboard } from "./pages/cleaning/CleaningDashboard";
+import { FacilitiesPage } from "./pages/facilities/FacilitiesPage";
+import { CleaningTab } from "./pages/facilities/CleaningTab";
+import { GroundsTab } from "./pages/facilities/GroundsTab";
+import { MaintenanceTab } from "./pages/facilities/MaintenanceTab";
+import { PreventiveTab } from "./pages/facilities/PreventiveTab";
 // Chat is now a global widget in Layout.tsx (ChatWidget), not a page route
 import { Profile } from "./pages/profile/Profile";
 import { FormattedMessage } from "react-intl";
@@ -335,15 +339,21 @@ export function App() {
           }
         />
 
-        {/* Cleaning & Garden */}
+        {/* Facilities (Cleaning & Maintenance) */}
         <Route
-          path="/cleaning"
+          path="/facilities"
           element={
-            <PermissionGuard requires="app:cleaning.view">
-              <CleaningDashboard />
+            <PermissionGuard requires="app:facilities.view">
+              <FacilitiesPage />
             </PermissionGuard>
           }
-        />
+        >
+          <Route path="cleaning" element={<CleaningTab />} />
+          <Route path="grounds" element={<GroundsTab />} />
+          <Route path="maintenance" element={<MaintenanceTab />} />
+          <Route path="preventive" element={<PreventiveTab />} />
+        </Route>
+        <Route path="/cleaning" element={<Navigate to="/facilities/cleaning" replace />} />
 
         {/* Chat is now a global widget (ChatWidget in Layout), not a routed page */}
 
