@@ -68,7 +68,7 @@ export function CleaningTab() {
   useEffect(() => { fetchAll(); }, [user?.access_token]);
 
   const seedDefaults = async () => {
-    await fetch(`${apiUrl}/facilities/cleaning/seed`, { method: "POST", headers });
+    await fetch(`${apiUrl}/facilities/cleaning/seed`, { method: "POST", headers, body: "{}" });
     await fetch(`${apiUrl}/service-groups/seed`, { headers });
     fetchAll();
   };

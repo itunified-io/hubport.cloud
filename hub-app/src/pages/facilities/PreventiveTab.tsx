@@ -49,7 +49,7 @@ export function PreventiveTab() {
   useEffect(() => { fetchTasks(); }, [user?.access_token]);
 
   const seedDefaults = async () => {
-    await fetch(`${apiUrl}/facilities/preventive/seed`, { method: "POST", headers });
+    await fetch(`${apiUrl}/facilities/preventive/seed`, { method: "POST", headers, body: "{}" });
     fetchTasks();
   };
 
