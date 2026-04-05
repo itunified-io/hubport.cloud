@@ -54,6 +54,7 @@ import { startAssignmentOverdueCheck } from './jobs/assignment-overdue-check.js'
 import { startCampaignAutoClose } from './jobs/campaign-auto-close.js';
 import { seedSystemRoles, bootstrapBoundaryVersions } from "./lib/seed-roles.js";
 import { seedSlotTemplates } from "./lib/seed-slot-templates.js";
+import { migrateFacilitiesPermissions } from "./lib/migration-facilities.js";
 
 
 const app = Fastify({
@@ -169,6 +170,10 @@ async function start(): Promise<void> {
     app.log.info("Upserting system roles...");
     await seedSystemRoles();
     app.log.info("System roles up to date");
+
+    app.log.info("Migrating facilities permissions...");
+    await migrateFacilitiesPermissions();
+    app.log.info("Facilities permissions migrated");
 
     app.log.info("Bootstrapping boundary version snapshots...");
     await bootstrapBoundaryVersions();
