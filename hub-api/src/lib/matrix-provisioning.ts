@@ -156,12 +156,12 @@ function shouldJoinRoom(
 
 /**
  * Maps a room's requiredRole to all AppRole names that grant access.
- * Allows e.g. "Cleaning Responsible" room to include sub-roles.
+ * Allows e.g. "Cleaning Coordinator" room to include sub-roles.
  */
 const ROOM_ROLE_ALIASES: Record<string, string[]> = {
   "Technik": ["Technik", "Technik Responsible"],
   "Ordnungsdienst": ["Ordnungsdienst"],
-  "Cleaning Responsible": ["Cleaning Responsible", "Grundreinigung", "Sichtreinigung"],
+  "Cleaning Coordinator": ["Cleaning Coordinator", "Grundreinigung", "Sichtreinigung"],
 };
 
 // ─── Bulk Migration ─────────────────────────────────────────────────
