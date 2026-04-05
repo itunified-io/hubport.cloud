@@ -15,8 +15,13 @@ import { Type, type Static } from "@sinclair/typebox";
 import prisma from "../lib/prisma.js";
 import { requirePermission } from "../lib/rbac.js";
 import { PERMISSIONS } from "../lib/permissions.js";
-import { queryBuildingsInBBox, type OverpassBuilding } from "../lib/osm-overpass.js";
-import { bboxFromGeoJSON, isInsideBoundaries } from "../lib/geo.js";
+import { queryBuildingsInPolygon, type OverpassBuilding } from "../lib/osm-overpass.js";
+import { isInsideBoundaries } from "../lib/geo.js";
+import {
+  checkBuildingCoveragePostGIS,
+  checkCongregationContainsPostGIS,
+} from "../lib/postgis-helpers.js";
+import { ALLOWED_BUILDING_TYPES } from "../lib/gap-analysis.js";
 
 // ─── Schemas ────────────────────────────────────────────────────────
 
@@ -46,6 +51,42 @@ const OsmIdParams = Type.Object({
   osmId: Type.String(),
 });
 type OsmIdParamsType = Static<typeof OsmIdParams>;
+
+const TRIAGE_STATUSES = ["unreviewed", "confirmed_residential", "ignored", "needs_visit"] as const;
+
+const OverrideBody = Type.Object({
+  overriddenType: Type.Optional(Type.String()),
+  overriddenAddress: Type.Optional(Type.String()),
+  triageStatus: Type.Optional(Type.Union(TRIAGE_STATUSES.map(s => Type.Literal(s)))),
+  notes: Type.Optional(Type.String()),
+});
+type OverrideBodyType = Static<typeof OverrideBody>;
+
+const OverrideOsmIdParams = Type.Object({
+  osmId: Type.String(),
+});
+type OverrideOsmIdParamsType = Static<typeof OverrideOsmIdParams>;
+
+const BatchOverrideBody = Type.Object({
+  overrides: Type.Array(
+    Type.Object({
+      osmId: Type.String(),
+      overriddenType: Type.Optional(Type.String()),
+      overriddenAddress: Type.Optional(Type.String()),
+      triageStatus: Type.Optional(Type.Union(TRIAGE_STATUSES.map(s => Type.Literal(s)))),
+      notes: Type.Optional(Type.String()),
+    }),
+    { minItems: 1, maxItems: 200 },
+  ),
+});
+type BatchOverrideBodyType = Static<typeof BatchOverrideBody>;
+
+const OverrideQuerystring = Type.Object({
+  triageStatus: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Number({ minimum: 1, maximum: 1000 })),
+  offset: Type.Optional(Type.Number({ minimum: 0 })),
+});
+type OverrideQuerystringType = Static<typeof OverrideQuerystring>;
 
 export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
   // ─── Run gap detection ───────────────────────────────────────────
@@ -78,16 +119,6 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const bbox = bboxFromGeoJSON(congBoundary.boundaries);
-      if (!bbox) {
-        return reply.code(400).send({ error: "Could not compute bounding box from congregation boundary" });
-      }
-
-      // Get all regular territories with boundaries
-      const territories = allTerritories.filter(
-        (t) => t.type === "territory" && t.boundaries,
-      );
-
       // Create run record (linked to congregation boundary territory)
       const run = await prisma.gapDetectionRun.create({
         data: {
@@ -99,13 +130,28 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
       });
 
       try {
-        // Single Overpass query for the entire congregation area
-        const allBuildings = await queryBuildingsInBBox(bbox.south, bbox.west, bbox.north, bbox.east);
-
-        // Filter to buildings actually inside the congregation boundary polygon
-        const buildingsInCongregation = allBuildings.filter((b) =>
-          isInsideBoundaries(b.lat, b.lng, congBoundary.boundaries),
+        // H3 hex-tiled Overpass query covering the congregation polygon
+        const allBuildings = await queryBuildingsInPolygon(
+          congBoundary.boundaries as { type: string; coordinates: unknown },
         );
+
+        // Filter to buildings inside the congregation boundary.
+        // Use PostGIS ST_Contains for accuracy (handles holes, complex geometries).
+        // Falls back to JS ray-casting if PostGIS is unavailable.
+        let buildingsInCongregation: OverpassBuilding[];
+        try {
+          const congSet = await checkCongregationContainsPostGIS(
+            prisma,
+            allBuildings.map((b) => ({ osmId: b.osmId, lat: b.lat, lng: b.lng })),
+            congBoundary.boundaries as object,
+          );
+          buildingsInCongregation = allBuildings.filter((b) => congSet.has(b.osmId));
+        } catch {
+          // PostGIS fallback
+          buildingsInCongregation = allBuildings.filter((b) =>
+            isInsideBoundaries(b.lat, b.lng, congBoundary.boundaries),
+          );
+        }
 
         // Load ignored buildings
         const ignoredBuildings = await prisma.ignoredOsmBuilding.findMany({
@@ -113,25 +159,42 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
         });
         const ignoredOsmIds = new Set(ignoredBuildings.map((b) => b.osmId));
 
-        // For each building, check if it falls inside ANY territory
+        // Check which buildings fall inside ANY territory polygon.
+        // Use PostGIS ST_Contains for accurate results with complex geometries
+        // (holes from water clipping, auto-fix artifacts, etc.).
+        const nonIgnored = buildingsInCongregation.filter((b) => !ignoredOsmIds.has(b.osmId));
         const gaps: OverpassBuilding[] = [];
         const covered: OverpassBuilding[] = [];
 
-        for (const building of buildingsInCongregation) {
-          // Skip ignored buildings
-          if (ignoredOsmIds.has(building.osmId)) {
-            covered.push(building); // count as covered
-            continue;
-          }
+        // Count ignored as covered
+        const ignoredCount = buildingsInCongregation.length - nonIgnored.length;
 
-          const inAnyTerritory = territories.some((t) =>
-            isInsideBoundaries(building.lat, building.lng, t.boundaries),
+        try {
+          const coveredSet = await checkBuildingCoveragePostGIS(
+            prisma,
+            nonIgnored.map((b) => ({ osmId: b.osmId, lat: b.lat, lng: b.lng })),
           );
-
-          if (inAnyTerritory) {
-            covered.push(building);
-          } else {
-            gaps.push(building);
+          for (const building of nonIgnored) {
+            if (coveredSet.has(building.osmId)) {
+              covered.push(building);
+            } else {
+              gaps.push(building);
+            }
+          }
+        } catch {
+          // PostGIS fallback — use JS ray-casting
+          const territories = allTerritories.filter(
+            (t) => t.type === "territory" && t.boundaries,
+          );
+          for (const building of nonIgnored) {
+            const inAnyTerritory = territories.some((t) =>
+              isInsideBoundaries(building.lat, building.lng, t.boundaries),
+            );
+            if (inAnyTerritory) {
+              covered.push(building);
+            } else {
+              gaps.push(building);
+            }
           }
         }
 
@@ -157,7 +220,7 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
             status: "completed",
             completedAt: new Date(),
             totalBuildings: buildingsInCongregation.length,
-            coveredCount: covered.length,
+            coveredCount: covered.length + ignoredCount,
             gapCount: gaps.length,
             resultGeoJson,
           },
@@ -331,6 +394,141 @@ export async function gapDetectionRoutes(app: FastifyInstance): Promise<void> {
           territory: { select: { id: true, number: true, name: true } },
         },
       });
+    },
+  );
+
+  // ─── List building overrides ────────────────────────────────────
+  app.get<{ Querystring: OverrideQuerystringType }>(
+    "/territories/gap-detection/overrides",
+    {
+      preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_VIEW),
+      schema: { querystring: OverrideQuerystring },
+    },
+    async (request) => {
+      const { triageStatus, limit = 200, offset = 0 } = request.query;
+      const where = triageStatus ? { triageStatus } : {};
+
+      const [overrides, total] = await Promise.all([
+        prisma.buildingOverride.findMany({
+          where,
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.buildingOverride.count({ where }),
+      ]);
+
+      return { overrides, total };
+    },
+  );
+
+  // ─── Create/update building override ────────────────────────────
+  app.put<{ Params: OverrideOsmIdParamsType; Body: OverrideBodyType }>(
+    "/territories/gap-detection/overrides/:osmId",
+    {
+      preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_RUN),
+      schema: { params: OverrideOsmIdParams, body: OverrideBody },
+    },
+    async (request, reply) => {
+      const osmId = decodeURIComponent(request.params.osmId);
+      const { overriddenType, overriddenAddress, triageStatus, notes } = request.body;
+      const publisherId = request.user?.sub ?? "system";
+
+      // Validate building type if provided
+      if (overriddenType && !ALLOWED_BUILDING_TYPES.has(overriddenType)) {
+        return reply.code(400).send({ error: `Invalid building type: ${overriddenType}` });
+      }
+
+      const override = await prisma.buildingOverride.upsert({
+        where: { osmId },
+        create: {
+          osmId,
+          overriddenType: overriddenType ?? null,
+          overriddenAddress: overriddenAddress ?? null,
+          triageStatus: triageStatus ?? "unreviewed",
+          notes: notes ?? null,
+          reviewedBy: publisherId,
+          reviewedAt: new Date(),
+        },
+        update: {
+          ...(overriddenType !== undefined && { overriddenType }),
+          ...(overriddenAddress !== undefined && { overriddenAddress }),
+          ...(triageStatus !== undefined && { triageStatus }),
+          ...(notes !== undefined && { notes }),
+          reviewedBy: publisherId,
+          reviewedAt: new Date(),
+        },
+      });
+
+      return override;
+    },
+  );
+
+  // ─── Batch triage overrides ─────────────────────────────────────
+  app.post<{ Body: BatchOverrideBodyType }>(
+    "/territories/gap-detection/overrides/batch",
+    {
+      preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_RUN),
+      schema: { body: BatchOverrideBody },
+    },
+    async (request, reply) => {
+      const publisherId = request.user?.sub ?? "system";
+
+      // Validate all building types
+      for (const item of request.body.overrides) {
+        if (item.overriddenType && !ALLOWED_BUILDING_TYPES.has(item.overriddenType)) {
+          return reply.code(400).send({ error: `Invalid building type: ${item.overriddenType}` });
+        }
+      }
+
+      // Deduplicate: last entry wins
+      const deduped = new Map<string, typeof request.body.overrides[0]>();
+      for (const item of request.body.overrides) {
+        deduped.set(item.osmId, item);
+      }
+
+      const results = await prisma.$transaction(
+        Array.from(deduped.values()).map((item) =>
+          prisma.buildingOverride.upsert({
+            where: { osmId: item.osmId },
+            create: {
+              osmId: item.osmId,
+              overriddenType: item.overriddenType ?? null,
+              overriddenAddress: item.overriddenAddress ?? null,
+              triageStatus: item.triageStatus ?? "unreviewed",
+              notes: item.notes ?? null,
+              reviewedBy: publisherId,
+              reviewedAt: new Date(),
+            },
+            update: {
+              ...(item.overriddenType !== undefined && { overriddenType: item.overriddenType }),
+              ...(item.overriddenAddress !== undefined && { overriddenAddress: item.overriddenAddress }),
+              ...(item.triageStatus !== undefined && { triageStatus: item.triageStatus }),
+              ...(item.notes !== undefined && { notes: item.notes }),
+              reviewedBy: publisherId,
+              reviewedAt: new Date(),
+            },
+          }),
+        ),
+      );
+
+      return { updated: results.length };
+    },
+  );
+
+  // ─── Delete building override ───────────────────────────────────
+  app.delete<{ Params: OverrideOsmIdParamsType }>(
+    "/territories/gap-detection/overrides/:osmId",
+    {
+      preHandler: requirePermission(PERMISSIONS.GAP_DETECTION_RUN),
+      schema: { params: OverrideOsmIdParams },
+    },
+    async (request, reply) => {
+      const osmId = decodeURIComponent(request.params.osmId);
+
+      // Idempotent: 204 whether override exists or not
+      await prisma.buildingOverride.deleteMany({ where: { osmId } });
+      return reply.code(204).send();
     },
   );
 }

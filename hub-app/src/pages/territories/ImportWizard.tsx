@@ -234,7 +234,7 @@ export function ImportWizard() {
             )}
             <input
               type="file"
-              accept=".kml"
+              accept=".kml,application/vnd.google-earth.kml+xml,application/xml,text/xml,text/plain"
               className="hidden"
               disabled={loading}
               onChange={async (e) => {

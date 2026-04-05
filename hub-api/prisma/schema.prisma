@@ -113,53 +113,53 @@ enum SpeakerStatus {
 
 /// Workbook part section
 enum WorkbookSection {
-  treasures          // Schätze aus Gottes Wort
-  ministry           // Uns im Dienst verbessern
-  living             // Unser Leben als Christ
+  treasures // Schätze aus Gottes Wort
+  ministry // Uns im Dienst verbessern
+  living // Unser Leben als Christ
 }
 
 /// Meeting slot category
 enum SlotCategory {
-  program            // Program part (content)
-  duty               // Operational duty (sound, video, etc.)
+  program // Program part (content)
+  duty // Operational duty (sound, video, etc.)
 }
 
 // ─── Publisher ────────────────────────────────────────────────────────
 
 model Publisher {
-  id               String            @id @default(uuid())
-  keycloakSub      String?           @unique /// Keycloak user ID link
-  firstName        String            /// @encrypted — AES-256-GCM
-  lastName         String            /// @encrypted — AES-256-GCM
-  displayName      String?           /// Optional display name override
-  email            String?           /// @encrypted — AES-256-GCM (private/contact email)
-  internalEmail    String?           /// Auto-generated username@slug.hubport.cloud (Matrix/Keycloak login)
-  phone            String?           /// @encrypted — AES-256-GCM
-  gender           Gender?
-  address          String?           /// @encrypted — AES-256-GCM
-  dateOfBirth      DateTime?         /// @encrypted
-  congregationRole CongregationRole  @default(publisher)
-  congregationFlags String[]         /// Additional flags: pioneer types, elder/MS sub-roles
-  role             String            @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)
-  status           MemberStatus      @default(active)
-  isOwner          Boolean           @default(false) /// Tenant owner (installer-created admin)
-  notes            String?           /// @encrypted — AES-256-GCM
-  avatarUrl        String?           /// Profile picture URL
+  id                String           @id @default(uuid())
+  keycloakSub       String?          @unique /// Keycloak user ID link
+  firstName         String /// @encrypted — AES-256-GCM
+  lastName          String /// @encrypted — AES-256-GCM
+  displayName       String? /// Optional display name override
+  email             String? /// @encrypted — AES-256-GCM (private/contact email)
+  internalEmail     String? /// Auto-generated username@slug.hubport.cloud (Matrix/Keycloak login)
+  phone             String? /// @encrypted — AES-256-GCM
+  gender            Gender?
+  address           String? /// @encrypted — AES-256-GCM
+  dateOfBirth       DateTime? /// @encrypted
+  congregationRole  CongregationRole @default(publisher)
+  congregationFlags String[] /// Additional flags: pioneer types, elder/MS sub-roles
+  role              String           @default("publisher") /// Legacy Keycloak realm role (admin/elder/publisher/viewer)
+  status            MemberStatus     @default(active)
+  isOwner           Boolean          @default(false) /// Tenant owner (installer-created admin)
+  notes             String? /// @encrypted — AES-256-GCM
+  avatarUrl         String? /// Profile picture URL
 
   // Privacy
-  privacyAccepted   Boolean          @default(false)
-  privacyAcceptedAt DateTime?
-  privacySettings   Json             @default("{\"contactVisibility\":\"elders_only\",\"addressVisibility\":\"elders_only\",\"notesVisibility\":\"elders_only\"}")
-  allowLocationSharing Boolean       @default(false) /// Opt-in for live location sharing during field service
+  privacyAccepted      Boolean   @default(false)
+  privacyAcceptedAt    DateTime?
+  privacySettings      Json      @default("{\"contactVisibility\":\"elders_only\",\"addressVisibility\":\"elders_only\",\"notesVisibility\":\"elders_only\"}")
+  allowLocationSharing Boolean   @default(false) /// Opt-in for live location sharing during field service
 
   // Onboarding tracking
-  invitedBy  String?
-  invitedAt  DateTime?
-  approvedBy String?
-  approvedAt DateTime?
-  onboardingStep    OnboardingStep  @default(invited)
-  onboardingToken   String?         /// Hashed JWT — cleared on completion
-  termsVersion      String?         /// Version of accepted terms
+  invitedBy       String?
+  invitedAt       DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  onboardingStep  OnboardingStep @default(invited)
+  onboardingToken String? /// Hashed JWT — cleared on completion
+  termsVersion    String? /// Version of accepted terms
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -170,7 +170,7 @@ model Publisher {
   assignments     TerritoryAssignment[]
   appRoles        AppRoleMember[]
   inviteCode      InviteCode?
-  serviceGroup    ServiceGroup?       @relation(fields: [serviceGroupId], references: [id])
+  serviceGroup    ServiceGroup?         @relation(fields: [serviceGroupId], references: [id])
   serviceGroupId  String?
   overseerOf         ServiceGroup[]      @relation("ServiceGroupOverseer")
   assistantOf        ServiceGroup[]      @relation("ServiceGroupAssistant")
@@ -197,7 +197,7 @@ model AppRole {
   id          String    @id @default(uuid())
   name        String    @unique /// e.g. "Coordinator", "Secretary"
   description String?
-  permissions Json      /// Array of permission keys ["app:publishers.view", ...]
+  permissions Json /// Array of permission keys ["app:publishers.view", ...]
   scope       RoleScope @default(all)
   isSystem    Boolean   @default(false) /// System roles cannot be deleted
 
@@ -226,12 +226,12 @@ model AppRoleMember {
 
 model AuditLog {
   id          String   @id @default(uuid())
-  actorId     String   /// Keycloak sub of the actor
-  action      String   /// e.g. "publisher.update", "role.assign"
-  objectType  String   /// e.g. "Publisher", "AppRole"
+  actorId     String /// Keycloak sub of the actor
+  action      String /// e.g. "publisher.update", "role.assign"
+  objectType  String /// e.g. "Publisher", "AppRole"
   objectId    String?
-  beforeState Json?    /// Snapshot before mutation
-  afterState  Json?    /// Snapshot after mutation
+  beforeState Json? /// Snapshot before mutation
+  afterState  Json? /// Snapshot after mutation
   createdAt   DateTime @default(now())
 
   @@index([actorId])
@@ -255,17 +255,17 @@ model InviteCode {
 // ─── Existing Models ─────────────────────────────────────────────────
 
 model Territory {
-  id          String   @id @default(uuid())
-  number      String   @unique
-  name        String
-  description String?
-  type           String   @default("territory") // "territory" | "congregation_boundary"
-  boundaries     Json? // GeoJSON for map display
-  shareExcluded  Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  syncVersion    Int      @default(0)
-  deletedAt      DateTime?
+  id            String    @id @default(uuid())
+  number        String    @unique
+  name          String
+  description   String?
+  type          String    @default("territory") // "territory" | "congregation_boundary"
+  boundaries    Json? // GeoJSON for map display
+  shareExcluded Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  syncVersion   Int       @default(0)
+  deletedAt     DateTime?
 
   assignments      TerritoryAssignment[]
   addresses        Address[]
@@ -282,11 +282,11 @@ model TerritoryBoundaryVersion {
   territoryId   String
   version       Int
   boundaries    Json
-  changeType    String   // "creation" | "manual_edit" | "auto_clip" | "import" | "restore"
+  changeType    String // "creation" | "manual_edit" | "auto_clip" | "import" | "restore"
   changeSummary String?
   createdAt     DateTime @default(now())
 
-  territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  territory Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
 
   @@index([territoryId, version])
 }
@@ -296,14 +296,14 @@ model TerritoryAssignment {
   territoryId String
   publisherId String
   assignedAt  DateTime  @default(now())
-  assignedBy  String?   /// publisherId who assigned
+  assignedBy  String? /// publisherId who assigned
   returnedAt  DateTime?
-  returnedBy  String?   /// publisherId who returned it
+  returnedBy  String? /// publisherId who returned it
   dueDate     DateTime? /// Adaptive due date
   isActive    Boolean   @default(true)
   campaignId  String?
   isSuspended Boolean   @default(false)
-  groupId     String?   /// field group ID (deliberately unlinked)
+  groupId     String? /// field group ID (deliberately unlinked)
   notes       String?
 
   createdAt   DateTime  @default(now())
@@ -321,10 +321,10 @@ model TerritoryAssignment {
 model Meeting {
   id        String        @id @default(uuid())
   title     String
-  type      String        // midweek, weekend, special
+  type      String // midweek, weekend, special
   date      DateTime
-  startTime String        // "19:00"
-  endTime   String?       // "21:00"
+  startTime String // "19:00"
+  endTime   String? // "21:00"
   location  String?
   notes     String?
   status    MeetingStatus @default(draft)
@@ -334,15 +334,15 @@ model Meeting {
   workbookWeekId     String?
   weekendStudyWeekId String?
   publishedAt        DateTime?
-  publishedBy        String?   /// keycloakSub of publisher
+  publishedBy        String? /// keycloakSub of publisher
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  meetingPeriod    MeetingPeriod?    @relation(fields: [meetingPeriodId], references: [id])
-  workbookWeek     WorkbookWeek?     @relation(fields: [workbookWeekId], references: [id])
-  weekendStudyWeek WeekendStudyWeek? @relation(fields: [weekendStudyWeekId], references: [id])
+  meetingPeriod    MeetingPeriod?       @relation(fields: [meetingPeriodId], references: [id])
+  workbookWeek     WorkbookWeek?        @relation(fields: [workbookWeekId], references: [id])
+  weekendStudyWeek WeekendStudyWeek?    @relation(fields: [weekendStudyWeekId], references: [id])
   assignments      MeetingAssignment[]
   talkSchedules    PublicTalkSchedule[]
 
@@ -354,40 +354,40 @@ model Meeting {
 // ─── Congregation Settings ──────────────────────────────────────────
 
 model CongregationSettings {
-  id            String   @id @default(uuid())
-  language      String   @default("de") /// Congregation language (ISO 639-1)
-  jwLanguageCode String  @default("de") /// JW.org language code
-  defaultMidweekDay  Int @default(3)    /// 0=Sun, 1=Mon, ... 3=Wed
-  defaultMidweekTime String @default("19:00")
-  defaultWeekendDay  Int @default(0)    /// 0=Sun
-  defaultWeekendTime String @default("10:00")
-  defaultLocation    String?
+  id                      String   @id @default(uuid())
+  language                String   @default("de") /// Congregation language (ISO 639-1)
+  jwLanguageCode          String   @default("de") /// JW.org language code
+  defaultMidweekDay       Int      @default(3) /// 0=Sun, 1=Mon, ... 3=Wed
+  defaultMidweekTime      String   @default("19:00")
+  defaultWeekendDay       Int      @default(0) /// 0=Sun
+  defaultWeekendTime      String   @default("10:00")
+  defaultLocation         String?
   // Territory module settings
-  defaultCheckoutDays      Int     @default(120)
-  overdueReminderDays      Int     @default(14)
-  returnedVisibleDays      Int     @default(30)
-  osmRefreshCooldownHours  Int     @default(24)
-  gapDetectionMinArea      Int     @default(50)
-  defaultShareScope        String  @default("boundary")
-  defaultShareDays         Int     @default(30)
-  shareMaxDays             Int     @default(90)
-  autoSyncTerritories      Boolean @default(false)
-  requirePINForFullShare   Boolean @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  defaultCheckoutDays     Int      @default(120)
+  overdueReminderDays     Int      @default(14)
+  returnedVisibleDays     Int      @default(30)
+  osmRefreshCooldownHours Int      @default(24)
+  gapDetectionMinArea     Int      @default(50)
+  defaultShareScope       String   @default("boundary")
+  defaultShareDays        Int      @default(30)
+  shareMaxDays            Int      @default(90)
+  autoSyncTerritories     Boolean  @default(false)
+  requirePINForFullShare  Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 // ─── Meeting Periods ────────────────────────────────────────────────
 
 model MeetingPeriod {
   id              String         @id @default(uuid())
-  type            String         // midweek_workbook, weekend_study
+  type            String // midweek_workbook, weekend_study
   status          PlanningStatus @default(draft)
   language        String
   startDate       DateTime
   endDate         DateTime
-  sourceEditionId String?        /// WorkbookEdition or WeekendStudyEdition id
-  openedBy        String?        /// keycloakSub
+  sourceEditionId String? /// WorkbookEdition or WeekendStudyEdition id
+  openedBy        String? /// keycloakSub
   openedAt        DateTime?
   publishedBy     String?
   publishedAt     DateTime?
@@ -407,11 +407,11 @@ model MeetingPeriod {
 model WorkbookEdition {
   id                    String   @id @default(uuid())
   language              String
-  yearMonth             String   /// e.g. "2026-03", "2026-04"
+  yearMonth             String /// e.g. "2026-03", "2026-04"
   sourceUrl             String?
-  sourcePublicationCode String?  /// e.g. "mwb"
-  checksum              String?  /// SHA-256 of source content
-  rawMetadata           Json?    /// Raw import metadata for debugging
+  sourcePublicationCode String? /// e.g. "mwb"
+  checksum              String? /// SHA-256 of source content
+  rawMetadata           Json? /// Raw import metadata for debugging
   importedAt            DateTime @default(now())
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -423,16 +423,16 @@ model WorkbookEdition {
 }
 
 model WorkbookWeek {
-  id          String   @id @default(uuid())
-  editionId   String
-  weekOf      DateTime /// Monday of the week
-  dateRange   String?  /// e.g. "March 23–29"
-  theme       String?  /// Main scripture/theme
+  id           String   @id @default(uuid())
+  editionId    String
+  weekOf       DateTime /// Monday of the week
+  dateRange    String? /// e.g. "March 23–29"
+  theme        String? /// Main scripture/theme
   bibleReading String? /// Bible reading reference
-  songNumbers  Int[]   /// Song numbers for the week [opening, middle, closing]
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  songNumbers  Int[] /// Song numbers for the week [opening, middle, closing]
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   edition  WorkbookEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
   parts    WorkbookPart[]
@@ -444,20 +444,20 @@ model WorkbookWeek {
 }
 
 model WorkbookPart {
-  id               String          @id @default(uuid())
-  weekId           String
-  section          WorkbookSection
-  partType         String          /// Normalized type: "talk", "bible_reading", "initial_call", etc.
-  title            String          /// Part title from workbook
-  durationMinutes  Int?
-  sourceRef        String?         /// Reference to source material
-  sourceUrl        String?
-  requiresAssistant Boolean        @default(false)
-  sortOrder        Int             @default(0)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id                String          @id @default(uuid())
+  weekId            String
+  section           WorkbookSection
+  partType          String /// Normalized type: "talk", "bible_reading", "initial_call", etc.
+  title             String /// Part title from workbook
+  durationMinutes   Int?
+  sourceRef         String? /// Reference to source material
+  sourceUrl         String?
+  requiresAssistant Boolean         @default(false)
+  sortOrder         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  week        WorkbookWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  week        WorkbookWeek        @relation(fields: [weekId], references: [id], onDelete: Cascade)
   assignments MeetingAssignment[]
 
   @@index([weekId])
@@ -467,14 +467,14 @@ model WorkbookPart {
 // ─── Weekend Study Import ───────────────────────────────────────────
 
 model WeekendStudyEdition {
-  id           String   @id @default(uuid())
-  language     String
-  issueKey     String   /// e.g. "w_2026_03"
-  checksum     String?
-  rawMetadata  Json?
-  importedAt   DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  language    String
+  issueKey    String /// e.g. "w_2026_03"
+  checksum    String?
+  rawMetadata Json?
+  importedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   weeks WeekendStudyWeek[]
 
@@ -487,7 +487,7 @@ model WeekendStudyWeek {
   weekOf       DateTime /// Sunday of the study week
   articleTitle String
   articleUrl   String?
-  studyNumber  Int?     /// Study article number (e.g., 1, 2, 3...)
+  studyNumber  Int? /// Study article number (e.g., 1, 2, 3...)
   sourceRef    String?
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
@@ -504,18 +504,18 @@ model WeekendStudyWeek {
 // ─── Meeting Slot Templates ─────────────────────────────────────────
 
 model MeetingSlotTemplate {
-  id              String       @id @default(uuid())
-  meetingType     String       // midweek, weekend, all
-  slotKey         String       @unique /// e.g. "chairman_midweek", "sound", "opening_prayer"
-  label           String       /// Human-readable label
-  category        SlotCategory @default(program)
-  requiredPrivileges String[]  /// Permission keys required to fill this slot
-  allowsAssistant Boolean      @default(false)
-  requiresAssistant Boolean    @default(false)
-  sortOrder       Int          @default(0)
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                 String       @id @default(uuid())
+  meetingType        String // midweek, weekend, all
+  slotKey            String       @unique /// e.g. "chairman_midweek", "sound", "opening_prayer"
+  label              String /// Human-readable label
+  category           SlotCategory @default(program)
+  requiredPrivileges String[] /// Permission keys required to fill this slot
+  allowsAssistant    Boolean      @default(false)
+  requiresAssistant  Boolean      @default(false)
+  sortOrder          Int          @default(0)
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   assignments MeetingAssignment[]
 
@@ -528,9 +528,9 @@ model MeetingAssignment {
   id                   String           @id @default(uuid())
   meetingId            String
   slotTemplateId       String
-  workbookPartId       String?          /// Links to specific workbook part (midweek)
-  assigneePublisherId  String?          /// Assigned publisher
-  assistantPublisherId String?          /// Assistant/householder
+  workbookPartId       String? /// Links to specific workbook part (midweek)
+  assigneePublisherId  String? /// Assigned publisher
+  assistantPublisherId String? /// Assistant/householder
   status               AssignmentStatus @default(pending)
   source               AssignmentSource @default(manual)
   notes                String?
@@ -552,14 +552,14 @@ model MeetingAssignment {
 // ─── Assignment History (Immutable Audit) ───────────────────────────
 
 model AssignmentHistory {
-  id             String   @id @default(uuid())
-  assignmentId   String
-  action         String   /// create, update, unassign, substitute, publish, lock, reopen
-  actorId        String   /// keycloakSub
-  previousState  Json?
-  newState       Json?
-  reason         String?
-  createdAt      DateTime @default(now())
+  id            String   @id @default(uuid())
+  assignmentId  String
+  action        String /// create, update, unassign, substitute, publish, lock, reopen
+  actorId       String /// keycloakSub
+  previousState Json?
+  newState      Json?
+  reason        String?
+  createdAt     DateTime @default(now())
 
   @@index([assignmentId])
   @@index([actorId])
@@ -570,11 +570,11 @@ model AssignmentHistory {
 
 model Speaker {
   id                String        @id @default(uuid())
-  firstName         String        /// @encrypted
-  lastName          String        /// @encrypted
-  congregationName  String?       /// Source congregation name (encrypted for manual speakers)
-  email             String?       /// @encrypted — contact email
-  phone             String?       /// @encrypted — contact phone
+  firstName         String /// @encrypted
+  lastName          String /// @encrypted
+  congregationName  String? /// Source congregation name (encrypted for manual speakers)
+  email             String? /// @encrypted — contact email
+  phone             String? /// @encrypted — contact phone
   publisherId       String?       @unique /// FK to Publisher — set for local speakers, null for manual/hubport
   publisher         Publisher?    @relation("PublisherSpeaker", fields: [publisherId], references: [id], onDelete: SetNull)
   source            SpeakerSource @default(local)
@@ -583,28 +583,28 @@ model Speaker {
   monthlyInviteCap  Int           @default(4) /// Max talks per month (speaker sets in profile)
   sharePhone        Boolean       @default(false) /// Privacy: share phone with partners
   shareEmail        Boolean       @default(false) /// Privacy: share email with partners
-  shareAvailability Boolean       @default(true)  /// Privacy: share availability with partners
+  shareAvailability Boolean       @default(true) /// Privacy: share availability with partners
   notes             String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  schedules  PublicTalkSchedule[]
-  talks      SpeakerTalk[]
+  schedules PublicTalkSchedule[]
+  talks     SpeakerTalk[]
 
   @@index([source, status])
 }
 
 enum SpeakerSource {
-  local    /// Own congregation publisher
-  hubport  /// From hubport.cloud partner (federated)
-  manual   /// Manually added (not on hubport.cloud)
+  local /// Own congregation publisher
+  hubport /// From hubport.cloud partner (federated)
+  manual /// Manually added (not on hubport.cloud)
 }
 
 model PublicTalk {
   id           String   @id @default(uuid())
   talkNumber   Int      @unique /// Official talk number
   title        String
-  outline      String?  /// Optional outline/description
+  outline      String? /// Optional outline/description
   discontinued Boolean  @default(false) /// true = no longer in active catalog
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -632,7 +632,7 @@ model AwayPeriod {
   publisher   Publisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
   startDate   DateTime  @db.Date
   endDate     DateTime  @db.Date
-  reason      String?   /// @encrypted — AES-256-GCM
+  reason      String? /// @encrypted — AES-256-GCM
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -642,23 +642,23 @@ model AwayPeriod {
 }
 
 model PublicTalkSchedule {
-  id            String          @id @default(uuid())
-  meetingId     String
-  speakerId     String
-  publicTalkId  String?
-  mode          TalkMode        @default(local)
-  invitationState InvitationState @default(draft)
-  invitedAt     DateTime?
-  confirmedAt   DateTime?
-  declinedAt    DateTime?
-  cancelledAt   DateTime?
-  notes         String?
-  centralInvitationId String?   /// Links to central-api TalkInvitation for cross-tenant invites
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id                  String          @id @default(uuid())
+  meetingId           String
+  speakerId           String
+  publicTalkId        String?
+  mode                TalkMode        @default(local)
+  invitationState     InvitationState @default(draft)
+  invitedAt           DateTime?
+  confirmedAt         DateTime?
+  declinedAt          DateTime?
+  cancelledAt         DateTime?
+  notes               String?
+  centralInvitationId String? /// Links to central-api TalkInvitation for cross-tenant invites
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  meeting    Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  speaker    Speaker    @relation(fields: [speakerId], references: [id])
+  meeting    Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  speaker    Speaker     @relation(fields: [speakerId], references: [id])
   publicTalk PublicTalk? @relation(fields: [publicTalkId], references: [id])
 
   @@unique([meetingId, speakerId])
@@ -672,18 +672,18 @@ model PublicTalkSchedule {
 /// Field service groups — publishers are assigned to one group.
 /// Default: 5 groups, configurable by admin.
 model ServiceGroup {
-  id             String      @id @default(uuid())
-  name           String      @unique /// e.g. "Gruppe 1", "Gruppe 2"
-  overseerId     String?     /// FK to Publisher (group overseer)
-  assistantId    String?     /// FK to Publisher (group assistant)
-  sortOrder      Int         @default(0)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id          String   @id @default(uuid())
+  name        String   @unique /// e.g. "Gruppe 1", "Gruppe 2"
+  overseerId  String? /// FK to Publisher (group overseer)
+  assistantId String? /// FK to Publisher (group assistant)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  overseerPub    Publisher?  @relation("ServiceGroupOverseer", fields: [overseerId], references: [id], onDelete: SetNull)
-  assistantPub   Publisher?  @relation("ServiceGroupAssistant", fields: [assistantId], references: [id], onDelete: SetNull)
-  members            Publisher[]
-  cleaningSchedules  CleaningSchedule[]
+  overseerPub       Publisher?         @relation("ServiceGroupOverseer", fields: [overseerId], references: [id], onDelete: SetNull)
+  assistantPub      Publisher?         @relation("ServiceGroupAssistant", fields: [assistantId], references: [id], onDelete: SetNull)
+  members           Publisher[]
+  cleaningSchedules CleaningSchedule[]
 }
 
 // ─── Cleaning & Garden ──────────────────────────────────────────────
@@ -699,7 +699,7 @@ enum CleaningCategory {
 /// Admin creates named types (e.g., "Penzberg Nord Grund").
 model CleaningDuty {
   id        String           @id @default(uuid())
-  name      String           /// Free-text name (e.g. "Penzberg Nord Grund")
+  name      String /// Free-text name (e.g. "Penzberg Nord Grund")
   category  CleaningCategory @default(custom)
   isDefault Boolean          @default(false) /// True for auto-created defaults
   sortOrder Int              @default(0)
@@ -716,7 +716,7 @@ model CleaningSchedule {
   dutyId         String
   serviceGroup   ServiceGroup   @relation(fields: [serviceGroupId], references: [id], onDelete: Cascade)
   serviceGroupId String
-  date           DateTime       /// Scheduled date
+  date           DateTime /// Scheduled date
   status         ScheduleStatus @default(scheduled)
   notes          String?
   createdAt      DateTime       @default(now())
@@ -771,7 +771,7 @@ enum MaintenanceStatus {
 /// Garden duties — assigned to INDIVIDUAL PUBLISHERS (not service groups).
 model GardenDuty {
   id        String         @id @default(uuid())
-  name      String         /// e.g. "Rasen mähen", "Winterdienst"
+  name      String /// e.g. "Rasen mähen", "Winterdienst"
   type      GardenDutyType @default(custom)
   isDefault Boolean        @default(false)
   sortOrder Int            @default(0)
@@ -783,12 +783,12 @@ model GardenDuty {
 
 /// Publisher assignment to a garden duty.
 model GardenDutyMember {
-  id          String    @id @default(uuid())
+  id          String     @id @default(uuid())
   duty        GardenDuty @relation(fields: [dutyId], references: [id], onDelete: Cascade)
   dutyId      String
   publisher   Publisher  @relation(fields: [publisherId], references: [id], onDelete: Cascade)
   publisherId String
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
 
   @@unique([dutyId, publisherId])
   @@index([publisherId])
@@ -891,9 +891,9 @@ model ChatSettings {
 /// Used by matrix-provisioning.ts to ensure idempotent space creation.
 model MatrixSpaceConfig {
   id        String   @id @default(uuid())
-  spaceId   String   /// Matrix room ID of the space
+  spaceId   String /// Matrix room ID of the space
   spaceName String   @unique /// "Versammlung" or "Dienste"
-  rooms     Json     /// [{ roomId, name, requiredRole }]
+  rooms     Json /// [{ roomId, name, requiredRole }]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -902,10 +902,10 @@ model MatrixSpaceConfig {
 model Notification {
   id          String    @id @default(uuid())
   publisherId String
-  type        String    /// "invitation_received", "invitation_approved", etc.
+  type        String /// "invitation_received", "invitation_approved", etc.
   title       String
   body        String
-  data        Json?     /// { invitationId, partnerId, ... }
+  data        Json? /// { invitationId, partnerId, ... }
   readAt      DateTime?
   createdAt   DateTime  @default(now())
 
@@ -980,18 +980,18 @@ enum CampaignInviteStatus {
 }
 
 model Campaign {
-  id           String             @id @default(uuid())
-  title        String
-  template     CampaignTemplate
-  status       CampaignStatus     @default(draft)
-  startDate    DateTime
-  endDate      DateTime
-  matrixRoomId String?
-  createdBy    String             /// keycloakSub of creator
-  invitations  CampaignInvite[]
+  id            String                 @id @default(uuid())
+  title         String
+  template      CampaignTemplate
+  status        CampaignStatus         @default(draft)
+  startDate     DateTime
+  endDate       DateTime
+  matrixRoomId  String?
+  createdBy     String /// keycloakSub of creator
+  invitations   CampaignInvite[]
   meetingPoints CampaignMeetingPoint[]
-  createdAt    DateTime           @default(now())
-  deletedAt    DateTime?          /// auto-delete 7 days after endDate
+  createdAt     DateTime               @default(now())
+  deletedAt     DateTime? /// auto-delete 7 days after endDate
 }
 
 model CampaignInvite {
@@ -1015,10 +1015,10 @@ model CampaignMeetingPoint {
   id           String   @id @default(uuid())
   campaignId   String
   campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  conductorId  String   /// publisherId of conductor
+  conductorId  String /// publisherId of conductor
   assistantIds String[] /// publisherIds of assistants
   territoryIds String[] /// territory IDs assigned to this meeting point
-  name         String?  /// Meeting point name/location
+  name         String? /// Meeting point name/location
   latitude     Float?
   longitude    Float?
   address      String?
@@ -1026,10 +1026,10 @@ model CampaignMeetingPoint {
   time         String?
   createdAt    DateTime @default(now())
 
-  syncVersion  Int       @default(0)
-  deletedAt    DateTime?
+  syncVersion Int       @default(0)
+  deletedAt   DateTime?
 
-  fieldServiceMeetingPointId String?  /// Optional link to permanent meeting point
+  fieldServiceMeetingPointId String? /// Optional link to permanent meeting point
   fieldServiceMeetingPoint   FieldServiceMeetingPoint? @relation(fields: [fieldServiceMeetingPointId], references: [id])
 
   fieldGroups CampaignFieldGroup[]
@@ -1039,22 +1039,22 @@ model CampaignMeetingPoint {
 }
 
 model CampaignFieldGroup {
-  id              String           @id @default(uuid())
-  meetingPointId  String
-  meetingPoint    CampaignMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
-  name            String?
-  memberIds       String[]         /// publisherIds
-  territoryIds    String[]         /// territory IDs (a group can work multiple territories)
-  sessionDate     DateTime?        @db.Date
-  sessionTime     String?
-  status          FieldGroupStatus @default(open)
-  startedAt       DateTime?
-  closedAt        DateTime?
-  notes           String?
-  joinCode        String?          /// 6-char alphanumeric join code, unique while active
-  createdAt       DateTime         @default(now())
+  id             String               @id @default(uuid())
+  meetingPointId String
+  meetingPoint   CampaignMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
+  name           String?
+  memberIds      String[] /// publisherIds
+  territoryIds   String[] /// territory IDs (a group can work multiple territories)
+  sessionDate    DateTime?            @db.Date
+  sessionTime    String?
+  status         FieldGroupStatus     @default(open)
+  startedAt      DateTime?
+  closedAt       DateTime?
+  notes          String?
+  joinCode       String? /// 6-char alphanumeric join code, unique while active
+  createdAt      DateTime             @default(now())
 
-  locationShares  LocationShare[]
+  locationShares LocationShare[]
 
   @@index([meetingPointId])
 }
@@ -1066,20 +1066,20 @@ enum LocationDuration {
 }
 
 model LocationShare {
-  id             String            @id @default(uuid())
-  fieldGroupId   String
-  fieldGroup     CampaignFieldGroup @relation(fields: [fieldGroupId], references: [id], onDelete: Cascade)
-  publisherId    String
-  publisher      Publisher         @relation(fields: [publisherId], references: [id], onDelete: Cascade)
-  lastLatitude   Float?            /// Cleared on deactivation
-  lastLongitude  Float?            /// Cleared on deactivation
-  heading        Float?            /// Compass heading in degrees (0-360)
-  accuracy       Float?            /// GPS accuracy in meters
-  isActive       Boolean           @default(true)
-  duration       LocationDuration
-  consentedAt    DateTime          @default(now())
-  lastUpdatedAt  DateTime?
-  expiresAt      DateTime          /// Auto-expire after duration
+  id            String             @id @default(uuid())
+  fieldGroupId  String
+  fieldGroup    CampaignFieldGroup @relation(fields: [fieldGroupId], references: [id], onDelete: Cascade)
+  publisherId   String
+  publisher     Publisher          @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  lastLatitude  Float? /// Cleared on deactivation
+  lastLongitude Float? /// Cleared on deactivation
+  heading       Float? /// Compass heading in degrees (0-360)
+  accuracy      Float? /// GPS accuracy in meters
+  isActive      Boolean            @default(true)
+  duration      LocationDuration
+  consentedAt   DateTime           @default(now())
+  lastUpdatedAt DateTime?
+  expiresAt     DateTime /// Auto-expire after duration
 
   @@index([fieldGroupId, isActive])
   @@index([publisherId])
@@ -1102,19 +1102,19 @@ enum ServiceFieldGroupStatus {
 
 /// Permanent, recurring meeting point for regular field service.
 model FieldServiceMeetingPoint {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   tenantId        String
   name            String
   address         String?
   latitude        Float?
   longitude       Float?
-  dayOfWeek       Int      /// 0=Sun, 1=Mon, ..., 6=Sat
-  time            String   /// "HH:MM" format
-  conductorId     String?  /// Default conductor (Publisher ID)
+  dayOfWeek       Int /// 0=Sun, 1=Mon, ..., 6=Sat
+  time            String /// "HH:MM" format
+  conductorId     String? /// Default conductor (Publisher ID)
   assistantIds    String[] /// Default assistant Publisher IDs
   territoryIds    String[] /// Default territory IDs to work
   maxParticipants Int?
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   notes           String?
   createdBy       String
   createdAt       DateTime  @default(now())
@@ -1130,27 +1130,27 @@ model FieldServiceMeetingPoint {
 
 /// Concrete, scheduled instance of field service at a meeting point.
 model ServiceGroupMeeting {
-  id              String               @id @default(uuid())
-  tenantId        String
-  meetingPointId  String
-  meetingPoint    FieldServiceMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
-  serviceGroupId  String?              /// Optional link to existing ServiceGroup
-  campaignId      String?              /// If set, this is a campaign-linked meeting
-  date            DateTime             /// Concrete date of meeting
-  time            String               /// "HH:MM" format
-  conductorId     String               /// Conductor for this meeting
-  status          ServiceMeetingStatus @default(planned)
-  notes           String?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  createdBy       String
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  syncVersion     Int                  @default(0)
-  deletedAt       DateTime?
+  id             String                   @id @default(uuid())
+  tenantId       String
+  meetingPointId String
+  meetingPoint   FieldServiceMeetingPoint @relation(fields: [meetingPointId], references: [id], onDelete: Cascade)
+  serviceGroupId String? /// Optional link to existing ServiceGroup
+  campaignId     String? /// If set, this is a campaign-linked meeting
+  date           DateTime /// Concrete date of meeting
+  time           String /// "HH:MM" format
+  conductorId    String /// Conductor for this meeting
+  status         ServiceMeetingStatus     @default(planned)
+  notes          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdBy      String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  syncVersion    Int                      @default(0)
+  deletedAt      DateTime?
 
-  signups         ServiceMeetingSignup[]
-  fieldGroups     ServiceMeetingFieldGroup[]
+  signups     ServiceMeetingSignup[]
+  fieldGroups ServiceMeetingFieldGroup[]
 
   @@index([tenantId])
   @@index([meetingPointId])
@@ -1159,12 +1159,12 @@ model ServiceGroupMeeting {
 
 /// Publisher self-enrollment for a service meeting.
 model ServiceMeetingSignup {
-  id          String    @id @default(uuid())
+  id          String              @id @default(uuid())
   tenantId    String
   meetingId   String
   meeting     ServiceGroupMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   publisherId String
-  signedUpAt  DateTime  @default(now())
+  signedUpAt  DateTime            @default(now())
   cancelledAt DateTime?
 
   @@unique([meetingId, publisherId])
@@ -1177,10 +1177,10 @@ model ServiceMeetingFieldGroup {
   tenantId     String
   meetingId    String
   meeting      ServiceGroupMeeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  name         String?                 /// "Gruppe 1", "Gruppe 2"
-  leaderId     String                  /// Group leader Publisher ID
-  memberIds    String[]                /// Publisher IDs in this group
-  territoryIds String[]                /// Assigned territory IDs
+  name         String? /// "Gruppe 1", "Gruppe 2"
+  leaderId     String /// Group leader Publisher ID
+  memberIds    String[] /// Publisher IDs in this group
+  territoryIds String[] /// Assigned territory IDs
   status       ServiceFieldGroupStatus @default(planned)
   startedAt    DateTime?
   completedAt  DateTime?
@@ -1201,7 +1201,7 @@ model ServiceLocationShare {
   publisherId   String
   latitude      Float
   longitude     Float
-  accuracy      Float?                   /// GPS accuracy in meters
+  accuracy      Float? /// GPS accuracy in meters
   isActive      Boolean                  @default(true)
   startedAt     DateTime                 @default(now())
   lastUpdatedAt DateTime                 @default(now())
@@ -1217,9 +1217,9 @@ model ServiceLocationShare {
 /// Defaults: territories/talks → publisher, speakers → elder
 model SharingVisibility {
   id        String   @id @default(uuid())
-  partnerId String   // The sharing partner's tenantId (from central-api)
-  category  String   // "speakers" | "territories"
-  minRole   String   // "enabled" | "disabled"
+  partnerId String // The sharing partner's tenantId (from central-api)
+  category  String // "speakers" | "territories"
+  minRole   String // "enabled" | "disabled"
   depth     String   @default("boundary") /// "boundary" | "addresses" | "full"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1235,13 +1235,13 @@ model TerritoryShare {
   territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
   codeHash    String    @unique /// SHA-256 of share code
   scope       String    @default("boundary") /// "boundary" | "addresses" | "full"
-  pinHash     String?   /// SHA-256 hash of PIN (required for scope=full)
+  pinHash     String? /// SHA-256 hash of PIN (required for scope=full)
   pinAttempts Int       @default(0)
   expiresAt   DateTime
   revokedAt   DateTime?
-  revokedBy   String?   /// publisherId
+  revokedBy   String? /// publisherId
   isActive    Boolean   @default(true)
-  createdBy   String    /// publisherId
+  createdBy   String /// publisherId
   createdAt   DateTime  @default(now())
   syncVersion Int       @default(0)
   deletedAt   DateTime?
@@ -1253,13 +1253,13 @@ model TerritoryShare {
 }
 
 model ShareAccessLog {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   shareId   String
   share     TerritoryShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
-  ipHash    String   /// SHA-256 of IP
+  ipHash    String /// SHA-256 of IP
   userAgent String?
-  scope     String   /// What was actually viewed
-  createdAt DateTime @default(now())
+  scope     String /// What was actually viewed
+  createdAt DateTime       @default(now())
 
   @@index([shareId])
   @@index([createdAt])
@@ -1268,34 +1268,34 @@ model ShareAccessLog {
 // ─── Territory Addresses & OSM ──────────────────────────────────────
 
 model Address {
-  id           String        @id @default(uuid())
-  territoryId  String
-  territory    Territory     @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  osmId        String?       /// OSM node/way ID
-  lat          Float
-  lng          Float
+  id              String        @id @default(uuid())
+  territoryId     String
+  territory       Territory     @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  osmId           String? /// OSM node/way ID
+  lat             Float
+  lng             Float
   // point column added via raw SQL (PostGIS)
-  street       String?
-  houseNumber  String?
-  city         String?
-  postcode     String?
-  buildingType String?       /// e.g. "apartments", "house", "yes"
-  units        Int           @default(1)
-  bellCount    Int           @default(1) /// Number of doorbells/units
-  floor        String?
-  type         AddressType   @default(residential)
-  status       AddressStatus @default(active)
-  source       AddressSource @default(manual)
-  languages    String[]      /// ISO 639-1 codes spoken here
-  doNotCallReason  String?   /// Reason for DNC status
-  doNotVisitUntil  DateTime? /// Temporary DNC expiry
-  notes        String?
-  lastVisitAt  DateTime?
-  sortOrder    Int           @default(0)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  syncVersion  Int           @default(0)
-  deletedAt    DateTime?
+  street          String?
+  houseNumber     String?
+  city            String?
+  postcode        String?
+  buildingType    String? /// e.g. "apartments", "house", "yes"
+  units           Int           @default(1)
+  bellCount       Int           @default(1) /// Number of doorbells/units
+  floor           String?
+  type            AddressType   @default(residential)
+  status          AddressStatus @default(active)
+  source          AddressSource @default(manual)
+  languages       String[] /// ISO 639-1 codes spoken here
+  doNotCallReason String? /// Reason for DNC status
+  doNotVisitUntil DateTime? /// Temporary DNC expiry
+  notes           String?
+  lastVisitAt     DateTime?
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  syncVersion     Int           @default(0)
+  deletedAt       DateTime?
 
   visits AddressVisit[]
 
@@ -1325,14 +1325,14 @@ model LocalOsmFeature {
   id           String       @id @default(uuid())
   territoryId  String
   territory    Territory    @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  osmId        String?      /// Nullable for user-created features
+  osmId        String? /// Nullable for user-created features
   featureType  LocalOsmType
-  tags         Json         /// Raw OSM tags
-  geometry     Json         /// GeoJSON geometry
-  enrichedName String?      /// Manual name override
-  enrichedType String?      /// Manual type override
-  createdBy    String?      /// publisherId
-  updatedBy    String?      /// publisherId
+  tags         Json /// Raw OSM tags
+  geometry     Json /// GeoJSON geometry
+  enrichedName String? /// Manual name override
+  enrichedType String? /// Manual type override
+  createdBy    String? /// publisherId
+  updatedBy    String? /// publisherId
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -1345,17 +1345,30 @@ model IgnoredOsmBuilding {
   territoryId   String
   territory     Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
   osmId         String
-  reason        String    /// Required reason for ignoring
+  reason        String /// Required reason for ignoring
   notes         String?
-  evidence      String?   /// What evidence prompted the ignore
+  evidence      String? /// What evidence prompted the ignore
   lat           Float?
   lng           Float?
   streetAddress String?
   buildingType  String?
-  ignoredBy     String    /// publisherId
+  ignoredBy     String /// publisherId
   createdAt     DateTime  @default(now())
 
   @@unique([territoryId, osmId])
+}
+
+model BuildingOverride {
+  id                String    @id @default(uuid())
+  osmId             String    @unique
+  overriddenType    String?
+  overriddenAddress String?
+  triageStatus      String    @default("unreviewed") /// unreviewed, confirmed_residential, ignored, needs_visit
+  notes             String?
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model OsmRefreshQueue {
@@ -1377,18 +1390,18 @@ model OsmRefreshQueue {
 }
 
 model GapDetectionRun {
-  id              String    @id @default(uuid())
-  territoryId     String
-  territory       Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
-  status          String    @default("pending") /// pending, running, completed, failed
-  totalBuildings  Int?
-  coveredCount    Int?
-  gapCount        Int?
-  resultGeoJson   Json?     /// GeoJSON of uncovered areas
-  startedAt       DateTime?
-  completedAt     DateTime?
-  runBy           String    /// publisherId
-  createdAt       DateTime  @default(now())
+  id             String    @id @default(uuid())
+  territoryId    String
+  territory      Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  status         String    @default("pending") /// pending, running, completed, failed
+  totalBuildings Int?
+  coveredCount   Int?
+  gapCount       Int?
+  resultGeoJson  Json? /// GeoJSON of uncovered areas
+  startedAt      DateTime?
+  completedAt    DateTime?
+  runBy          String /// publisherId
+  createdAt      DateTime  @default(now())
 
   @@index([territoryId])
 }
@@ -1426,15 +1439,15 @@ model Tenant {
   tunnelId       String?
   tunnelToken    String?
   ztAppId        String?
-  discoverable   Boolean  @default(false)
+  discoverable   Boolean      @default(false)
   centroidLat    Float?
   centroidLng    Float?
   circuitNumber  String?
   region         String?
   country        String?
   city           String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   activatedAt    DateTime?
 
   @@ignore
@@ -1472,7 +1485,7 @@ model SharingApproval {
   requesterId           String
   approverId            String
   status                SharingStatus @default(PENDING)
-  offeredCategories     Json     @default("[\"speakers\",\"territories\"]")
+  offeredCategories     Json          @default("[\"speakers\",\"territories\"]")
   acceptedCategories    Json?
   requesterContactName  String?
   requesterContactEmail String?
@@ -1481,8 +1494,8 @@ model SharingApproval {
   termsVersion          String?
   rejectedReason        String?
   respondedAt           DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@unique([requesterId, approverId])
   @@ignore
@@ -1491,23 +1504,23 @@ model SharingApproval {
 // ─── Device Registration & Push Subscriptions ───────────────────────
 
 model Device {
-  id            String    @id @default(uuid())
-  tenantId      String
-  userId        String
-  deviceUuid    String
-  userAgent     String
-  platform      String
-  screenSize    String
-  displayName   String
-  encSalt       String
-  status        String    @default("active")
-  revokedAt     DateTime?
-  revokedBy     String?
-  revokeReason  String?
-  lastSyncAt    DateTime?
-  lastIp        String?
-  registeredAt  DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  deviceUuid   String
+  userAgent    String
+  platform     String
+  screenSize   String
+  displayName  String
+  encSalt      String
+  status       String    @default("active")
+  revokedAt    DateTime?
+  revokedBy    String?
+  revokeReason String?
+  lastSyncAt   DateTime?
+  lastIp       String?
+  registeredAt DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   pushSubscription PushSubscription?
 
@@ -1516,16 +1529,16 @@ model Device {
 }
 
 model PushSubscription {
-  id          String   @id @default(uuid())
-  tenantId    String
-  deviceId    String   @unique
-  endpoint    String
-  p256dh      String
-  auth        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String   @unique
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
 }
@@ -1600,4 +1613,15 @@ model TenantAuditLog {
 
   @@index([tenantId, createdAt])
   @@ignore
+}
+
+model HexGridCache {
+  id            String   @id @default(uuid())
+  boundaryHash  String
+  resolution    Int
+  hexIndexes    String[]
+  buildingCount Int?
+  createdAt     DateTime @default(now())
+
+  @@unique([boundaryHash, resolution])
 }

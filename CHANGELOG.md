@@ -21,6 +21,37 @@ Format: [CalVer](https://calver.org/) — `YYYY.MM.DD.TS`
 - test: route handler tests for maintenance (19 tests) and preventive (10 tests) endpoints
 - chore: bump version to 2026.04.05.1
 
+## v2026.04.04.25
+
+### Fix: Smart Resolve includes uncertain buildings
+- fix: include "low" severity buildings (building=yes without address) in Smart Resolve analysis
+- fix: 94 of 102 uncovered buildings were silently excluded because `yes` type → "low" severity was filtered out
+
+## v2026.04.04.24
+
+### Fix: H3 Hex Grid Resolution & Concurrency
+- fix: reduce H3 resolution from 8 to 7 — 265 hexes → ~38 hexes for congregation polygon
+- fix: batch 3 concurrent Overpass queries per round with 1.5s inter-batch delay
+- fix: resolves "Failed to fetch" timeout on gap detection run (~265s → ~20s)
+
+## v2026.04.04.23
+
+### H3 Hexagonal Grid for Overpass Spatial Tiling
+- feat: H3 hex grid engine (`hub-api/src/lib/hex-grid.ts`) — polygonToHexes, hexToBBox, hexToGeoJSON, subdivideHexes, pointToHex, hashBoundary (#296)
+- feat: `queryBuildingsInPolygon()` in osm-overpass.ts — hex-based Overpass tiling replaces bbox queries
+- feat: `HexGridCache` Prisma model for caching hex computations per boundary+resolution
+- feat: gap detection route now uses H3 hex tiling instead of bounding box queries
+- feat: 14 unit tests for hex-grid engine
+- fix: Overpass 504 timeouts on large congregation boundaries (~20km × 20km)
+
+## v2026.04.03.11
+
+### Gap Detection Filter & Auto-Fix Bugs
+- feat: add building type filter chips to gap detection sidebar (toggle shed, barn, commercial, etc.)
+- fix: handle MultiPolygon geometry in territory edit mode (Edit button stops working after first save)
+- fix: bulk fix uses `runAutoFixPipeline`, matching single-fix behavior (was failing with inline PostGIS)
+- fix: Branch-KML-Import file picker accept attribute (macOS text/plain MIME type)
+
 ## v2026.04.03.9
 
 ### Territory Management Features

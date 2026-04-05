@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hubport — Weekend Meeting Planner</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #09090b; --bg-1: #111113; --bg-2: #1a1a1d;
+    --text: #e4e4e7; --text-muted: #71717a; --text-dim: #52525b;
+    --border: #27272a; --border-hover: #3f3f46;
+    --amber: #f59e0b; --amber-light: #fbbf24; --amber-dim: rgba(245,158,11,0.15);
+    --green: #22c55e; --red: #ef4444; --blue: #3b82f6;
+    --talk: #047857; --study: #4a6da7;
+    --technik: #475569; --ordnung: #047857; --reinigung: #92400e;
+    --radius: 10px; --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+
+  /* Strip — WT Study editions (now in sidebar) */
+  .sc { flex-shrink: 0; width: 80px; border-radius: 6px; border: 1px solid var(--border); overflow: hidden; background: var(--bg-1); cursor: default; }
+  .sc.now { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
+  .sc.active { border-color: var(--study); box-shadow: 0 0 0 1px rgba(74,109,167,0.4); transform: translateY(-2px); }
+  .sc.dim { opacity: 0.3; }
+  .sc .img { height: 90px; background: var(--bg-2); position: relative; overflow: hidden; }
+  .sc .img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sc .img .t { position: absolute; padding: 1px 4px; font-size: 7px; font-weight: 700; border-radius: 2px; }
+  .sc .img .t.r { top: 3px; right: 3px; background: var(--amber); color: #000; }
+  .sc .img .t.l { top: 3px; left: 3px; background: #2563eb; color: #fff; }
+  .sc .bot { padding: 3px 4px; }
+  .sc .bot .lb { font-size: 8px; font-weight: 500; color: var(--text-muted); }
+  .sc .bot .reimp { display: block; margin-top: 2px; font-size: 7px; color: var(--text-dim); text-align: center; cursor: pointer; }
+  .sc .bot .reimp:hover { color: var(--amber); }
+
+  /* Week Nav */
+  .wnav { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 14px; }
+  .wnav .arr { background: var(--bg-1); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .wnav .arr:hover { background: var(--bg-2); color: var(--text); border-color: var(--border-hover); }
+  .wnav .mid { text-align: center; }
+  .wnav .date { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .wnav .sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .wnav .sub .tw { color: var(--amber); font-weight: 600; }
+
+  /* Dots */
+  .dots { display: flex; gap: 4px; justify-content: center; margin-bottom: 16px; }
+  .d { width: 6px; height: 6px; border-radius: 50%; background: #2a2a2a; cursor: pointer; transition: all 0.15s; }
+  .d:hover { background: #444; }
+  .d.a { width: 20px; border-radius: 3px; background: var(--amber); }
+
+  /* Layout */
+  .grid2 { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* Program Card */
+  .pcard { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--bg-1); box-shadow: var(--shadow); }
+
+  /* Song */
+  .song { display: flex; align-items: center; gap: 10px; padding: 7px 14px; }
+  .song svg { width: 13px; height: 13px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .song .st { font-size: 12px; font-weight: 500; flex: 1; }
+  .song.tk { background: rgba(4,120,87,0.08); border-left: 3px solid var(--talk); color: var(--talk); }
+  .song.sd { background: rgba(74,109,167,0.08); border-left: 3px solid var(--study); color: var(--study); }
+
+  /* Prayer */
+  .pray { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: rgba(255,255,255,0.015); }
+  .pray svg { width: 12px; height: 12px; color: var(--text-dim); flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; }
+  .pray .pt { font-size: 12px; color: var(--text-muted); flex: 1; }
+  .pray .pn { font-size: 12px; font-weight: 500; }
+  .pray .pn.auto { opacity: 0.5; font-style: italic; }
+
+  /* Section header */
+  .sh { padding: 6px 14px; }
+  .sh span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.95); }
+  .sh.tk { background: var(--talk); }
+  .sh.sd { background: var(--study); }
+
+  /* Section body */
+  .sb.tk { background: rgba(4,120,87,0.04); }
+  .sb.sd { background: rgba(74,109,167,0.04); }
+
+  /* Part row */
+  .pr { display: flex; align-items: center; gap: 10px; padding: 8px 14px; transition: background 0.1s; }
+  .pr:hover { background: rgba(255,255,255,0.02); }
+  .pr + .pr { border-top: 1px solid rgba(255,255,255,0.03); }
+  .pr svg { width: 13px; height: 13px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pr .c { flex: 1; min-width: 0; }
+  .pr .c .tt { font-size: 12px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
+  .pr .c .su { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .pr .r { display: flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
+  .dur { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+  .asg { font-size: 12px; font-weight: 500; }
+  .asg.y { color: var(--text); }
+  .asg.n { color: var(--text-dim); font-style: italic; }
+  .eb { font-size: 9px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; background: none; color: var(--text-muted); cursor: pointer; line-height: 1; }
+  .eb:hover { background: var(--bg-2); border-color: var(--border-hover); }
+
+  /* Talk info block */
+  .talk-info { padding: 10px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .talk-info .speaker { display: flex; align-items: center; gap: 6px; }
+  .talk-info .speaker-name { font-size: 13px; font-weight: 600; }
+  .talk-info .speaker-cong { font-size: 10px; color: var(--text-dim); }
+  .talk-info .talk-title { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .talk-info .talk-num { font-size: 10px; color: var(--text-dim); }
+
+  /* Invitation badge */
+  .inv-badge { font-size: 8px; font-weight: 600; padding: 1px 6px; border-radius: 8px; }
+  .inv-badge.confirmed { background: #14532d; color: #86efac; }
+  .inv-badge.invited { background: #1e3a5f; color: #93c5fd; }
+  .inv-badge.draft { background: #374151; color: #9ca3af; }
+
+  /* Stacked names */
+  .dn { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .dn .row { display: flex; align-items: center; gap: 4px; }
+
+  /* Sidebar */
+  .side { display: flex; flex-direction: column; gap: 10px; }
+  .dg { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--bg-1); box-shadow: var(--shadow); }
+  .dgh { padding: 5px 12px; display: flex; align-items: center; gap: 6px; }
+  .dgh span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: rgba(255,255,255,0.9); }
+  .dgh svg { width: 11px; height: 11px; fill: none; stroke: rgba(255,255,255,0.7); stroke-width: 2; }
+  .dgh.tk { background: var(--technik); }
+  .dgh.od { background: var(--ordnung); }
+  .dgh.rn { background: var(--reinigung); }
+  .dr { display: flex; align-items: center; justify-content: space-between; padding: 5px 12px; }
+  .dr + .dr { border-top: 1px solid rgba(255,255,255,0.03); }
+  .dr .dl { font-size: 11px; color: var(--text-muted); }
+  .dr .rv { display: flex; align-items: center; gap: 4px; }
+  .dr .dn2 { font-size: 11px; font-weight: 500; }
+  .dr .dn2.y { color: var(--text); }
+  .dr .dn2.n { color: var(--text-dim); font-style: italic; }
+  .eb2 { font-size: 8px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; background: none; color: var(--text-dim); cursor: pointer; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; text-align: center; }
+  .stat .sl { font-size: 9px; color: var(--text-muted); }
+  .stat .sv { font-size: 18px; font-weight: 700; }
+  .stat .sv.g { color: var(--green); }
+  .stat .sv.a { color: var(--amber); }
+
+  /* Action buttons */
+  .actions { display: flex; gap: 6px; }
+  .btn-pub { flex: 1; padding: 7px; font-size: 11px; font-weight: 600; background: var(--green); color: #000; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .btn-sec { padding: 7px 12px; font-size: 11px; border: 1px solid var(--border); background: none; color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .btn-pub svg, .btn-sec svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Weekend Meeting Planner</h1>
+  </div>
+
+  <!-- Week Navigator -->
+  <div class="wnav">
+    <button class="arr">&#8249;</button>
+    <div class="mid">
+      <div class="date">Sonntag, 29. März 2026</div>
+      <div class="sub">Woche 23.&ndash;29. März &middot; <span class="tw">Diese Woche</span></div>
+    </div>
+    <button class="arr">&#8250;</button>
+  </div>
+
+  <div class="dots">
+    <div class="d a" title="29. Mar"></div>
+    <div class="d" title="5. Apr"></div>
+    <div class="d" title="12. Apr"></div>
+    <div class="d" title="19. Apr"></div>
+    <div class="d" title="26. Apr"></div>
+  </div>
+
+  <!-- Single Weekend Meeting View -->
+  <div class="grid2">
+    <div>
+      <div class="pcard">
+        <!-- Chairman — always first, amber tint -->
+        <div class="pray" style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(245,158,11,0.04);">
+          <svg viewBox="0 0 24 24" style="color:var(--amber)"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <span class="pt" style="color:var(--amber);font-weight:500;">Vorsitzender</span>
+          <span class="pn">M. Weber</span>
+          <button class="eb">&#9998;</button>
+        </div>
+
+        <!-- Opening Song -->
+        <div class="song tk">
+          <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span class="st">Lied 52</span>
+        </div>
+
+        <!-- Opening Prayer -->
+        <div class="pray">
+          <svg viewBox="0 0 24 24"><path d="M7 11v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-7a5 5 0 0 1 10 0v1"/><path d="M11 12v7a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-7a5 5 0 0 1 10 0v1"/></svg>
+          <span class="pt">Gebet</span>
+          <span class="pn">T. Braun</span>
+          <button class="eb">&#9998;</button>
+        </div>
+
+        <!-- PUBLIC TALK section -->
+        <div class="sh tk"><span>Öffentlicher Vortrag</span></div>
+        <div class="sb tk">
+          <div class="talk-info">
+            <div class="speaker">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px;color:var(--talk)"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              <span class="speaker-name">H. Zimmermann</span>
+              <span class="speaker-cong">Versammlung Nordwest</span>
+              <span class="inv-badge confirmed">Bestätigt</span>
+            </div>
+            <div class="talk-title">#15: Warum kann man der Bibel vertrauen?</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
+              <span class="dur">30 min</span>
+              <button class="eb">&#9998;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle Song -->
+        <div class="song sd">
+          <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span class="st">Lied 118</span>
+        </div>
+
+        <!-- WATCHTOWER STUDY section -->
+        <div class="sh sd"><span>Wachtturm-Studium</span></div>
+        <div class="sb sd">
+          <div class="pr">
+            <svg viewBox="0 0 24 24" style="color:var(--study)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            <div class="c">
+              <div class="tt"><a href="https://wol.jw.org" style="color:var(--text);text-decoration:none;">Jehova ist der Gott der Gerechtigkeit</a></div>
+              <div class="su">Studienartikel 13 &middot; w26 März S. 8-12</div>
+            </div>
+            <div class="r">
+              <span class="dur">60 min</span>
+              <div class="dn">
+                <div class="row"><span class="asg y">P. Richter</span></div>
+                <div class="row"><span class="asg y">S. Lang</span></div>
+              </div>
+              <button class="eb">&#9998;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Closing Song -->
+        <div class="song sd">
+          <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span class="st">Lied 87</span>
+        </div>
+
+        <!-- Closing Prayer -->
+        <div class="pray">
+          <svg viewBox="0 0 24 24"><path d="M7 11v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-7a5 5 0 0 1 10 0v1"/><path d="M11 12v7a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-7a5 5 0 0 1 10 0v1"/></svg>
+          <span class="pt">Schlussgebet</span>
+          <span class="pn">A. Schmidt</span>
+          <button class="eb">&#9998;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="side">
+      <!-- WT Study Edition Strip (in sidebar, above duties) -->
+      <div class="dg">
+        <div style="padding:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+          <div class="sc now active" style="width:56px;margin:0;">
+            <div class="img" style="height:64px;"><img src="https://cms-imgp.jw-cdn.org/img/p/w/2026/163/univ/art/w_univ_202603_lg.jpg"><span class="t r">Now</span><span class="t l" style="font-size:6px;">&#10003;</span></div>
+            <div class="bot" style="padding:2px 3px;"><div class="lb" style="font-size:7px;">Mär/Apr</div><span class="reimp" style="font-size:6px;">&#8635;</span></div>
+          </div>
+          <div class="sc" style="width:56px;margin:0;">
+            <div class="img" style="height:64px;"><img src="https://cms-imgp.jw-cdn.org/img/p/w/2026/165/univ/art/w_univ_202605_lg.jpg"><span class="t l" style="font-size:6px;">&#10003;</span></div>
+            <div class="bot" style="padding:2px 3px;"><div class="lb" style="font-size:7px;">Mai/Jun</div><span class="reimp" style="font-size:6px;">&#8635;</span></div>
+          </div>
+          <div class="sc" style="width:56px;margin:0;">
+            <div class="img" style="height:64px;"><img src="https://cms-imgp.jw-cdn.org/img/p/w/2026/167/univ/art/w_univ_202607_lg.jpg"></div>
+            <div class="bot" style="padding:2px 3px;"><div class="lb" style="font-size:7px;">Jul/Aug</div></div>
+          </div>
+          <div class="sc dim" style="width:56px;margin:0;">
+            <div class="img" style="height:64px;display:flex;align-items:center;justify-content:center;color:#444;font-size:8px">&#8212;</div>
+            <div class="bot" style="padding:2px 3px;"><div class="lb" style="font-size:7px;">Sep/Okt</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technik -->
+      <div class="dg">
+        <div class="dgh tk">
+          <svg viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+          <span>Technik</span>
+        </div>
+        <div class="dr"><span class="dl">Sound</span><div class="rv"><span class="dn2 y">R. Bauer</span><button class="eb2">&#9998;</button></div></div>
+        <div class="dr"><span class="dl">Video / PC</span><div class="rv"><span class="dn2 y">M. Klein</span><button class="eb2">&#9998;</button></div></div>
+        <div class="dr"><span class="dl">Mikrofon 1</span><div class="rv"><span class="dn2 n">&mdash;</span><button class="eb2" style="color:var(--amber)">+</button></div></div>
+        <div class="dr"><span class="dl">Mikrofon 2</span><div class="rv"><span class="dn2 n">&mdash;</span><button class="eb2" style="color:var(--amber)">+</button></div></div>
+        <div class="dr"><span class="dl">Bühne</span><div class="rv"><span class="dn2 n">&mdash;</span><button class="eb2" style="color:var(--amber)">+</button></div></div>
+        <div class="dr"><span class="dl">Zoom</span><div class="rv"><span class="dn2 y">T. Braun</span><button class="eb2">&#9998;</button></div></div>
+      </div>
+
+      <!-- Ordnungsdienst -->
+      <div class="dg">
+        <div class="dgh od">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Ordnungsdienst</span>
+        </div>
+        <div class="dr"><span class="dl">Saaldiener 1</span><div class="rv"><span class="dn2 y">F. Maier</span><button class="eb2">&#9998;</button></div></div>
+        <div class="dr"><span class="dl">Saaldiener 2</span><div class="rv"><span class="dn2 n">&mdash;</span><button class="eb2" style="color:var(--amber)">+</button></div></div>
+      </div>
+
+      <!-- Reinigung -->
+      <div class="dg">
+        <div class="dgh rn">
+          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span>Reinigung</span>
+        </div>
+        <div class="dr"><span class="dl">Grundreinigung</span><div class="rv"><span class="dn2 n">&mdash;</span></div></div>
+        <div class="dr"><span class="dl">Sichtreinigung</span><div class="rv"><span class="dn2 n">&mdash;</span></div></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat"><div class="sl">Zugewiesen</div><div class="sv g">7</div></div>
+        <div class="stat"><div class="sl">Offen</div><div class="sv a">8</div></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="btn-pub">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Veröffentlichen
+        </button>
+        <button class="btn-sec">
+          <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Drucken
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

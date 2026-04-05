@@ -86,6 +86,11 @@ function getSegmentIndices(
 /**
  * Build a replacement polygon from original coords, replacing the segment
  * between startIdx and endIdx with new coordinates.
+ *
+ * Always replaces the SHORTER segment (fewer original vertices) so that the
+ * majority of the polygon is preserved. This prevents accidentally destroying
+ * the polygon when the user selects two vertices where the forward path
+ * contains most of the ring.
  */
 function buildReplacedPolygon(
   originalCoords: [number, number][],
@@ -97,30 +102,38 @@ function buildReplacedPolygon(
   const vertexCount = originalCoords.length - 1;
   const open = originalCoords.slice(0, vertexCount);
 
+  // Determine which segment is shorter: forward (start→end) or wrapped (start→wrap→end)
+  const forwardLen =
+    startIdx <= endIdx
+      ? endIdx - startIdx + 1
+      : vertexCount - startIdx + endIdx + 1;
+  const wrappedLen = vertexCount - forwardLen + 2; // the other direction
+
+  // Replace the shorter segment, keep the longer one
+  const replaceForward = forwardLen <= wrappedLen;
+
   const result: [number, number][] = [];
 
-  if (startIdx <= endIdx) {
-    // Keep vertices before start
-    for (let i = 0; i < startIdx; i++) result.push(open[i]!);
-    // Insert replacement (start point, replacement interior, end point)
+  if (replaceForward) {
+    // Replace startIdx→endIdx (forward), keep the rest
+    for (let i = endIdx; i !== startIdx; i = (i + 1) % vertexCount) {
+      result.push(open[i]!);
+    }
     result.push(open[startIdx]!);
-    // Add replacement interior coords (skip first and last which are the projected endpoints)
-    for (const coord of replacementCoords) result.push(coord);
-    result.push(open[endIdx]!);
-    // Keep vertices after end
-    for (let i = endIdx + 1; i < vertexCount; i++) result.push(open[i]!);
+    // Add replacement coords (reversed — going from start back toward end)
+    for (let j = replacementCoords.length - 1; j >= 0; j--) {
+      result.push(replacementCoords[j]!);
+    }
   } else {
-    // Wrap-around: keep vertices between end and start (the non-selected part)
-    for (let i = endIdx; i <= startIdx; i++) result.push(open[i % vertexCount]!);
-    // The selected segment wraps around, so replacement goes from start → wrap → end
-    // Actually for wrap case, we keep endIdx..startIdx and replace startIdx..wrap..endIdx
-    // Simpler: just keep the non-selected segment
-    result.length = 0;
+    // Replace the wrapped segment (end→wrap→start), keep startIdx→endIdx forward
+    for (let i = startIdx; i !== endIdx; i = (i + 1) % vertexCount) {
+      result.push(open[i]!);
+    }
     result.push(open[endIdx]!);
-    for (const coord of replacementCoords.reverse()) result.push(coord);
-    result.push(open[startIdx]!);
-    // Fill in the non-selected vertices between end+1 and start-1
-    // Actually let me simplify: always pick the shorter path
+    // Add replacement coords going from end back toward start
+    for (const coord of replacementCoords) {
+      result.push(coord);
+    }
   }
 
   // Close the ring
@@ -200,10 +213,14 @@ function findClipCandidates(
       const projStart = nearestPointOnLine(targetLine, startPoint);
       const projEnd = nearestPointOnLine(targetLine, endPoint);
 
-      // Check distance — skip if either projection is too far (>100m)
+      // Check distance — skip if either projection is too far
+      // Boundaries (congregation/branch) get a generous 500m threshold since
+      // territories commonly extend well beyond their boundary.
+      // Roads and neighbors use a tighter 100m threshold.
       const startDist = projStart.properties.dist ?? Infinity;
       const endDist = projEnd.properties.dist ?? Infinity;
-      if (startDist > 0.1 || endDist > 0.1) continue; // >100m in km
+      const maxDist = target.type === "boundary" ? 0.5 : 0.1; // km
+      if (startDist > maxDist || endDist > maxDist) continue;
 
       // Extract the sub-line between the two projected points
       const sliced = lineSlice(projStart, projEnd, targetLine);
