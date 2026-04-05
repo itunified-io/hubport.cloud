@@ -5,11 +5,18 @@ import prisma from "./prisma.js";
  * Idempotent — safe to run multiple times.
  */
 export async function migrateFacilitiesPermissions(): Promise<void> {
-  // 1. Rename "Cleaning Responsible" role to "Cleaning Coordinator"
-  await prisma.appRole.updateMany({
-    where: { name: "Cleaning Responsible" },
-    data: { name: "Cleaning Coordinator" },
-  });
+  // 1. Rename "Cleaning Responsible" role to "Cleaning Coordinator" (skip if already renamed or target exists)
+  const oldRole = await prisma.appRole.findFirst({ where: { name: "Cleaning Responsible" } });
+  const newRoleExists = await prisma.appRole.findFirst({ where: { name: "Cleaning Coordinator" } });
+  if (oldRole && !newRoleExists) {
+    await prisma.appRole.update({
+      where: { id: oldRole.id },
+      data: { name: "Cleaning Coordinator" },
+    });
+  } else if (oldRole && newRoleExists) {
+    // Both exist — delete the old one (seed already created the new one)
+    await prisma.appRole.delete({ where: { id: oldRole.id } });
+  }
 
   // 2. Migrate permission strings in all AppRole.permissions JSON arrays
   const roles = await prisma.appRole.findMany();
